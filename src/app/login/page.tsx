@@ -35,7 +35,7 @@ export default function LoginPage() {
       setLoading(true);
 
       const response = await fetch(
-        "http://localhost:5000/api/auth/login",
+        "https://backend-five-swart-88.vercel.app/api/auth/login",
         {
           method: "POST",
           headers: {
