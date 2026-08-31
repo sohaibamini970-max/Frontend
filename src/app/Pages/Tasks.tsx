@@ -314,13 +314,22 @@ function StatusSummary({ tasks }: { tasks: Task[] }) {
 
 export default function Tasks() {
 
-  // Check user role
+// ✅ CORRECT - runs only on client
+const [currentUser, setCurrentUser] = useState<any>(null);
+const [isAdmin, setIsAdmin] = useState(false);
+
+useEffect(() => {
   const storedUser = localStorage.getItem("user");
-  const currentUser = storedUser ? JSON.parse(storedUser) : null;
-  const isAdmin =
-    currentUser?.role === "System Administrator" ||
-    currentUser?.role === "Executive Manager" ||
-    currentUser?.role === "Project Manager";
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  setCurrentUser(user);
+  
+  const isAdminUser =
+    user?.role === "System Administrator" ||
+    user?.role === "Executive Manager" ||
+    user?.role === "Project Manager";
+  
+  setIsAdmin(isAdminUser);
+}, []);
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
