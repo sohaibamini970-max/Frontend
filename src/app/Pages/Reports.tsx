@@ -125,7 +125,7 @@ type Permissions = {
 
 type ReportOverviewResponse = {
     success: boolean;
-
+    message?: string;
     user: {
         id: string;
         name: string;

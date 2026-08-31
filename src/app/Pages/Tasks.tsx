@@ -332,7 +332,7 @@ export default function Tasks() {
 
   const [search, setSearch] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
-
+  const [error, setError] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<
     TaskStatus | "All"
   >("All");
@@ -425,7 +425,7 @@ export default function Tasks() {
         setProjects(normalizedProjects);
 
         const taskResponses = await Promise.all(
-          normalizedProjects.map(async (project) => {
+          normalizedProjects.map(async (project: Project) => {
             try {
               const response = await fetch(
                 `${API_BASE}/tasks/project/${project.id}`,
@@ -473,14 +473,14 @@ export default function Tasks() {
 
         const projectsWithTasks =
           normalizedProjects
-            .filter((project) =>
+            .filter((project: Project) =>
               allTasks.some(
                 (task) =>
                   String(task.project_id) ===
                   String(project.id)
               )
             )
-            .map((project) => project.id);
+            .map((project: Project) => project.id);
 
         setExpandedProjects(projectsWithTasks);
 
@@ -647,7 +647,7 @@ export default function Tasks() {
        * has at least one assigned task.
        */
       const myProjects =
-        allProjects.filter((project) =>
+        allProjects.filter((project: Project, projectIndex: number) =>
           projectIds.includes(
             String(project.id)
           )
@@ -661,7 +661,7 @@ export default function Tasks() {
        */
       setExpandedProjects(
         myProjects.map(
-          (project) => project.id
+          (project:Project) => project.id
         )
       );
     } catch (error) {
