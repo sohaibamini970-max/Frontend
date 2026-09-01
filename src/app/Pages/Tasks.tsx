@@ -75,7 +75,7 @@ type User = {
   role?: string;
 };
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = "https://backend-five-swart-88.vercel.app/api";
 
 function getToken() {
   if (typeof window === "undefined") return "";
