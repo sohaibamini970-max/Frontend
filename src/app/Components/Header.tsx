@@ -26,8 +26,7 @@ import {
    API
 ========================================================= */
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_BASE = "https://backend-five-swart-88.vercel.app/api";
 
 /* =========================================================
    TYPES
