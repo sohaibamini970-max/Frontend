@@ -175,7 +175,7 @@ const getTodayDate = () => {
     setAboutDescription("");
     setStartDate("");
     setDeadline("");
-    setDeadError("");
+    setError("");
     setPriority("Medium");
   };
 
