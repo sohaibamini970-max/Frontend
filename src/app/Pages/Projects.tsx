@@ -736,7 +736,7 @@ export default function Projects() {
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <span className="rounded-md border border-violet-100 bg-violet-50 px-2.5 py-1 text-[10px] font-medium text-violet-600">Unassigned</span>
-                                  {isProjectManager && (
+                                  {isExecutiveManager && (
                                     <button type="button" onClick={() => openManualAssign(project.id)} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] font-medium text-gray-600 hover:bg-gray-50">
                                       <UserPlus size={12} />
                                       Assign
