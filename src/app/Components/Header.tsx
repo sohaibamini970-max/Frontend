@@ -588,11 +588,8 @@ export default function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`... ${
-                  active
-                  ? "..."
-                  : "..."
-                  }`}
+                   className={`relative flex h-full items-center text-[13px] font-medium transition ${active ? "text-white" : "text-white/55 hover:text-white"
+                    }`}
                 >
                   {item.name}
 
