@@ -574,7 +574,7 @@ const getTodayDate = () => {
       <MoreVertical size={17} />
     </button>
 
-    {openProjectMenu === project.id && (
+    {openProjectMenu === project.id && isExecutiveManager && (
       <div
         className="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
