@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search, SlidersHorizontal, ChevronDown, MoreVertical, ChevronLeft, ChevronRight, X, Calendar, Users, Flag, UserPlus, GripVertical, Check, User, RefreshCw, ShieldCheck } from "lucide-react";
 
-const API_BASE = "https://backend-five-swart-88.vercel.app/";
+const API_BASE = "https://backend-five-swart-88.vercel.app";
 
 type ProjectStatus = "Unassigned" | "Backlog" | "In Progress" | "Paused" | "Done";
 type ProjectPriority = "Low" | "Medium" | "High";
