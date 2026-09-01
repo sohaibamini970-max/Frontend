@@ -50,32 +50,25 @@ function ManagerAvatar({ manager, small = false }: { manager: ProjectManager; sm
 }
 
 export default function Projects() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [projectManagers, setProjectManagers] = useState<ProjectManager[]>([]);
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingManagers, setLoadingManagers] = useState(false);
-  const [savingProject, setSavingProject] = useState(false);
-  const [assigningProject, setAssigningProject] = useState(false);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [activeView, setActiveView] = useState<"table" | "assignment">("table");
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<ProjectStatus | "All">("All");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [projectName, setProjectName] = useState("");
-  const [projectDomain, setProjectDomain] = useState("");
-  const [aboutTitle, setAboutTitle] = useState("");
-  const [aboutDescription, setAboutDescription] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [dateError, setDateError] = useState("");
-  const [priority, setPriority] = useState<ProjectPriority>("Medium");
-  const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
-  const dragScrollInterval = useRef<number | null>(null);
-   const [openProjectMenu, setOpenProjectMenu] = useState<string | number | null>(null);
+const [editModalOpen, setEditModalOpen] = useState(false);
+const [deadlineModalOpen, setDeadlineModalOpen] = useState(false);
+const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
+const [editProjectName, setEditProjectName] = useState("");
+const [editProjectDomain, setEditProjectDomain] = useState("");
+const [editAboutTitle, setEditAboutTitle] = useState("");
+const [editAboutDescription, setEditAboutDescription] = useState("");
+const [editStartDate, setEditStartDate] = useState("");
+const [editDeadline, setEditDeadline] = useState("");
+const [editPriority, setEditPriority] =
+  useState<ProjectPriority>("Medium");
+
+const [editDateError, setEditDateError] = useState("");
+const [savingEdit, setSavingEdit] = useState(false);
+const [savingDeadline, setSavingDeadline] = useState(false);
+const [deletingProject, setDeletingProject] = useState(false);
 
 const getTodayDate = () => {
   const today = new Date();
@@ -386,6 +379,231 @@ const getTodayDate = () => {
     return () => stopDragAutoScroll();
   }, []);
 
+  const openEditProject = (project: Project) => {
+  if (!isExecutiveManager) return;
+
+  setSelectedProject(project);
+
+  setEditProjectName(project.name || "");
+  setEditProjectDomain(project.domain || "");
+  setEditAboutTitle(project.aboutTitle || "");
+  setEditAboutDescription(project.aboutDescription || "");
+  setEditStartDate(project.startDate || "");
+  setEditDeadline(project.deadline || "");
+  setEditPriority(project.priority || "Medium");
+
+  setEditDateError("");
+  setOpenProjectMenu(null);
+  setEditModalOpen(true);
+};
+
+  const handleUpdateProject = async () => {
+  if (!selectedProject || !isExecutiveManager) return;
+
+  if (!editProjectName.trim()) {
+    setEditDateError("Project name is required.");
+    return;
+  }
+
+  if (
+    editStartDate &&
+    editDeadline &&
+    editDeadline < editStartDate
+  ) {
+    setEditDateError(
+      "Deadline must be greater than or equal to the start date."
+    );
+    return;
+  }
+
+  setEditDateError("");
+
+  try {
+    setSavingEdit(true);
+    setError("");
+
+    const response = await fetch(
+      `${API_BASE}/api/projects/${selectedProject.id}`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: editProjectName.trim(),
+          domain: editProjectDomain.trim(),
+          aboutTitle: editAboutTitle.trim(),
+          aboutDescription: editAboutDescription.trim(),
+          startDate: editStartDate || null,
+          deadline: editDeadline || null,
+          priority: editPriority,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Unable to update project."
+      );
+    }
+
+    const updated = data.project;
+
+    setProjects((prev) =>
+      prev.map((project) =>
+        project.id === selectedProject.id
+          ? {
+              ...project,
+              name: updated.name,
+              domain: updated.domain || "No domain",
+              aboutTitle:
+                updated.about_title || "Project",
+              aboutDescription:
+                updated.about_description || "",
+              startDate: updated.start_date || "",
+              deadline: updated.deadline || "",
+              priority:
+                updated.priority || "Medium",
+            }
+          : project
+      )
+    );
+
+    setEditModalOpen(false);
+    setSelectedProject(null);
+
+  } catch (error: any) {
+    setError(
+      error.message || "Unable to update project."
+    );
+  } finally {
+    setSavingEdit(false);
+  }
+};
+
+  const openDeadlineModal = (project: Project) => {
+  if (!isExecutiveManager) return;
+
+  setSelectedProject(project);
+  setEditDeadline(project.deadline || "");
+  setEditDateError("");
+  setOpenProjectMenu(null);
+  setDeadlineModalOpen(true);
+};
+
+  const handleUpdateDeadline = async () => {
+  if (!selectedProject || !isExecutiveManager) return;
+
+  if (
+    selectedProject.startDate &&
+    editDeadline &&
+    editDeadline < selectedProject.startDate
+  ) {
+    setEditDateError(
+      "Deadline must be greater than or equal to the start date."
+    );
+    return;
+  }
+
+  try {
+    setSavingDeadline(true);
+    setError("");
+    setEditDateError("");
+
+    const response = await fetch(
+      `${API_BASE}/api/projects/${selectedProject.id}/deadline`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          deadline: editDeadline || null,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Unable to update deadline."
+      );
+    }
+
+    const updated = data.project;
+
+    setProjects((prev) =>
+      prev.map((project) =>
+        project.id === selectedProject.id
+          ? {
+              ...project,
+              deadline: updated.deadline || "",
+            }
+          : project
+      )
+    );
+
+    setDeadlineModalOpen(false);
+    setSelectedProject(null);
+
+  } catch (error: any) {
+    setError(
+      error.message || "Unable to update deadline."
+    );
+  } finally {
+    setSavingDeadline(false);
+  }
+};
+
+  const openDeleteProject = (project: Project) => {
+  if (!isExecutiveManager) return;
+
+  setSelectedProject(project);
+  setOpenProjectMenu(null);
+  setDeleteModalOpen(true);
+};
+
+  const handleDeleteProject = async () => {
+  if (!selectedProject || !isExecutiveManager) return;
+
+  try {
+    setDeletingProject(true);
+    setError("");
+
+    const response = await fetch(
+      `${API_BASE}/api/projects/${selectedProject.id}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Unable to delete project."
+      );
+    }
+
+    setProjects((prev) =>
+      prev.filter(
+        (project) =>
+          project.id !== selectedProject.id
+      )
+    );
+
+    setDeleteModalOpen(false);
+    setSelectedProject(null);
+
+  } catch (error: any) {
+    setError(
+      error.message || "Unable to delete project."
+    );
+  } finally {
+    setDeletingProject(false);
+  }
+};
+
   return (
     <>
       <main className="min-h-[calc(100vh-72px)] bg-[#fafafa] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
@@ -574,76 +792,88 @@ const getTodayDate = () => {
       <MoreVertical size={17} />
     </button>
 
-    {openProjectMenu === project.id && isExecutiveManager && (
-      <div
-        className="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Update Project */}
+  {openProjectMenu === project.id && isExecutiveManager &&(
+  <div
+    className="absolute right-0 top-10 z-50 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+    onClick={(e) => e.stopPropagation()}
+  >
+    {isExecutiveManager && (
+      <>
+        {/* UPDATE PROJECT */}
+
         <button
           type="button"
-          onClick={() => {
-            setOpenProjectMenu(null);
-
-            // Open your existing edit/update modal here
-            // setSelectedProject(project);
-            // setEditModalOpen(true);
-          }}
+          onClick={() => openEditProject(project)}
           className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
         >
-          <Edit3 size={16} className="text-gray-500" />
+          <Edit3
+            size={16}
+            className="text-gray-500"
+          />
+
           Update Project
         </button>
 
-        {/* Update Deadline */}
+        {/* UPDATE DEADLINE */}
+
         <button
           type="button"
-          onClick={() => {
-            setOpenProjectMenu(null);
-
-            // Open deadline modal here
-            // setSelectedProject(project);
-            // setDeadlineModalOpen(true);
-          }}
+          onClick={() =>
+            openDeadlineModal(project)
+          }
           className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
         >
-          <Calendar size={16} className="text-gray-500" />
+          <Calendar
+            size={16}
+            className="text-gray-500"
+          />
+
           Update Deadline
         </button>
+      </>
+    )}
 
-        {/* View Project */}
-        <button
-          type="button"
-          onClick={() => {
-            setOpenProjectMenu(null);
+    {/* VIEW PROJECT */}
 
-            // View project
-            // router.push(`/projects/${project.id}`);
-          }}
-          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
-        >
-          <Eye size={16} className="text-gray-500" />
-          View Project
-        </button>
+    <button
+      type="button"
+      onClick={() => {
+        setOpenProjectMenu(null);
 
+        // Add your project details route here later.
+        // router.push(`/projects/${project.id}`);
+      }}
+      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+    >
+      <Eye
+        size={16}
+        className="text-gray-500"
+      />
+
+      View Project
+    </button>
+
+    {/* DELETE */}
+
+    {isExecutiveManager && (
+      <>
         <div className="my-1 border-t border-gray-100" />
 
-        {/* Delete */}
         <button
           type="button"
-          onClick={() => {
-            setOpenProjectMenu(null);
-
-            // Delete project
-            // handleDeleteProject(project.id);
-          }}
+          onClick={() =>
+            openDeleteProject(project)
+          }
           className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50"
         >
           <Trash2 size={16} />
+
           Delete Project
         </button>
-      </div>
+      </>
     )}
+  </div>
+)}
   </div>
 </td>
                           </tr>
@@ -1085,6 +1315,488 @@ const getTodayDate = () => {
           </div>
         </div>
       )}
+
+      {editModalOpen &&
+  isExecutiveManager &&
+  selectedProject && (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          setEditModalOpen(false);
+        }
+      }}
+    >
+      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+        {/* HEADER */}
+
+        <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+          <div>
+            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#07111f] text-white">
+              <Edit3 size={18} />
+            </div>
+
+            <h2 className="text-lg font-semibold tracking-tight text-gray-900">
+              Update project
+            </h2>
+
+            <p className="mt-1 text-xs text-gray-500">
+              Update the project information and dates.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEditModalOpen(false);
+              setSelectedProject(null);
+            }}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X size={19} />
+          </button>
+        </div>
+
+        {/* BODY */}
+
+        <div className="overflow-y-auto px-6 py-6">
+          <div className="grid gap-5 sm:grid-cols-2">
+
+            {/* NAME */}
+
+            <div className="sm:col-span-2">
+              <label className="mb-2 block text-xs font-semibold text-gray-700">
+                Project name
+                <span className="ml-1 text-red-500">
+                  *
+                </span>
+              </label>
+
+              <input
+                type="text"
+                value={editProjectName}
+                onChange={(e) =>
+                  setEditProjectName(
+                    e.target.value
+                  )
+                }
+                className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none placeholder:text-gray-400 focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+              />
+            </div>
+
+            {/* DOMAIN */}
+
+            <div>
+              <label className="mb-2 block text-xs font-semibold text-gray-700">
+                Project domain
+              </label>
+
+              <input
+                type="text"
+                value={editProjectDomain}
+                onChange={(e) =>
+                  setEditProjectDomain(
+                    e.target.value
+                  )
+                }
+                className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+              />
+            </div>
+
+            {/* PRIORITY */}
+
+            <div>
+              <label className="mb-2 block text-xs font-semibold text-gray-700">
+                Priority
+              </label>
+
+              <select
+                value={editPriority}
+                onChange={(e) =>
+                  setEditPriority(
+                    e.target.value as ProjectPriority
+                  )
+                }
+                className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+              >
+                <option value="Low">
+                  Low
+                </option>
+
+                <option value="Medium">
+                  Medium
+                </option>
+
+                <option value="High">
+                  High
+                </option>
+              </select>
+            </div>
+
+            {/* OBJECTIVE */}
+
+            <div className="sm:col-span-2">
+              <label className="mb-2 block text-xs font-semibold text-gray-700">
+                Project objective
+              </label>
+
+              <input
+                type="text"
+                value={editAboutTitle}
+                onChange={(e) =>
+                  setEditAboutTitle(
+                    e.target.value
+                  )
+                }
+                className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+              />
+            </div>
+
+            {/* DESCRIPTION */}
+
+            <div className="sm:col-span-2">
+              <label className="mb-2 block text-xs font-semibold text-gray-700">
+                Description
+              </label>
+
+              <textarea
+                value={editAboutDescription}
+                onChange={(e) =>
+                  setEditAboutDescription(
+                    e.target.value
+                  )
+                }
+                rows={4}
+                className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+              />
+            </div>
+
+            {/* START DATE */}
+
+            <div>
+              <label className="mb-2 block text-xs font-semibold text-gray-700">
+                Start date
+              </label>
+
+              <div className="relative">
+                <Calendar
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+
+                <input
+                  type="date"
+                  value={editStartDate}
+                  onChange={(e) => {
+                    const value =
+                      e.target.value;
+
+                    setEditDateError("");
+
+                    if (
+                      editDeadline &&
+                      value &&
+                      editDeadline < value
+                    ) {
+                      setEditDeadline("");
+                    }
+
+                    setEditStartDate(value);
+                  }}
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+                />
+              </div>
+            </div>
+
+            {/* DEADLINE */}
+
+            <div>
+              <label className="mb-2 block text-xs font-semibold text-gray-700">
+                Deadline
+              </label>
+
+              <div className="relative">
+                <Calendar
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+
+                <input
+                  type="date"
+                  value={editDeadline}
+                  min={
+                    editStartDate ||
+                    undefined
+                  }
+                  onChange={(e) => {
+                    setEditDeadline(
+                      e.target.value
+                    );
+                    setEditDateError("");
+                  }}
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+                />
+              </div>
+            </div>
+          </div>
+
+          {editDateError && (
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+              <p className="text-xs font-medium text-red-600">
+                {editDateError}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER */}
+
+        <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:flex-row sm:justify-end">
+
+          <button
+            type="button"
+            onClick={() => {
+              setEditModalOpen(false);
+              setSelectedProject(null);
+            }}
+            className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={handleUpdateProject}
+            disabled={
+              !editProjectName.trim() ||
+              savingEdit
+            }
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white shadow-sm hover:bg-[#111c2c] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {savingEdit ? (
+              <>
+                <RefreshCw
+                  size={14}
+                  className="animate-spin"
+                />
+                Updating...
+              </>
+            ) : (
+              <>
+                <Check size={15} />
+                Update project
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
+      {deadlineModalOpen &&
+  isExecutiveManager &&
+  selectedProject && (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          setDeadlineModalOpen(false);
+        }
+      }}
+    >
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+        <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+          <div>
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#07111f] text-white">
+              <Calendar size={18} />
+            </div>
+
+            <h2 className="text-lg font-semibold text-gray-900">
+              Update deadline
+            </h2>
+
+            <p className="mt-1 text-xs text-gray-500">
+              Update the deadline for{" "}
+              <span className="font-medium text-gray-700">
+                {selectedProject.name}
+              </span>
+              .
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDeadlineModalOpen(false);
+              setSelectedProject(null);
+            }}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-6 py-6">
+
+          <label className="mb-2 block text-xs font-semibold text-gray-700">
+            Deadline
+          </label>
+
+          <div className="relative">
+            <Calendar
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+
+            <input
+              type="date"
+              value={editDeadline}
+              min={
+                selectedProject.startDate ||
+                getTodayDate()
+              }
+              onChange={(e) => {
+                setEditDeadline(
+                  e.target.value
+                );
+                setEditDateError("");
+              }}
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+            />
+          </div>
+
+          {editDateError && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+              <p className="text-xs font-medium text-red-600">
+                {editDateError}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
+
+          <button
+            type="button"
+            onClick={() => {
+              setDeadlineModalOpen(false);
+              setSelectedProject(null);
+            }}
+            className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={handleUpdateDeadline}
+            disabled={savingDeadline}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white hover:bg-[#111c2c] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {savingDeadline ? (
+              <>
+                <RefreshCw
+                  size={14}
+                  className="animate-spin"
+                />
+                Updating...
+              </>
+            ) : (
+              <>
+                <Check size={15} />
+                Update deadline
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
+      {deleteModalOpen &&
+  isExecutiveManager &&
+  selectedProject && (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          setDeleteModalOpen(false);
+        }
+      }}
+    >
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+        <div className="px-6 py-6">
+
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+            <Trash2
+              size={21}
+              className="text-red-600"
+            />
+          </div>
+
+          <h2 className="mt-5 text-lg font-semibold text-gray-900">
+            Delete project?
+          </h2>
+
+          <p className="mt-2 text-sm leading-relaxed text-gray-500">
+            Are you sure you want to delete{" "}
+            <span className="font-semibold text-gray-800">
+              {selectedProject.name}
+            </span>
+            ?
+          </p>
+
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3">
+            <p className="text-xs font-medium leading-relaxed text-red-700">
+              This action will permanently delete the
+              project and all tasks associated with it.
+              This cannot be undone.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
+
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteModalOpen(false);
+              setSelectedProject(null);
+            }}
+            disabled={deletingProject}
+            className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDeleteProject}
+            disabled={deletingProject}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {deletingProject ? (
+              <>
+                <RefreshCw
+                  size={14}
+                  className="animate-spin"
+                />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <Trash2 size={15} />
+                Delete project
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
 
       {assignModalOpen && isProjectManager && (
         <div
