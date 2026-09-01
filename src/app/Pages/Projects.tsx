@@ -74,6 +74,17 @@ export default function Projects() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
   const dragScrollInterval = useRef<number | null>(null);
+  const [dateError, setDateError] = useState("");
+
+const getTodayDate = () => {
+  const today = new Date();
+
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
 
   const isExecutiveManager = currentUser?.role === "Executive Manager";
   const isProjectManager = currentUser?.role === "Project Manager";
@@ -164,20 +175,29 @@ export default function Projects() {
     setAboutDescription("");
     setStartDate("");
     setDeadline("");
+    setDeadError("");
     setPriority("Medium");
   };
 
-  const handleSaveProject = async () => {
+ const handleSaveProject = async () => {
+  if (!isExecutiveManager || !projectName.trim()) return;
 
-    
+  const today = getTodayDate();
+
   // Start date cannot be before today
   if (startDate && startDate < today) {
     setDateError("Start date must be today or a future date.");
     return;
   }
 
+  // Deadline cannot be before today
+  if (deadline && deadline < today) {
+    setDateError("Deadline cannot be before today.");
+    return;
+  }
+
   // Deadline cannot be before start date
-  if (deadline && startDate && deadline < startDate) {
+  if (startDate && deadline && deadline < startDate) {
     setDateError(
       "Deadline must be greater than or equal to the start date."
     );
@@ -185,34 +205,65 @@ export default function Projects() {
   }
 
   setDateError("");
-    
-    if (!isExecutiveManager || !projectName.trim()) return;
-    try {
-      setSavingProject(true);
-      setError("");
-      const response = await fetch(`${API_BASE}/api/projects`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ name: projectName.trim(), domain: projectDomain.trim(), aboutTitle: aboutTitle.trim(), aboutDescription: aboutDescription.trim(), startDate, deadline, priority }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Unable to create project");
-      const project = data.project;
-      const newProject: Project = {
-        id: String(project.id), name: project.name, domain: project.domain || "No domain", status: project.status || "Unassigned",
-        aboutTitle: project.about_title || "Project", aboutDescription: project.about_description || "",
-        progress: Number(project.progress || 0), members: [], startDate: project.start_date || "", deadline: project.deadline || "",
-        priority: project.priority || "Medium", managerId: null, managerName: null, creatorId: project.created_by ? String(project.created_by) : undefined,
-      };
-      setProjects((prev) => [newProject, ...prev]);
-      resetForm();
-      setModalOpen(false);
-    } catch (error: any) {
-      setError(error.message || "Unable to create project");
-    } finally {
-      setSavingProject(false);
+
+  try {
+    setSavingProject(true);
+    setError("");
+
+    const response = await fetch(`${API_BASE}/api/projects`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        name: projectName.trim(),
+        domain: projectDomain.trim(),
+        aboutTitle: aboutTitle.trim(),
+        aboutDescription: aboutDescription.trim(),
+        startDate: startDate || null,
+        deadline: deadline || null,
+        priority,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Unable to create project"
+      );
     }
-  };
+
+    const project = data.project;
+
+    const newProject: Project = {
+      id: String(project.id),
+      name: project.name,
+      domain: project.domain || "No domain",
+      status: project.status || "Unassigned",
+      aboutTitle: project.about_title || "Project",
+      aboutDescription: project.about_description || "",
+      progress: Number(project.progress || 0),
+      members: [],
+      startDate: project.start_date || "",
+      deadline: project.deadline || "",
+      priority: project.priority || "Medium",
+      managerId: null,
+      managerName: null,
+      managerEmail: null,
+      creatorId: project.created_by
+        ? String(project.created_by)
+        : undefined,
+    };
+
+    setProjects((prev) => [newProject, ...prev]);
+
+    resetForm();
+    setModalOpen(false);
+  } catch (error: any) {
+    setError(error.message || "Unable to create project");
+  } finally {
+    setSavingProject(false);
+  }
+};
 
   const stopDragAutoScroll = () => {
     if (dragScrollInterval.current !== null) {
@@ -849,16 +900,25 @@ export default function Projects() {
                       value={startDate}
                       min={getTodayDate()}
                       onChange={(e) => {
-                        const value = e.target.value;
-                
-                        setStartDate(value);
-                        setDateError("");
-                
-                        // If deadline already exists and becomes invalid
-                        if (deadline && value > deadline) {
-                          setDeadline("");
-                        }
-                      }}
+    const value = e.target.value;
+
+    setDateError("");
+
+    if (value && value < getTodayDate()) {
+      setDateError(
+        "Start date must be today or a future date."
+      );
+      return;
+    }
+
+    // If selected start date is after current deadline,
+    // clear the invalid deadline.
+    if (deadline && value && deadline < value) {
+      setDeadline("");
+    }
+
+    setStartDate(value);
+  }}
                       className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
                     />
                   </div>
@@ -872,28 +932,37 @@ export default function Projects() {
                       type="date"
                       value={deadline}
                       min={startDate || getTodayDate()}
-                      onChange={(e) => {
-                      const value = e.target.value;
+                    onChange={(e) => {
+    const value = e.target.value;
 
-                      if (startDate && value < startDate) {
-                      setDateError(
-                      "Deadline must be greater than or equal to the start date."
-                      );
-                      return;
-                      }
+    setDateError("");
 
-                      setDateError("");
-                     setDeadline(value);
-                     }}
+    if (value && value < getTodayDate()) {
+      setDateError("Deadline cannot be before today.");
+      return;
+    }
+
+    if (startDate && value && value < startDate) {
+      setDateError(
+        "Deadline must be greater than or equal to the start date."
+      );
+      return;
+    }
+
+    setDeadline(value);
+  }}
                       className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
                     />
                   </div>
                 </div>
               </div>
                   {dateError && (
-                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-                  <p className="text-xs font-medium text-red-600">
-                  {dateError}
+  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+    <p className="text-xs font-medium text-red-600">
+      {dateError}
+    </p>
+  </div>
+)}
               <div className="mt-6 rounded-xl border border-violet-100 bg-violet-50/60 p-4">
                 <div className="flex gap-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-violet-600 shadow-sm">
