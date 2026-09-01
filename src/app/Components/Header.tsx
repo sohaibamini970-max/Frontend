@@ -813,8 +813,8 @@ export default function Header() {
 
             <h1 className="text-[32px] font-medium leading-[1.1] tracking-[-1.5px] sm:text-[40px]">
               Here's what's happening
-              <br className="hidden sm:block" />
-              in your projects today.
+              <br className="hidden sm:block" /> 
+               in your projects today.
             </h1>
           </div>
 
