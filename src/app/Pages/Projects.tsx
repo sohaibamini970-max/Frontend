@@ -69,6 +69,7 @@ export default function Projects() {
   const [aboutDescription, setAboutDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [dateError, setDateError] = useState("");
   const [priority, setPriority] = useState<ProjectPriority>("Medium");
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -175,7 +176,7 @@ const getTodayDate = () => {
     setAboutDescription("");
     setStartDate("");
     setDeadline("");
-    setError("");
+    setDateError("");
     setPriority("Medium");
   };
 
