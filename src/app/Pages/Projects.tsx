@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Search, SlidersHorizontal, ChevronDown, MoreVertical, ChevronLeft, ChevronRight, X, Calendar, Users, Flag, UserPlus, GripVertical, Check, User, RefreshCw, ShieldCheck } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, ChevronDown, MoreVertical, ChevronLeft, ChevronRight, X, Calendar, Users, Flag, UserPlus, GripVertical, Check, User, RefreshCw, ShieldCheck,Edit3,Eye,Trash2, } from "lucide-react";
 
 const API_BASE = "https://backend-five-swart-88.vercel.app";
 
@@ -76,6 +76,7 @@ export default function Projects() {
   const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
   const dragScrollInterval = useRef<number | null>(null);
   const [dateError, setDateError] = useState("");
+  const [openProjectMenu, setOpenProjectMenu] = useState<string | number | null>(null);
 
 const getTodayDate = () => {
   const today = new Date();
@@ -559,11 +560,93 @@ const getTodayDate = () => {
                                 <span className="text-xs text-gray-400">No deadline</span>
                               )}
                             </td>
-                            <td className="px-3 py-4">
-                              <button type="button" className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
-                                <MoreVertical size={17} />
-                              </button>
-                            </td>
+                           <td className="px-3 py-4">
+  <div className="relative">
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setOpenProjectMenu(
+          openProjectMenu === project.id ? null : project.id
+        );
+      }}
+      className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+    >
+      <MoreVertical size={17} />
+    </button>
+
+    {openProjectMenu === project.id && (
+      <div
+        className="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Update Project */}
+        <button
+          type="button"
+          onClick={() => {
+            setOpenProjectMenu(null);
+
+            // Open your existing edit/update modal here
+            // setSelectedProject(project);
+            // setEditModalOpen(true);
+          }}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+        >
+          <Edit3 size={16} className="text-gray-500" />
+          Update Project
+        </button>
+
+        {/* Update Deadline */}
+        <button
+          type="button"
+          onClick={() => {
+            setOpenProjectMenu(null);
+
+            // Open deadline modal here
+            // setSelectedProject(project);
+            // setDeadlineModalOpen(true);
+          }}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+        >
+          <Calendar size={16} className="text-gray-500" />
+          Update Deadline
+        </button>
+
+        {/* View Project */}
+        <button
+          type="button"
+          onClick={() => {
+            setOpenProjectMenu(null);
+
+            // View project
+            // router.push(`/projects/${project.id}`);
+          }}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+        >
+          <Eye size={16} className="text-gray-500" />
+          View Project
+        </button>
+
+        <div className="my-1 border-t border-gray-100" />
+
+        {/* Delete */}
+        <button
+          type="button"
+          onClick={() => {
+            setOpenProjectMenu(null);
+
+            // Delete project
+            // handleDeleteProject(project.id);
+          }}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50"
+        >
+          <Trash2 size={16} />
+          Delete Project
+        </button>
+      </div>
+    )}
+  </div>
+</td>
                           </tr>
                         );
                       })}
