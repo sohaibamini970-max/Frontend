@@ -574,19 +574,25 @@ export default function Header() {
           ================================================= */}
 
           <nav className="hidden h-full items-center gap-7 lg:flex">
-           {[
-             ...navigation,
-             ...(isSystemAdministrator
-             ? [{ name: "Users", href: "/users" }]
-            : []),
-           ].map((item) => {
+          {[
+  ...navigation,
+  ...(isSystemAdministrator
+    ? [{ name: "Users", href: "/users" }]
+    : []),
+].map((item) => {
+  const active =
+    pathname === item.href ||
+    (item.href !== "/" && pathname.startsWith(item.href + "/"));
 
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`relative flex h-full items-center text-[13px] font-medium transition ${active ? "text-white" : "text-white/55 hover:text-white"
-                    }`}
+                  className={`... ${
+                  active
+                  ? "..."
+                  : "..."
+                  }`}
                 >
                   {item.name}
 
