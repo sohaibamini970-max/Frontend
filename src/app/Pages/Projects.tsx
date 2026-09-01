@@ -50,7 +50,34 @@ function ManagerAvatar({ manager, small = false }: { manager: ProjectManager; sm
 }
 
 export default function Projects() {
-const [editModalOpen, setEditModalOpen] = useState(false);
+const [projects, setProjects] = useState<Project[]>([]);
+ const [projectManagers, setProjectManagers] = useState<ProjectManager[]>([]);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingManagers, setLoadingManagers] = useState(false);
+   const [savingProject, setSavingProject] = useState(false);
+   const [assigningProject, setAssigningProject] = useState(false);
+   const [error, setError] = useState(""); 
+   const [search, setSearch] = useState("");
+    const [activeView, setActiveView] = useState<"table" | "assignment">("table");
+     const [filterOpen, setFilterOpen] = useState(false);
+     const [selectedStatus, setSelectedStatus] = useState<ProjectStatus | "All">("All");
+      const [modalOpen, setModalOpen] = useState(false);
+      const [projectName, setProjectName] = useState("");
+      const [projectDomain, setProjectDomain] = useState("");
+       const [aboutTitle, setAboutTitle] = useState("");
+       const [aboutDescription, setAboutDescription] = useState("");
+       const [startDate, setStartDate] = useState("");
+        const [deadline, setDeadline] = useState("");
+        const [dateError, setDateError] = useState("");
+        const [priority, setPriority] = useState<ProjectPriority>("Medium");
+         const [assignModalOpen, setAssignModalOpen] = useState(false); 
+        const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+         const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
+         const dragScrollInterval = useRef<number | null>(null);
+          const [openProjectMenu, setOpenProjectMenu] = useState<string | number | null>(null);
+
+          const [editModalOpen, setEditModalOpen] = useState(false);
 const [deadlineModalOpen, setDeadlineModalOpen] = useState(false);
 const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
