@@ -75,7 +75,6 @@ export default function Projects() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
   const dragScrollInterval = useRef<number | null>(null);
-  const [dateError, setDateError] = useState("");
   const [openProjectMenu, setOpenProjectMenu] = useState<string | number | null>(null);
 
 const getTodayDate = () => {
