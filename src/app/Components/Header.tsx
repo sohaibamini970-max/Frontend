@@ -147,7 +147,8 @@ export default function Header() {
 
   // Authenticated user state & actions from hook (untouched)
   const { user, loading, logout } = useAuth();
-
+  const isSystemAdministrator =
+  user?.role === "System Administrator";
   /* =========================================================
      ROLE-SCOPED DATA
      Fetched once we know who the user is, then used to derive
@@ -573,10 +574,12 @@ export default function Header() {
           ================================================= */}
 
           <nav className="hidden h-full items-center gap-7 lg:flex">
-            {navigation.map((item) => {
-              const active =
-                pathname === item.href ||
-                (item.href !== "/" && pathname.startsWith(item.href + "/"));
+           {[
+             ...navigation,
+             ...(isSystemAdministrator
+             ? [{ name: "Users", href: "/users" }]
+            : []),
+           ].map((item) => {
 
               return (
                 <Link
