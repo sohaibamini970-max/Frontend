@@ -168,6 +168,24 @@ export default function Projects() {
   };
 
   const handleSaveProject = async () => {
+
+    
+  // Start date cannot be before today
+  if (startDate && startDate < today) {
+    setDateError("Start date must be today or a future date.");
+    return;
+  }
+
+  // Deadline cannot be before start date
+  if (deadline && startDate && deadline < startDate) {
+    setDateError(
+      "Deadline must be greater than or equal to the start date."
+    );
+    return;
+  }
+
+  setDateError("");
+    
     if (!isExecutiveManager || !projectName.trim()) return;
     try {
       setSavingProject(true);
@@ -829,7 +847,18 @@ export default function Projects() {
                     <input
                       type="date"
                       value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      min={getTodayDate()}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                
+                        setStartDate(value);
+                        setDateError("");
+                
+                        // If deadline already exists and becomes invalid
+                        if (deadline && value > deadline) {
+                          setDeadline("");
+                        }
+                      }}
                       className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
                     />
                   </div>
@@ -842,13 +871,29 @@ export default function Projects() {
                     <input
                       type="date"
                       value={deadline}
-                      onChange={(e) => setDeadline(e.target.value)}
+                      min={startDate || getTodayDate()}
+                      onChange={(e) => {
+                      const value = e.target.value;
+
+                      if (startDate && value < startDate) {
+                      setDateError(
+                      "Deadline must be greater than or equal to the start date."
+                      );
+                      return;
+                      }
+
+                      setDateError("");
+                     setDeadline(value);
+                     }}
                       className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
                     />
                   </div>
                 </div>
               </div>
-
+                  {dateError && (
+                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+                  <p className="text-xs font-medium text-red-600">
+                  {dateError}
               <div className="mt-6 rounded-xl border border-violet-100 bg-violet-50/60 p-4">
                 <div className="flex gap-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-violet-600 shadow-sm">
