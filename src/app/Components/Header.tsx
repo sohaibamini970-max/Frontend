@@ -738,7 +738,7 @@ export default function Header() {
                   </button>
 
                   <button
-                    onClick = {() => router.push('settings/password')}
+                    onClick = {() => router.push('/settings/password')}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">
                     <Settings size={16} />
                     Change Password
