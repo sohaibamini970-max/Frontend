@@ -1592,7 +1592,7 @@ export default function Projects() {
       )}
 
       {/* ASSIGN MODAL */}
-      {assignModalOpen && isProjectManager && (
+      {assignModalOpen && isExecutiveManager && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]"
           onMouseDown={(e) => {
