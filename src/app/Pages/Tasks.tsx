@@ -2757,7 +2757,7 @@ const fetchTaskChallenges = async (task: Task) => {
 
         {/* MANAGEMENT MESSAGE */}
         {isManagementRole && (
-          <div className="mt-6 rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
+          <div className="mt-3 rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
             <div className="flex gap-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700">
                 <Users size={15} />
