@@ -1522,6 +1522,80 @@ const loadData = async () => {
       );
     };
 
+    /* =========================================================
+   TASK DROP ON UNASSIGNED MEMBER
+   MANAGEMENT ONLY
+
+   Members shown in the Members tab are unassigned
+   to any team, but they can still receive tasks.
+========================================================= */
+
+const handleUnassignedMemberDragOver = (
+  event: React.DragEvent<HTMLDivElement>
+) => {
+  if (!draggedTask || !canManageTeams) {
+    return;
+  }
+
+  event.preventDefault();
+
+  event.dataTransfer.dropEffect = "move";
+};
+
+const handleDropTaskOnUnassignedMember = async (
+  event: React.DragEvent<HTMLDivElement>,
+  memberId: string
+) => {
+  event.preventDefault();
+
+  if (!canManageTeams || !draggedTask) {
+    return;
+  }
+
+  const taskId =
+    event.dataTransfer.getData(
+      "application/x-arg-task"
+    ) || draggedTask;
+
+  setDraggedTask(null);
+
+  try {
+    await assignTask(taskId, memberId);
+
+    /*
+      Update local state immediately so the UI
+      responds without waiting for the refresh.
+    */
+    setTasks((previous) =>
+      previous.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              assignee_id: memberId,
+            }
+          : task
+      )
+    );
+
+    /*
+      Refresh all management data so task/member
+      assignment state stays synchronized with DB.
+    */
+    await loadData();
+  } catch (error) {
+    console.error(
+      "Failed to assign task to unassigned member:",
+      error
+    );
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Failed to assign task to member."
+    );
+  }
+};
+
   /* =========================================================
      CREATE TEAM
   ========================================================= */
@@ -2936,78 +3010,149 @@ const loadData = async () => {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {unassignedMembers.map(
-                          (member) => {
-                            const isDragging =
-                              draggedMember ===
-                              member.id;
-
-                            return (
-                              <div
-                                key={
-                                  member.id
-                                }
-                                draggable={
-                                  canManageTeams
-                                }
-                                onDragStart={(
-                                  event
-                                ) =>
-                                  handleMemberDragStart(
-                                    event,
-                                    member.id
-                                  )
-                                }
-                                onDragEnd={
-                                  handleMemberDragEnd
-                                }
-                                className={`rounded-xl border bg-white p-3 transition ${
-                                  isDragging
-                                    ? "border-[#07111f] bg-gray-50 shadow-lg ring-2 ring-gray-200"
-                                    : "border-gray-300 hover:border-gray-400 hover:shadow-sm"
-                                } cursor-grab active:cursor-grabbing`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <GripVertical
-                                    size={
-                                      14
-                                    }
-                                    className="shrink-0 text-gray-300"
-                                  />
-
-                                  <MemberAvatar
-                                    member={
-                                      member
-                                    }
-                                    small
-                                  />
-
-                                  <div className="min-w-0 flex-1">
-                                    <p className="truncate text-xs font-bold text-gray-900">
-                                      {
-                                        member.full_name
-                                      }
-                                    </p>
-
-                                    <p className="mt-0.5 truncate text-[9px] text-gray-500">
-                                      {
-                                        member.role
-                                      }
-                                    </p>
-
-                                    {isDragging && (
-                                      <p className="mt-1 text-[8px] font-bold text-blue-600">
-                                        Drag to a
-                                        team
-                                        below →
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
+                       {unassignedMembers.map((member) => {
+                        const isDragging =
+                          draggedMember === member.id;
+                      
+                        const isTaskDropTarget =
+                          draggedTask !== null;
+                      
+                        const stats = getMemberStats(member.id);
+                      
+                        return (
+                          <div
+                            key={member.id}
+                            draggable={canManageTeams}
+                            onDragStart={(event) =>
+                              handleMemberDragStart(
+                                event,
+                                member.id
+                              )
+                            }
+                            onDragEnd={handleMemberDragEnd}
+                      
+                            /* =================================================
+                               TASK DROP TARGET
+                               An unassigned member can receive a task
+                               without being assigned to a team.
+                            ================================================= */
+                            onDragOver={
+                              canManageTeams
+                                ? handleUnassignedMemberDragOver
+                                : undefined
+                            }
+                      
+                            onDrop={
+                              canManageTeams
+                                ? (event) =>
+                                    handleDropTaskOnUnassignedMember(
+                                      event,
+                                      member.id
+                                    )
+                                : undefined
+                            }
+                      
+                            className={`rounded-xl border bg-white p-3 transition-all ${
+                              isDragging
+                                ? "border-[#07111f] bg-gray-50 shadow-lg ring-2 ring-gray-200"
+                                : isTaskDropTarget
+                                ? "border-blue-300 bg-blue-50/40 ring-1 ring-blue-100"
+                                : "border-gray-300 hover:border-gray-400 hover:shadow-sm"
+                            } ${
+                              canManageTeams
+                                ? "cursor-grab active:cursor-grabbing"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {/* DRAG HANDLE */}
+                      
+                              <GripVertical
+                                size={14}
+                                className="shrink-0 text-gray-300"
+                              />
+                      
+                              {/* AVATAR */}
+                      
+                              <MemberAvatar
+                                member={member}
+                                small
+                              />
+                      
+                              {/* MEMBER INFO */}
+                      
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-bold text-gray-900">
+                                  {member.full_name}
+                                </p>
+                      
+                                <p className="mt-0.5 truncate text-[9px] text-gray-500">
+                                  {member.role}
+                                </p>
+                      
+                                {/* MEMBER STATUS */}
+                      
+                                {!draggedTask && !isDragging && (
+                                  <p className="mt-1 text-[8px] font-semibold text-orange-500">
+                                    No team assigned
+                                  </p>
+                                )}
+                      
+                                {/* MEMBER DRAG MESSAGE */}
+                      
+                                {isDragging && (
+                                  <p className="mt-1 text-[8px] font-bold text-blue-600">
+                                    Drag to a team below →
+                                  </p>
+                                )}
+                      
+                                {/* TASK DRAG MESSAGE */}
+                      
+                                {draggedTask && canManageTeams && (
+                                  <p className="mt-1 text-[8px] font-bold text-blue-600">
+                                    Drop task here
+                                  </p>
+                                )}
                               </div>
-                            );
-                          }
-                        )}
+                      
+                              {/* TASK STATISTICS */}
+                      
+                              <div className="hidden items-center gap-1 sm:flex">
+                                <span className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[8px] font-bold text-gray-500">
+                                  {stats.total} Tasks
+                                </span>
+                      
+                                <span className="rounded-md border border-emerald-100 bg-emerald-50 px-2 py-1 text-[8px] font-bold text-emerald-600">
+                                  {stats.done} Done
+                                </span>
+                              </div>
+                      
+                              {/* UNASSIGNED BADGE */}
+                      
+                              <span className="shrink-0 rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-[8px] font-bold text-orange-600">
+                                No Team
+                              </span>
+                            </div>
+                      
+                            {/* TASK DROP INDICATOR */}
+                      
+                            {draggedTask && canManageTeams && (
+                              <div className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-dashed border-blue-300 bg-blue-50 px-3 py-2.5">
+                                <UserPlus
+                                  size={13}
+                                  className="text-blue-600"
+                                />
+                      
+                                <span className="text-[9px] font-bold text-blue-700">
+                                  Drop task here to assign to{" "}
+                                  {member.full_name}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
                       </div>
                     )}
 
