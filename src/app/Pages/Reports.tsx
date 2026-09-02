@@ -393,25 +393,25 @@ export default function Reports() {
         setReportContent(
             `Project Report
 
-Project: ${project.name}
-Manager: ${project.manager || "Unassigned"}
-Status: ${project.status}
-Priority: ${project.priority}
-Progress: ${project.progress}%
-Start Date: ${formatDate(project.startDate)}
-Deadline: ${formatDate(project.deadline)}
-
-Overview:
-[Add project overview here]
-
-Progress:
-[Describe progress made]
-
-Risks & Blockers:
-[List any risks or blockers]
-
-Next Steps:
-[Outline next steps]`
+            Project: ${project.name}
+            Manager: ${project.manager || "Unassigned"}
+            Status: ${project.status}
+            Priority: ${project.priority}
+            Progress: ${project.progress}%
+            Start Date: ${formatDate(project.startDate)}
+            Deadline: ${formatDate(project.deadline)}
+            
+            Overview:
+            [Add project overview here]
+            
+            Progress:
+            [Describe progress made]
+            
+            Risks & Blockers:
+            [List any risks or blockers]
+            
+            Next Steps:
+            [Outline next steps]`
         );
         setReportFormat("PDF");
         setUploadedFile(null);
@@ -524,94 +524,108 @@ Next Steps:
             );
         }
 
-        // -------------------------------------------------
-        // FILE INFORMATION
-        // -------------------------------------------------
+        if (!data.content || !data.content.trim()) {
+    throw new Error(
+        "The file was uploaded, but no readable text was found."
+    );
+}
 
-        const fileData: ReportFile = {
-            id:
-                data.file?.id ||
-                data.file?.fileId,
+setUploadedFile(data.file);
+setReportContent(data.content.trim());
+setSelectedFile(null);
 
-            originalName:
-                data.file?.originalName ||
-                data.file?.original_name ||
-                selectedFile.name,
+alert(
+    "File uploaded successfully. The extracted content has been added to the report. Review it in Live Preview and click Save Report."
+);
 
-            fileName:
-                data.file?.fileName ||
-                data.file?.file_name,
+    //     // -------------------------------------------------
+    //     // FILE INFORMATION
+    //     // -------------------------------------------------
 
-            mimeType:
-                data.file?.mimeType ||
-                data.file?.mime_type ||
-                selectedFile.type,
+    //     const fileData: ReportFile = {
+    //         id:
+    //             data.file?.id ||
+    //             data.file?.fileId,
 
-            size:
-                data.file?.size ||
-                selectedFile.size,
+    //         originalName:
+    //             data.file?.originalName ||
+    //             data.file?.original_name ||
+    //             selectedFile.name,
 
-            url:
-                data.file?.url ||
-                "",
-        };
+    //         fileName:
+    //             data.file?.fileName ||
+    //             data.file?.file_name,
 
-        // -------------------------------------------------
-        // EXTRACTED DOCUMENT CONTENT
-        // -------------------------------------------------
+    //         mimeType:
+    //             data.file?.mimeType ||
+    //             data.file?.mime_type ||
+    //             selectedFile.type,
 
-        const extractedContent =
-            typeof data.content === "string"
-                ? data.content.trim()
-                : "";
+    //         size:
+    //             data.file?.size ||
+    //             selectedFile.size,
 
-        if (!extractedContent) {
-            throw new Error(
-                "The file was uploaded, but no readable text was extracted."
-            );
-        }
+    //         url:
+    //             data.file?.url ||
+    //             "",
+    //     };
 
-        // -------------------------------------------------
-        // PUT FILE CONTENT INTO REPORT CONTENT
-        // -------------------------------------------------
+    //     // -------------------------------------------------
+    //     // EXTRACTED DOCUMENT CONTENT
+    //     // -------------------------------------------------
 
-        setReportContent(
-            extractedContent
-        );
+    //     const extractedContent =
+    //         typeof data.content === "string"
+    //             ? data.content.trim()
+    //             : "";
 
-        // -------------------------------------------------
-        // SHOW UPLOADED FILE
-        // -------------------------------------------------
+    //     if (!extractedContent) {
+    //         throw new Error(
+    //             "The file was uploaded, but no readable text was extracted."
+    //         );
+    //     }
 
-        setUploadedFile(
-            fileData
-        );
+    //     // -------------------------------------------------
+    //     // PUT FILE CONTENT INTO REPORT CONTENT
+    //     // -------------------------------------------------
 
-        setSelectedFile(null);
+    //     setReportContent(
+    //         extractedContent
+    //     );
 
-        if (fileInputRef.current) {
-            fileInputRef.current.value =
-                "";
-        }
+    //     // -------------------------------------------------
+    //     // SHOW UPLOADED FILE
+    //     // -------------------------------------------------
 
-        alert(
-            "File uploaded successfully. The document content has been added to the report."
-        );
+    //     setUploadedFile(
+    //         fileData
+    //     );
 
-    } catch (error: any) {
-        console.error(
-            "File upload error:",
-            error
-        );
+    //     setSelectedFile(null);
 
-        setUploadError(
-            error.message ||
-            "Failed to upload file"
-        );
+    //     if (fileInputRef.current) {
+    //         fileInputRef.current.value =
+    //             "";
+    //     }
 
-    } finally {
-        setUploadingFile(false);
-    }
+    //     alert(
+    //         "File uploaded successfully. The document content has been added to the report."
+    //     );
+
+    // } catch (error: any) {
+    //     console.error(
+    //         "File upload error:",
+    //         error
+    //     );
+
+    //     setUploadError(
+    //         error.message ||
+    //         "Failed to upload file"
+    //     );
+
+    // } finally {
+    //     setUploadingFile(false);
+    // }
 };
 
     const handleSaveReport = async () => {
