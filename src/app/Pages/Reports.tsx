@@ -451,80 +451,168 @@ Next Steps:
         setUploadedFile(null);
     };
 
-    const handleFileUpload = async () => {
-        if (!selectedProject) {
-            setUploadError("Please select a project first.");
-            return;
+ const handleFileUpload = async () => {
+    if (!selectedProject) {
+        setUploadError("Please select a project first.");
+        return;
+    }
+
+    if (!permissions.canCreateReport) {
+        setUploadError("Only Project Managers can upload files.");
+        return;
+    }
+
+    if (!selectedFile) {
+        setUploadError("Please select a file first.");
+        return;
+    }
+
+    try {
+        setUploadingFile(true);
+        setUploadError("");
+
+        const token = getToken();
+
+        if (!token) {
+            throw new Error(
+                "Authentication token not found."
+            );
         }
 
-        if (!permissions.canCreateReport) {
-            setUploadError("Only Project Managers can upload files.");
-            return;
-        }
+        const formData = new FormData();
 
-        if (!selectedFile) {
-            setUploadError("Please select a file first.");
-            return;
-        }
+        formData.append(
+            "file",
+            selectedFile
+        );
+
+        formData.append(
+            "projectId",
+            String(selectedProject.id)
+        );
+
+        const response = await fetch(
+            `${API_BASE}/reports/project/${selectedProject.id}/upload`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization:
+                        `Bearer ${token}`,
+                },
+                body: formData,
+            }
+        );
+
+        let data: any;
 
         try {
-            setUploadingFile(true);
-            setUploadError("");
-
-            const token = getToken();
-            if (!token) {
-                throw new Error("Authentication token not found.");
-            }
-
-            const formData = new FormData();
-            formData.append("file", selectedFile);
-            formData.append("projectId", String(selectedProject.id));
-
-            const response = await fetch(
-                `${API_BASE}/reports/project/${selectedProject.id}/upload`,
-                {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: formData,
-                }
+            data =
+                await response.json();
+        } catch {
+            throw new Error(
+                `Server returned invalid response (${response.status})`
             );
-
-            let data: any;
-            try {
-                data = await response.json();
-            } catch {
-                throw new Error(`Server returned invalid response (${response.status})`);
-            }
-
-            if (!response.ok || !data.success) {
-                throw new Error(data.message || "Failed to upload file");
-            }
-
-            const fileData: ReportFile = {
-                id: data.file?.id || data.file?.fileId,
-                originalName: data.file?.originalName || data.file?.original_name || selectedFile.name,
-                fileName: data.file?.fileName || data.file?.file_name,
-                mimeType: data.file?.mimeType || data.file?.mime_type || selectedFile.type,
-                size: data.file?.size || selectedFile.size,
-                url: data.file?.url || "",
-            };
-
-            setUploadedFile(fileData);
-            setSelectedFile(null);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
-
-            alert("File uploaded successfully.");
-        } catch (error: any) {
-            console.error("File upload error:", error);
-            setUploadError(error.message || "Failed to upload file");
-        } finally {
-            setUploadingFile(false);
         }
-    };
+
+        if (
+            !response.ok ||
+            !data.success
+        ) {
+            throw new Error(
+                data.message ||
+                "Failed to upload file"
+            );
+        }
+
+        // -------------------------------------------------
+        // FILE INFORMATION
+        // -------------------------------------------------
+
+        const fileData: ReportFile = {
+            id:
+                data.file?.id ||
+                data.file?.fileId,
+
+            originalName:
+                data.file?.originalName ||
+                data.file?.original_name ||
+                selectedFile.name,
+
+            fileName:
+                data.file?.fileName ||
+                data.file?.file_name,
+
+            mimeType:
+                data.file?.mimeType ||
+                data.file?.mime_type ||
+                selectedFile.type,
+
+            size:
+                data.file?.size ||
+                selectedFile.size,
+
+            url:
+                data.file?.url ||
+                "",
+        };
+
+        // -------------------------------------------------
+        // EXTRACTED DOCUMENT CONTENT
+        // -------------------------------------------------
+
+        const extractedContent =
+            typeof data.content === "string"
+                ? data.content.trim()
+                : "";
+
+        if (!extractedContent) {
+            throw new Error(
+                "The file was uploaded, but no readable text was extracted."
+            );
+        }
+
+        // -------------------------------------------------
+        // PUT FILE CONTENT INTO REPORT CONTENT
+        // -------------------------------------------------
+
+        setReportContent(
+            extractedContent
+        );
+
+        // -------------------------------------------------
+        // SHOW UPLOADED FILE
+        // -------------------------------------------------
+
+        setUploadedFile(
+            fileData
+        );
+
+        setSelectedFile(null);
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value =
+                "";
+        }
+
+        alert(
+            "File uploaded successfully. The document content has been added to the report."
+        );
+
+    } catch (error: any) {
+        console.error(
+            "File upload error:",
+            error
+        );
+
+        setUploadError(
+            error.message ||
+            "Failed to upload file"
+        );
+
+    } finally {
+        setUploadingFile(false);
+    }
+};
 
     const handleSaveReport = async () => {
         if (!selectedProject) {
