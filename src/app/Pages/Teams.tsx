@@ -2161,7 +2161,7 @@ export default function Teams() {
                                   created for this
                                   project yet.
                                 </p>
-                              </div>
+                              </div> 
                             ) : (
                               projectTasks.map(
                                 (task) => {
