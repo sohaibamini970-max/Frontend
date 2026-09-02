@@ -124,6 +124,16 @@ function getTodayDate() {
   return `${year}-${month}-${day}`;
 }
 
+function getDateOnly(date?: string) {
+  if (!date) return "";
+
+  // Handles:
+  // 2026-09-10
+  // 2026-09-10T00:00:00.000Z
+  // 2026-09-10 00:00:00
+  return date.substring(0, 10);
+}
+
 function normalizeProject(project: any): Project {
   return {
     id: String(project.id),
@@ -138,7 +148,9 @@ function normalizeProject(project: any): Project {
       "",
     progress: Number(project.progress || 0),
     members: project.members || [],
-    start_date: project.start_date || project.startDate || "",
+    start_date: getDateOnly(
+    project.start_date || project.startDate || ""
+    ),
     deadline:
       project.deadline ||
       project.due_date ||
@@ -2095,20 +2107,26 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
                     <input
                       type="date"
                       value={taskStartDate}
-                       min={
-                        selectedProjectId
-                          ? (() => {
-                              const project = projects.find(
-                                (p) => p.id === selectedProjectId
-                              );
-                      
-                              const today = getTodayDate();
-                              const projectStart = project?.start_date || "";
-                      
-                              return projectStart > today ? projectStart : today;
-                            })()
-                          : getTodayDate()
-                      }
+                       min={(() => {
+                          const today = getTodayDate();
+                        
+                          const selectedProject = projects.find(
+                            (project) => project.id === selectedProjectId
+                          );
+                        
+                          const projectStartDate = getDateOnly(
+                            selectedProject?.start_date
+                          );
+                        
+                          // Task start date must be:
+                          // 1. Today or later
+                          // 2. Project start date or later
+                          if (projectStartDate && projectStartDate > today) {
+                            return projectStartDate;
+                          }
+                        
+                          return today;
+                        })()}
                         onChange={(event) =>
                           setTaskStartDate(event.target.value)
                         }
