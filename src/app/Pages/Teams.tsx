@@ -419,11 +419,13 @@ async function fetchTeamsWithMembers(): Promise<
    FETCH AVAILABLE MEMBERS
 ========================================================= */
 
-const fetchUnassignedMembers = async () => {
+async function fetchUnassignedMembers(): Promise<TeamMember[]> {
   const response = await fetch(
     `${API_BASE}/teams/available-members`,
     {
+      method: "GET",
       headers: getAuthHeaders(),
+      cache: "no-store",
     }
   );
 
@@ -438,18 +440,27 @@ const fetchUnassignedMembers = async () => {
 
   const data = await response.json();
 
-  const rows = extractRows(data);
+  const rows = extractRows(data, "members");
 
-  // Only actual Member-role users can be assigned to teams.
-  const membersOnly = rows.filter(
-    (member: TeamMember) =>
-      member.role === "Member" &&
-      !member.team_id
+  const mapped: TeamMember[] = rows.map((member: any) => ({
+    id: String(member.id),
+    email: member.email || "",
+    full_name:
+      member.full_name ||
+      member.fullName ||
+      member.name ||
+      "Unknown User",
+    role: member.role || "Member",
+    team_id: member.team_id ? String(member.team_id) : null,
+    team_name: member.team_name || null,
+  }));
+
+  // Only actual Member-role users who aren't already on a team
+  // can be assigned to a team.
+  return mapped.filter(
+    (member) => member.role === "Member" && !member.team_id
   );
-
-  setUnassignedMembers(membersOnly);
-};
-
+}
 /* =========================================================
    AVATAR
 ========================================================= */
