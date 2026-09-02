@@ -1599,12 +1599,14 @@ const handleDropTaskOnUnassignedMember = async (
 
     try {
       const payload = {
-        full_name:
+        fullName:
           newMemberName.trim(),
-        role:
+        jobTitle:
           newMemberRole.trim(),
         email:
           newMemberEmail.trim(),
+        password:"12345678",
+        role:"Member",
       };
 
       let response =
