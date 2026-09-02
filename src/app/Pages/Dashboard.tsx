@@ -14,6 +14,8 @@ import {
   Clock3,
   Circle,
   AlertCircle,
+  X,
+  FolderKanban,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -734,24 +736,17 @@ export default function Dashboard() {
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
 
-              {activeProjects.map(
-                (project) => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    onView={() =>
-                      router.push(
-                        "/projects"
-                      )
-                    }
-                    onTask={() =>
-                      router.push(
-                        `/tasks?projectId=${project.id}`
-                      )
-                    }
-                  />
-                )
-              )}
+             {activeProjects.map((project) => (
+            <ProjectCard
+            key={project.id}
+            project={project}
+            onView={() =>
+              router.push(
+                `/projects?projectId=${project.id}`
+              )
+            }
+           />
+           ))}
 
             </div>
           )}
@@ -1213,78 +1208,216 @@ export default function Dashboard() {
    PROJECT CARD
 ========================================================= */
 
+/* =========================================================
+   PROJECT CARD
+========================================================= */
+
 function ProjectCard({
   project,
   onView,
-  onTask,
 }: {
   project: Project;
   onView: () => void;
-  onTask: () => void;
 }) {
-  const initials =
-    getInitials(project.name);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
-  const status =
-    project.status || "Unassigned";
+  const initials = getInitials(project.name);
 
-  const statusClass =
-    getProjectStatusClass(status);
+  const status = project.status || "Unassigned";
+
+  const statusClass = getProjectStatusClass(status);
 
   const description =
     project.about_description ||
     project.about_title ||
     "No project description available.";
 
+  const progress = Math.min(
+    100,
+    Math.max(0, Number(project.progress) || 0)
+  );
+
   return (
-    <div className="rounded-xl border border-gray-300 bg-[#fafafa] p-4 transition hover:shadow-sm">
+    <>
+      {/* =====================================================
+          PROJECT CARD
+      ===================================================== */}
 
-      {/* TOP */}
+      <div className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.05)] transition-all duration-200 hover:-translate-y-[2px] hover:shadow-[0_8px_22px_rgba(0,0,0,0.09)]">
 
-      <div className="flex items-start gap-3">
+        {/* =================================================
+            VISUAL HEADER
+        ================================================= */}
 
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#d5d5d5] via-[#8d8d8d] to-[#383838] text-[10px] font-semibold text-white">
-          {initials}
-        </div>
+        <div className="relative h-[132px] overflow-hidden bg-gradient-to-br from-[#e8f0ff] via-[#f3f6fb] to-[#dfe8f7]">
 
-        <div className="min-w-0 flex-1">
+          {/* Decorative shapes */}
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="absolute -right-8 -top-12 h-32 w-32 rounded-full bg-[#557bd2]/10" />
 
-            <h3 className="truncate text-[11px] font-semibold text-[#18181b]">
+          <div className="absolute -bottom-16 right-10 h-36 w-36 rounded-full bg-[#557bd2]/10" />
+
+          <div className="absolute right-5 top-8 h-20 w-20 rotate-12 rounded-2xl border border-white/70 bg-white/40 shadow-sm backdrop-blur-sm" />
+
+          <div className="absolute bottom-[-20px] right-12 h-16 w-16 rounded-full bg-white/40" />
+
+          {/* Project icon */}
+
+          <div className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-[#557bd2] shadow-sm">
+
+            <FolderKanban size={16} />
+
+          </div>
+
+          {/* Status */}
+
+          <span
+            className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-[8px] font-semibold shadow-sm ${statusClass}`}
+          >
+            {status}
+          </span>
+
+          {/* Main title */}
+
+          <div className="absolute bottom-4 left-4 right-4">
+
+            <h3 className="max-w-[75%] truncate text-[14px] font-bold text-[#18181b]">
               {project.name}
             </h3>
 
-            <span
-              className={`rounded-full px-2 py-0.5 text-[8px] ${statusClass}`}
-            >
-              {status}
-            </span>
+            <p className="mt-1 line-clamp-1 max-w-[85%] text-[9px] leading-4 text-gray-500">
+              {description}
+            </p>
 
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-[9px] text-gray-400">
+        </div>
 
-            {project.deadline && (
-              <>
+        {/* =================================================
+            PROJECT INFORMATION
+        ================================================= */}
+
+        <div className="p-4">
+
+          {/* DATE + DOMAIN */}
+
+          <div className="grid grid-cols-2 gap-3">
+
+            <div>
+              <p className="text-[8px] font-medium uppercase tracking-wide text-gray-400">
+                Deadline
+              </p>
+
+              <div className="mt-1 flex items-center gap-1.5">
                 <CalendarDays
                   size={11}
+                  className="text-gray-400"
                 />
 
-                {formatDate(
-                  project.deadline
-                )}
-              </>
-            )}
-
-            {project.domain && (
-              <>
-                <span>•</span>
-                <span>
-                  {project.domain}
+                <span className="text-[10px] font-semibold text-gray-700">
+                  {project.deadline
+                    ? formatDate(project.deadline)
+                    : "Not set"}
                 </span>
-              </>
-            )}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[8px] font-medium uppercase tracking-wide text-gray-400">
+                Domain
+              </p>
+
+              <p className="mt-1 truncate text-[10px] font-semibold text-gray-700">
+                {project.domain || "General"}
+              </p>
+            </div>
+
+          </div>
+
+          {/* PROGRESS */}
+
+          <div className="mt-4">
+
+            <div className="mb-1.5 flex items-center justify-between">
+
+              <span className="text-[8px] font-medium uppercase tracking-wide text-gray-400">
+                Progress
+              </span>
+
+              <span className="text-[9px] font-bold text-gray-700">
+                {progress}%
+              </span>
+
+            </div>
+
+            <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
+
+              <div
+                className="h-full rounded-full bg-[#557bd2] transition-all duration-500"
+                style={{
+                  width: `${progress}%`,
+                }}
+              />
+
+            </div>
+
+          </div>
+
+          {/* MANAGER */}
+
+          <div className="mt-3 flex items-center justify-between">
+
+            <div className="flex min-w-0 items-center gap-2">
+
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-300 to-gray-600 text-[7px] font-bold text-white">
+                {getInitials(
+                  project.manager_name || "PM"
+                )}
+              </div>
+
+              <div className="min-w-0">
+
+                <p className="text-[7px] uppercase tracking-wide text-gray-400">
+                  Project Manager
+                </p>
+
+                <p className="truncate text-[9px] font-semibold text-gray-700">
+                  {project.manager_name || "Not assigned"}
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* =================================================
+              TWO ACTION BUTTONS
+          ================================================= */}
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+
+            {/* VIEW PROJECT */}
+
+            <button
+              onClick={onView}
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-[#edf2ff] py-2.5 text-[9px] font-semibold text-[#5577c4] transition hover:bg-[#dfe8ff] active:scale-[0.98]"
+            >
+              <Eye size={13} />
+
+              View Project
+            </button>
+
+            {/* DETAILS POPUP */}
+
+            <button
+              onClick={() => setDetailsOpen(true)}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white py-2.5 text-[9px] font-semibold text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98]"
+            >
+              <Eye size={13} />
+
+              Details
+            </button>
 
           </div>
 
@@ -1292,80 +1425,242 @@ function ProjectCard({
 
       </div>
 
-      {/* DESCRIPTION */}
+      {/* =====================================================
+          PROJECT DETAILS MODAL
+      ===================================================== */}
 
-      <p className="mt-3 min-h-[32px] line-clamp-2 text-[10px] leading-[1.5] text-gray-600">
-        {description}
-      </p>
-
-      {/* PROGRESS */}
-
-      <div className="mt-3">
-
-        <div className="mb-1 flex items-center justify-between">
-
-          <span className="text-[8px] text-gray-400">
-            Progress
-          </span>
-
-          <span className="text-[8px] font-semibold text-gray-600">
-            {project.progress || 0}%
-          </span>
-
-        </div>
-
-        <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
+      {detailsOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]"
+          onClick={() => setDetailsOpen(false)}
+        >
 
           <div
-            className="h-full rounded-full bg-[#557bd2] transition-all"
-            style={{
-              width: `${Math.min(
-                100,
-                Math.max(
-                  0,
-                  project.progress || 0
-                )
-              )}%`,
-            }}
-          />
+            className="w-full max-w-[560px] overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
 
-        </div>
+            {/* MODAL HEADER */}
 
-      </div>
+            <div className="relative overflow-hidden bg-gradient-to-br from-[#e8f0ff] via-[#f4f7fc] to-[#dfe8f7] px-5 py-5">
 
-      {/* MANAGER */}
+              <div className="absolute -right-10 -top-16 h-40 w-40 rounded-full bg-[#557bd2]/10" />
 
-      {project.manager_name && (
-        <div className="mt-2 text-[8px] text-gray-400">
-          Manager:{" "}
-          <span className="font-medium text-gray-600">
-            {project.manager_name}
-          </span>
+              <div className="relative flex items-start justify-between">
+
+                <div className="flex items-center gap-3">
+
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#557bd2] shadow-sm">
+                    <FolderKanban size={20} />
+                  </div>
+
+                  <div>
+
+                    <h2 className="text-[15px] font-bold text-gray-900">
+                      {project.name}
+                    </h2>
+
+                    <p className="mt-0.5 text-[9px] text-gray-500">
+                      Project Details
+                    </p>
+
+                  </div>
+
+                </div>
+
+                <button
+                  onClick={() =>
+                    setDetailsOpen(false)
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-gray-500 transition hover:bg-white hover:text-gray-900"
+                >
+                  <X size={16} />
+                </button>
+
+              </div>
+
+            </div>
+
+            {/* MODAL CONTENT */}
+
+            <div className="max-h-[65vh] overflow-y-auto p-5">
+
+              {/* STATUS + PROGRESS */}
+
+              <div className="grid grid-cols-2 gap-3">
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+
+                  <p className="text-[8px] font-medium uppercase tracking-wide text-gray-400">
+                    Status
+                  </p>
+
+                  <span
+                    className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[8px] font-semibold ${statusClass}`}
+                  >
+                    {status}
+                  </span>
+
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+
+                  <p className="text-[8px] font-medium uppercase tracking-wide text-gray-400">
+                    Progress
+                  </p>
+
+                  <p className="mt-1 text-[17px] font-bold text-gray-800">
+                    {progress}%
+                  </p>
+
+                </div>
+
+              </div>
+
+              {/* DESCRIPTION */}
+
+              <div className="mt-4 rounded-xl border border-gray-100 p-4">
+
+                <p className="text-[8px] font-semibold uppercase tracking-wide text-gray-400">
+                  Description
+                </p>
+
+                <p className="mt-2 whitespace-pre-wrap text-[10px] leading-5 text-gray-600">
+                  {description}
+                </p>
+
+              </div>
+
+              {/* PROJECT INFORMATION */}
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+
+                <ProjectDetailItem
+                  label="Domain"
+                  value={
+                    project.domain ||
+                    "Not specified"
+                  }
+                />
+
+                <ProjectDetailItem
+                  label="Priority"
+                  value={
+                    project.priority ||
+                    "Not specified"
+                  }
+                />
+
+                <ProjectDetailItem
+                  label="Start Date"
+                  value={
+                    project.start_date
+                      ? formatDate(
+                          project.start_date
+                        )
+                      : "Not specified"
+                  }
+                />
+
+                <ProjectDetailItem
+                  label="Deadline"
+                  value={
+                    project.deadline
+                      ? formatDate(
+                          project.deadline
+                        )
+                      : "Not specified"
+                  }
+                />
+
+                <ProjectDetailItem
+                  label="Project Manager"
+                  value={
+                    project.manager_name ||
+                    "Not assigned"
+                  }
+                />
+
+                <ProjectDetailItem
+                  label="Manager Role"
+                  value={
+                    project.manager_role ||
+                    "Project Manager"
+                  }
+                />
+
+              </div>
+
+              {/* CREATED BY */}
+
+              {project.creator_name && (
+                <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-3">
+
+                  <p className="text-[8px] font-medium uppercase tracking-wide text-gray-400">
+                    Created By
+                  </p>
+
+                  <p className="mt-1 text-[10px] font-semibold text-gray-700">
+                    {project.creator_name}
+                  </p>
+
+                  {project.creator_role && (
+                    <p className="mt-0.5 text-[8px] text-gray-400">
+                      {project.creator_role}
+                    </p>
+                  )}
+
+                </div>
+              )}
+
+            </div>
+
+            {/* MODAL FOOTER */}
+
+            <div className="border-t border-gray-100 bg-gray-50 p-4">
+
+              <button
+                onClick={onView}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#557bd2] py-2.5 text-[10px] font-semibold text-white transition hover:bg-[#456bc2]"
+              >
+                <Eye size={14} />
+
+                Open Project
+              </button>
+
+            </div>
+
+          </div>
+
         </div>
       )}
 
-      {/* BUTTONS */}
+    </>
+  );
+}
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+/* =========================================================
+   PROJECT DETAIL ITEM
+========================================================= */
 
-        <button
-          onClick={onView}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-[#edf2ff] py-2 text-[9px] font-medium text-[#5577c4] transition hover:bg-[#e1e8ff]"
-        >
-          <Eye size={13} />
-          View Project
-        </button>
+function ProjectDetailItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+      <p className="text-[8px] font-medium uppercase tracking-wide text-gray-400">
+        {label}
+      </p>
 
-        <button
-          onClick={onTask}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-[#eaf6ed] py-2 text-[9px] font-medium text-[#458c59] transition hover:bg-[#dff2e4]"
-        >
-          <Plus size={13} />
-          Add Task
-        </button>
-
-      </div>
-
+      <p className="mt-1 truncate text-[10px] font-semibold text-gray-700">
+        {value}
+      </p>
     </div>
   );
 }
