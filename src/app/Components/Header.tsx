@@ -537,7 +537,7 @@ export default function Header() {
     <header
       className="relative overflow-hidden bg-black text-white"
       style={{
-        backgroundImage: "url('/Dashboard-Img/HeaderBackground.jpg')",
+        backgroundImage: "url('/Dashboard-Img/loginimage.jpg')",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
