@@ -115,6 +115,15 @@ function formatDate(date?: string) {
   });
 }
 
+function getTodayDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 function normalizeProject(project: any): Project {
   return {
     id: String(project.id),
@@ -813,85 +822,154 @@ useEffect(() => {
     setTaskDueDate("");
   };
 
-  const handleCreateTask = async () => {
-    if (!taskName.trim()) {
-      alert("Task name is required.");
-      return;
-    }
+const handleCreateTask = async () => {
+  if (!taskName.trim()) {
+    alert("Task name is required.");
+    return;
+  }
 
-    if (!selectedProjectId) {
-      alert("Please select a project.");
-      return;
-    }
+  if (!selectedProjectId) {
+    alert("Please select a project.");
+    return;
+  }
 
-    // Check user role - members can't create tasks
-    const storedUser = localStorage.getItem("user");
-    const currentUser = storedUser ? JSON.parse(storedUser) : null;
-    const isMemberOnly =
-      currentUser?.role === "Member" ||
-      (!currentUser?.role);
+  const selectedProject = projects.find(
+  (project) => project.id === selectedProjectId
+);
 
-    if (isMemberOnly) {
-      alert("Only Project Managers and Admins can create tasks.");
-      return;
-    }
+if (!selectedProject) {
+  alert("Selected project not found.");
+  return;
+}
 
-    try {
-      setCreatingTask(true);
+const projectStartDate = selectedProject.start_date;
 
-      const response = await fetch(
-        `${API_BASE}/tasks/project/${selectedProjectId}`,
-        {
-          method: "POST",
-          headers: {
-            ...authHeaders(),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: taskName.trim(),
-            description: taskDescription.trim() || null,
-            status: taskStatus,
-            priority: taskPriority,
-            assigneeId: taskAssignee || null,
-            startDate: taskStartDate || null,
-            dueDate: taskDueDate || null,
-          }),
-        }
-      );
+  // Get logged-in user
+  const storedUser = localStorage.getItem("user");
+  const loggedInUser = storedUser
+    ? JSON.parse(storedUser)
+    : null;
 
-      const data = await response.json();
+  const isMemberOnly =
+    loggedInUser?.role === "Member" ||
+    !loggedInUser?.role;
 
-      if (!response.ok) {
-        throw new Error(data.error || data.message || "Failed to create task");
+  if (isMemberOnly) {
+    alert("Only Project Managers and Admins can create tasks.");
+    return;
+  }
+
+  // -----------------------------------------
+  // DATE VALIDATION
+  // -----------------------------------------
+
+  const today = getTodayDate();
+
+if (taskStartDate && taskStartDate < today) {
+  alert("Task start date must be today or a future date.");
+  return;
+}
+
+if (projectStartDate && taskStartDate && taskStartDate < projectStartDate) {
+  alert(
+    `Task start date cannot be before the project start date (${formatDate(
+      projectStartDate
+    )}).`
+  );
+  return;
+}
+
+if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
+  alert("Due date must be greater than the task start date.");
+  return;
+}
+
+  // -----------------------------------------
+  // LOGIN USER / PROJECT MANAGER ID
+  // -----------------------------------------
+
+  const projectManagerId = loggedInUser?.id || null;
+
+  try {
+    setCreatingTask(true);
+
+    const response = await fetch(
+      `${API_BASE}/tasks/project/${selectedProjectId}`,
+      {
+        method: "POST",
+        headers: {
+          ...authHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: taskName.trim(),
+          description: taskDescription.trim() || null,
+          status: taskStatus,
+          priority: taskPriority,
+
+          // Selected task assignee
+          assigneeId: taskAssignee || null,
+
+          // Logged-in Project Manager / creator ID
+          projectManagerId,
+
+          startDate: taskStartDate || null,
+          dueDate: taskDueDate || null,
+        }),
       }
+    );
 
-      const backendTask = data.task || data.data || data;
+    const data = await response.json();
 
-      const createdTask = normalizeTask({
-        ...backendTask,
-        project_id:
-          backendTask.project_id ||
-          backendTask.projectId ||
-          selectedProjectId,
-      });
-
-      setTasks((previous) => [createdTask, ...previous]);
-
-      setExpandedProjects((previous) =>
-        previous.includes(selectedProjectId)
-          ? previous
-          : [...previous, selectedProjectId]
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        data.message ||
+        "Failed to create task"
       );
-
-      closeModal();
-    } catch (error: any) {
-      console.error("Create Task Error:", error);
-      alert(error.message || "Failed to create task");
-    } finally {
-      setCreatingTask(false);
     }
-  };
 
+    const backendTask =
+      data.task ||
+      data.data ||
+      data;
+
+    const createdTask = normalizeTask({
+      ...backendTask,
+      project_id:
+        backendTask.project_id ||
+        backendTask.projectId ||
+        selectedProjectId,
+    });
+
+    setTasks((previous) => [
+      createdTask,
+      ...previous,
+    ]);
+
+    setExpandedProjects((previous) =>
+      previous.includes(selectedProjectId)
+        ? previous
+        : [...previous, selectedProjectId]
+    );
+
+    closeModal();
+
+  } catch (error: any) {
+    console.error(
+      "Create Task Error:",
+      error
+    );
+
+    alert(
+      error.message ||
+      "Failed to create task"
+    );
+
+  } finally {
+    setCreatingTask(false);
+  }
+};
   const handleDeleteTask = async (taskId: string) => {
     const task = tasks.find((item) => item.id === taskId);
 
@@ -2017,11 +2095,23 @@ useEffect(() => {
                     <input
                       type="date"
                       value={taskStartDate}
-                      onChange={(event) =>
-                        setTaskStartDate(
-                          event.target.value
-                        )
+                       min={
+                        selectedProjectId
+                          ? (() => {
+                              const project = projects.find(
+                                (p) => p.id === selectedProjectId
+                              );
+                      
+                              const today = getTodayDate();
+                              const projectStart = project?.start_date || "";
+                      
+                              return projectStart > today ? projectStart : today;
+                            })()
+                          : getTodayDate()
                       }
+                        onChange={(event) =>
+                          setTaskStartDate(event.target.value)
+                        }
                       className="h-11 w-full rounded-lg border-2 border-gray-400 bg-gray-50 pl-10 pr-3 text-sm font-semibold text-gray-950 outline-none focus:border-gray-800 focus:bg-white focus:ring-2 focus:ring-gray-200"
                     />
                   </div>
@@ -2041,10 +2131,29 @@ useEffect(() => {
                     <input
                       type="date"
                       value={taskDueDate}
+                      min={
+                        taskStartDate
+                          ? (() => {
+                              const date = new Date(
+                                `${taskStartDate}T00:00:00`
+                              );
+                    
+                              date.setDate(date.getDate() + 1);
+                    
+                              const year = date.getFullYear();
+                              const month = String(
+                                date.getMonth() + 1
+                              ).padStart(2, "0");
+                              const day = String(
+                                date.getDate()
+                              ).padStart(2, "0");
+                    
+                              return `${year}-${month}-${day}`;
+                            })()
+                          : getTodayDate()
+                      }
                       onChange={(event) =>
-                        setTaskDueDate(
-                          event.target.value
-                        )
+                        setTaskDueDate(event.target.value)
                       }
                       className="h-11 w-full rounded-lg border-2 border-gray-400 bg-gray-50 pl-10 pr-3 text-sm font-semibold text-gray-950 outline-none focus:border-gray-800 focus:bg-white focus:ring-2 focus:ring-gray-200"
                     />
