@@ -709,33 +709,6 @@ export default function Teams() {
     canManageTeams,
   ]);
 
-  const memberVisibleProjects = useMemo(() => {
-    if (canManageTeams) {
-      return visibleProjects;
-    }
-
-    // Members see only projects where they have tasks
-    return visibleProjects.filter((project) => {
-      const projectTasks = tasks.filter(
-        (task) =>
-          String(task.project_id) ===
-          String(project.id)
-      );
-
-      // Show if task is assigned to member
-      return projectTasks.some(
-        (task) =>
-          String(task.assignee_id) ===
-          String(currentUserId)
-      );
-    });
-  }, [
-    visibleProjects,
-    canManageTeams,
-    tasks,
-    currentUserId,
-  ]);
-
   /* =========================================================
      FORM STATES
   ========================================================= */
@@ -3516,5 +3489,3 @@ export default function Teams() {
     </main>
   );
 }
-
-
