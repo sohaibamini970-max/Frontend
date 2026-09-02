@@ -2080,7 +2080,6 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
                     type="text"
                     value={taskAssignee}
                     className="h-11 w-full rounded-lg border-2 border-gray-400 bg-gray-50 px-3.5 text-sm font-semibold text-gray-950 outline-none focus:border-gray-800 focus:bg-white focus:ring-2 focus:ring-gray-200"
-                  >
                   
                   />
                 </div>
