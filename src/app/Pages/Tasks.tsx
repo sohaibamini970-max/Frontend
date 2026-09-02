@@ -75,6 +75,17 @@ type User = {
   role?: string;
 };
 
+type TaskChallenge = {
+  id: string;
+  task_id: string;
+  user_id: string;
+  challenge: string;
+  author_name?: string;
+  author_email?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 const API_BASE = "https://backend-five-swart-88.vercel.app/api";
 
 function getToken() {
@@ -396,6 +407,57 @@ useEffect(() => {
   const [taskAssignee, setTaskAssignee] = useState("");
   const [taskStartDate, setTaskStartDate] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
+
+  const [challengeModalOpen, setChallengeModalOpen] =
+  useState(false);
+
+const [selectedChallengeTask, setSelectedChallengeTask] =
+  useState<Task | null>(null);
+
+const [challenges, setChallenges] =
+  useState<TaskChallenge[]>([]);
+
+const [challengeText, setChallengeText] =
+  useState("");
+
+const [loadingChallenges, setLoadingChallenges] =
+  useState(false);
+
+const [savingChallenge, setSavingChallenge] =
+  useState(false);
+
+const [deletingChallenge, setDeletingChallenge] =
+  useState<string | null>(null);
+
+const [challengeCounts, setChallengeCounts] =
+  useState<Record<string, number>>({});
+
+  const isManagementRole =
+  currentUser?.role === "System Administrator" ||
+  currentUser?.role === "Executive Manager" ||
+  currentUser?.role === "Project Manager";
+
+  const isMember =
+  currentUser?.role === "Member";
+
+  const canWriteChallenge = (task: Task) => {
+  return (
+    isMember &&
+    String(task.assignee_id || "") ===
+      String(currentUser?.id || "")
+  );
+};
+
+const canReadChallenge = (task: Task) => {
+  return (
+    isManagementRole ||
+    (
+      isMember &&
+      String(task.assignee_id || "") ===
+        String(currentUser?.id || "")
+    )
+  );
+};
 
   useEffect(() => {
     fetchProjectsAndTasks();
@@ -1040,6 +1102,206 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
     }
   };
 
+  const fetchTaskChallenges = async (task: Task) => {
+  try {
+    setLoadingChallenges(true);
+
+    const response = await fetch(
+      `${API_BASE}/challenges/task/${task.id}`,
+      {
+        headers: authHeaders(),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        data.message ||
+        "Failed to load challenges"
+      );
+    }
+
+    setChallenges(
+      Array.isArray(data.challenges)
+        ? data.challenges
+        : []
+    );
+  } catch (error: any) {
+    console.error(
+      "Fetch challenges error:",
+      error
+    );
+
+    setChallenges([]);
+
+    alert(
+      error.message ||
+      "Failed to load challenges"
+    );
+  } finally {
+    setLoadingChallenges(false);
+  }
+};
+  const openChallenges = async (task: Task) => {
+  if (!canReadChallenge(task)) {
+    alert(
+      "You are not authorized to view challenges for this task."
+    );
+    return;
+  }
+
+  setSelectedChallengeTask(task);
+  setChallengeText("");
+  setChallenges([]);
+  setChallengeModalOpen(true);
+  setOpenTaskMenu(null);
+
+  await fetchTaskChallenges(task);
+};
+
+  const closeChallenges = () => {
+  if (savingChallenge) return;
+
+  setChallengeModalOpen(false);
+  setSelectedChallengeTask(null);
+  setChallenges([]);
+  setChallengeText("");
+};
+
+  const handleAddChallenge = async () => {
+  if (!selectedChallengeTask) return;
+
+  if (!canWriteChallenge(selectedChallengeTask)) {
+    alert(
+      "Only the Member assigned to this task can add challenges."
+    );
+    return;
+  }
+
+  if (!challengeText.trim()) {
+    alert("Please write the problem or challenge.");
+    return;
+  }
+
+  try {
+    setSavingChallenge(true);
+
+    const response = await fetch(
+      `${API_BASE}/challenges/task/${selectedChallengeTask.id}`,
+      {
+        method: "POST",
+        headers: {
+          ...authHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          challenge: challengeText.trim(),
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        data.message ||
+        "Failed to add challenge"
+      );
+    }
+
+    if (data.challenge) {
+      setChallenges((previous) => [
+        ...previous,
+        data.challenge,
+      ]);
+    } else {
+      await fetchTaskChallenges(
+        selectedChallengeTask
+      );
+    }
+
+    setChallengeText("");
+  } catch (error: any) {
+    console.error(
+      "Add challenge error:",
+      error
+    );
+
+    alert(
+      error.message ||
+      "Failed to add challenge"
+    );
+  } finally {
+    setSavingChallenge(false);
+  }
+};
+
+  const handleDeleteChallenge = async (
+  challengeId: string
+) => {
+  const confirmed = window.confirm(
+    "Are you sure you want to delete this challenge?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    setDeletingChallenge(challengeId);
+
+    const response = await fetch(
+      `${API_BASE}/challenges/${challengeId}`,
+      {
+        method: "DELETE",
+        headers: authHeaders(),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        data.message ||
+        "Failed to delete challenge"
+      );
+    }
+
+    setChallenges((previous) =>
+      previous.filter(
+        (challenge) =>
+          challenge.id !== challengeId
+      )
+    );
+  } catch (error: any) {
+    console.error(
+      "Delete challenge error:",
+      error
+    );
+
+    alert(
+      error.message ||
+      "Failed to delete challenge"
+    );
+  } finally {
+    setDeletingChallenge(null);
+  }
+};
+
+  const loadedChallenges =
+  Array.isArray(data.challenges)
+    ? data.challenges
+    : [];
+
+setChallenges(loadedChallenges);
+
+setChallengeCounts((previous) => ({
+  ...previous,
+  [task.id]: loadedChallenges.length,
+}));
+
   const handleTaskStatusChange = async (
     taskId: string,
     status: TaskStatus
@@ -1121,6 +1383,8 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
       </main>
     );
   }
+
+  
 
   return (
     <>
@@ -1613,6 +1877,25 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
                                         </div>
 
                                         <div className="relative flex shrink-0 items-center gap-2">
+
+                                         {canReadChallenge(task) && (
+                                          <button
+                                            onClick={() => openChallenges(task)}
+                                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-2.5 text-[10px] font-bold text-violet-800 hover:bg-violet-100"
+                                            title="View task challenges"
+                                          >
+                                            <Flag size={13} />
+                                        
+                                            Challenges
+                                        
+                                            {challengeCounts[task.id] !== undefined && (
+                                              <span className="rounded-full bg-violet-200 px-1.5 py-0.5 text-[9px] font-bold text-violet-900">
+                                                {challengeCounts[task.id]}
+                                              </span>
+                                            )}
+                                          </button>
+                                        )}
+                                          
                                           <button
                                             onClick={() =>
                                               setOpenTaskMenu(
@@ -2238,6 +2521,283 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
           </div>
         </div>
       )}
+
+      {/* Challengez model */}
+      {challengeModalOpen && selectedChallengeTask && (
+  <div
+    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
+    onMouseDown={(event) => {
+      if (
+        event.target === event.currentTarget &&
+        !savingChallenge
+      ) {
+        closeChallenges();
+      }
+    }}
+  >
+    <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border-2 border-gray-500 bg-white shadow-2xl">
+
+      {/* HEADER */}
+      <div className="flex items-start justify-between border-b-2 border-gray-300 bg-[#f7f8fa] px-6 py-5">
+
+        <div className="min-w-0">
+
+          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm">
+            <Flag size={18} />
+          </div>
+
+          <h2 className="text-lg font-bold tracking-tight text-gray-950">
+            Task Challenges
+          </h2>
+
+          <p className="mt-1 text-xs font-medium text-gray-600">
+            Problems and challenges faced while performing this task.
+          </p>
+
+          <div className="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">
+              Task
+            </p>
+
+            <p className="mt-0.5 text-sm font-bold text-gray-950">
+              {selectedChallengeTask.name}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={closeChallenges}
+          disabled={savingChallenge}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-200 hover:text-gray-950 disabled:opacity-50"
+        >
+          <X size={19} />
+        </button>
+      </div>
+
+      {/* CONTENT */}
+      <div className="overflow-y-auto bg-[#eef1f4] px-6 py-6">
+
+        {/* EXISTING CHALLENGES */}
+        <div>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-gray-950">
+                Reported challenges
+              </h3>
+
+              <p className="mt-1 text-xs font-medium text-gray-600">
+                Challenges already reported for this task.
+              </p>
+            </div>
+
+            <span className="rounded-full border border-violet-300 bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-800">
+              {challenges.length}{" "}
+              {challenges.length === 1
+                ? "Challenge"
+                : "Challenges"}
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-3">
+
+            {loadingChallenges ? (
+              <div className="flex min-h-[130px] items-center justify-center rounded-xl border-2 border-gray-300 bg-white">
+                <div className="text-center">
+                  <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+
+                  <p className="mt-2 text-xs font-semibold text-gray-600">
+                    Loading challenges...
+                  </p>
+                </div>
+              </div>
+            ) : challenges.length === 0 ? (
+              <div className="rounded-xl border-2 border-dashed border-gray-400 bg-white px-5 py-10 text-center">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-600">
+                  <Flag size={18} />
+                </div>
+
+                <p className="mt-3 text-sm font-bold text-gray-950">
+                  No challenges reported
+                </p>
+
+                <p className="mt-1 text-xs font-medium text-gray-600">
+                  No problems or challenges have been recorded for this task yet.
+                </p>
+              </div>
+            ) : (
+              challenges.map((challenge, index) => (
+                <div
+                  key={challenge.id}
+                  className="rounded-xl border-2 border-gray-300 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-start gap-3">
+
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-xs font-bold text-violet-800">
+                      {index + 1}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+
+                      <div className="flex items-start justify-between gap-3">
+
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                            Reported by
+                          </p>
+
+                          <p className="mt-0.5 text-xs font-bold text-gray-950">
+                            {challenge.author_name ||
+                              "Member"}
+                          </p>
+                        </div>
+
+                        {(isManagementRole ||
+                          String(challenge.user_id) ===
+                            String(currentUser?.id)) && (
+                          <button
+                            onClick={() =>
+                              handleDeleteChallenge(
+                                challenge.id
+                              )
+                            }
+                            disabled={
+                              deletingChallenge ===
+                              challenge.id
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                            title="Delete challenge"
+                          >
+                            {deletingChallenge ===
+                            challenge.id ? (
+                              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-red-600" />
+                            ) : (
+                              <Trash2 size={14} />
+                            )}
+                          </button>
+                        )}
+
+                      </div>
+
+                      <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3.5 py-3">
+                        <p className="whitespace-pre-wrap text-xs font-medium leading-relaxed text-gray-800">
+                          {challenge.challenge}
+                        </p>
+                      </div>
+
+                      {challenge.created_at && (
+                        <p className="mt-2 text-[10px] font-medium text-gray-500">
+                          {formatDate(
+                            challenge.created_at
+                          )}
+                        </p>
+                      )}
+
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* MEMBER INPUT */}
+        {canWriteChallenge(selectedChallengeTask) && (
+          <div className="mt-6 rounded-xl border-2 border-violet-300 bg-violet-50 p-4">
+
+            <div className="flex items-start gap-3">
+
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-violet-700 shadow-sm">
+                <Flag size={16} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+
+                <h3 className="text-sm font-bold text-gray-950">
+                  Report a problem or challenge
+                </h3>
+
+                <p className="mt-1 text-xs font-medium leading-relaxed text-gray-700">
+                  Describe any problem, blocker, difficulty, or challenge you faced while performing this task.
+                </p>
+
+                <textarea
+                  value={challengeText}
+                  onChange={(event) =>
+                    setChallengeText(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Example: The API response was delayed and prevented me from completing the integration..."
+                  rows={5}
+                  className="mt-4 w-full resize-none rounded-lg border-2 border-gray-400 bg-white px-3.5 py-3 text-sm font-medium text-gray-950 caret-gray-950 outline-none placeholder:text-gray-500 focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
+                />
+
+                <div className="mt-3 flex justify-end">
+                  <button
+                    onClick={handleAddChallenge}
+                    disabled={
+                      savingChallenge ||
+                      !challengeText.trim()
+                    }
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {savingChallenge ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={15} />
+                        Add challenge
+                      </>
+                    )}
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MANAGEMENT MESSAGE */}
+        {isManagementRole && (
+          <div className="mt-6 rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
+            <div className="flex gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700">
+                <Users size={15} />
+              </div>
+
+              <div>
+                <p className="text-xs font-bold text-gray-950">
+                  Management view
+                </p>
+
+                <p className="mt-1 text-[11px] font-medium leading-relaxed text-gray-700">
+                  You can review the challenges reported by the member assigned to this task. Only the assigned Member can submit new challenges.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* FOOTER */}
+      <div className="flex justify-end border-t-2 border-gray-300 bg-[#f5f6f8] px-6 py-4">
+
+        <button
+          onClick={closeChallenges}
+          disabled={savingChallenge}
+          className="h-10 rounded-lg border-2 border-gray-400 bg-white px-5 text-sm font-semibold text-gray-900 hover:bg-gray-100 disabled:opacity-50"
+        >
+          Close
+        </button>
+
+      </div>
+    </div>
+  </div>
+)}
     </>
   );
 }
