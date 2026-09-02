@@ -2076,28 +2076,13 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
                     Assignee
                   </label>
 
-                  <select
+                  <input
+                    type="text"
                     value={taskAssignee}
-                    onChange={(event) =>
-                      setTaskAssignee(
-                        event.target.value
-                      )
-                    }
                     className="h-11 w-full rounded-lg border-2 border-gray-400 bg-gray-50 px-3.5 text-sm font-semibold text-gray-950 outline-none focus:border-gray-800 focus:bg-white focus:ring-2 focus:ring-gray-200"
                   >
-                    <option value="">
-                      Select team member
-                    </option>
-
-                    {users.map((user) => (
-                      <option
-                        key={user.id}
-                        value={user.id}
-                      >
-                        {user.full_name}
-                      </option>
-                    ))}
-                  </select>
+                  
+                  />
                 </div>
 
                 <div>
