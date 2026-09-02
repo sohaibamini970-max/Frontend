@@ -86,7 +86,7 @@ type Team = {
 // ============================================================
 
 const API_BASE =
-  "http://localhost:5000/api";
+  "https://backend-five-swart-88.vercel.app//api";
 
 export default function TeamsPage() {
   const router = useRouter();
