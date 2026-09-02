@@ -2532,42 +2532,63 @@ const fetchTaskChallenges = async (task: Task) => {
   >
     <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border-2 border-gray-500 bg-white shadow-2xl">
 
-      {/* HEADER */}
-      <div className="flex items-start justify-between border-b-2 border-gray-300 bg-[#f7f8fa] px-3 py-5">
+      {/* Challenge Modal Header */}
+
+<div className="shrink-0 border-b border-gray-200 bg-white px-5 py-3">
+
+  <div className="flex items-center justify-between gap-3">
+
+    <div className="min-w-0">
+
+      <div className="flex items-center gap-2">
+
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100">
+
+          <Flag size={16} className="text-violet-700" />
+
+        </div>
 
         <div className="min-w-0">
 
-          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm">
-            <Flag size={18} />
-          </div>
+          <h2 className="truncate text-base font-bold text-gray-950">
 
-          <h2 className="text-lg font-bold tracking-tight text-gray-950">
             Task Challenges
+
           </h2>
 
-          <p className="mt-1 text-xs font-medium text-gray-600">
-            Problems and challenges faced while performing this task.
+          <p className="truncate text-[11px] text-gray-500">
+
+            {selectedChallengeTask?.name}
+
           </p>
 
-          <div className="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">
-              Task
-            </p>
-
-            <p className="mt-0.5 text-sm font-bold text-gray-950">
-              {selectedChallengeTask.name}
-            </p>
-          </div>
         </div>
 
-        <button
-          onClick={closeChallenges}
-          disabled={savingChallenge}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-200 hover:text-gray-950 disabled:opacity-50"
-        >
-          <X size={19} />
-        </button>
       </div>
+
+    </div>
+
+    <button
+
+      type="button"
+
+      onClick={closeChallenges}
+
+      disabled={savingChallenge}
+
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+
+      aria-label="Close challenges"
+
+    >
+
+      <X size={18} />
+
+    </button>
+
+  </div>
+
+</div>
 
       {/* CONTENT */}
       <div className="overflow-y-auto bg-[#eef1f4] px-6 py-6">
