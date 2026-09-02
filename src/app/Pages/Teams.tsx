@@ -2117,13 +2117,19 @@ const loadData = async () => {
         {/* =================================================
             MAIN WORKSPACE
         ================================================= */}
-
-        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(380px,0.9fr)]">
+            
+            <div
+              className={`mt-5 ${
+              canManageTeams
+                ? "grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(380px,0.9fr)]"
+                : "mx-auto flex max-w-3xl justify-center"
+              }`}
+            >
 
           {/* =================================================
               PROJECT PANEL
           ================================================= */}
-
+          {canManageTeams && (
           <section className="min-w-0 overflow-hidden rounded-2xl border border-gray-300 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-gray-300 bg-[#07111f] px-5 py-4">
               <div className="flex items-center gap-3">
@@ -2475,7 +2481,7 @@ const loadData = async () => {
               </div>
             </div>
           </section>
-
+  )}
           {/* =================================================
               TEAM PANEL
           ================================================= */}
