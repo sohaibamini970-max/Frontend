@@ -2533,7 +2533,7 @@ const fetchTaskChallenges = async (task: Task) => {
     <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border-2 border-gray-500 bg-white shadow-2xl">
 
       {/* HEADER */}
-      <div className="flex items-start justify-between border-b-2 border-gray-300 bg-[#f7f8fa] px-6 py-5">
+      <div className="flex items-start justify-between border-b-2 border-gray-300 bg-[#f7f8fa] px-3 py-5">
 
         <div className="min-w-0">
 
