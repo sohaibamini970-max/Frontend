@@ -1102,7 +1102,7 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
     }
   };
 
-  const fetchTaskChallenges = async (task: Task) => {
+const fetchTaskChallenges = async (task: Task) => {
   try {
     setLoadingChallenges(true);
 
@@ -1123,11 +1123,17 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
       );
     }
 
-    setChallenges(
+    const loadedChallenges =
       Array.isArray(data.challenges)
         ? data.challenges
-        : []
-    );
+        : [];
+
+    setChallenges(loadedChallenges);
+
+    setChallengeCounts((previous) => ({
+      ...previous,
+      [task.id]: loadedChallenges.length,
+    }));
   } catch (error: any) {
     console.error(
       "Fetch challenges error:",
@@ -1144,6 +1150,7 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
     setLoadingChallenges(false);
   }
 };
+  
   const openChallenges = async (task: Task) => {
   if (!canReadChallenge(task)) {
     alert(
@@ -1289,18 +1296,6 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
     setDeletingChallenge(null);
   }
 };
-
-  const loadedChallenges =
-  Array.isArray(data.challenges)
-    ? data.challenges
-    : [];
-
-setChallenges(loadedChallenges);
-
-setChallengeCounts((previous) => ({
-  ...previous,
-  [task.id]: loadedChallenges.length,
-}));
 
   const handleTaskStatusChange = async (
     taskId: string,
