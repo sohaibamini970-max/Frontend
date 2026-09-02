@@ -343,6 +343,8 @@ useEffect(() => {
   const storedUser = localStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   setCurrentUser(user);
+
+  setTaskAssignee(user?.id || "");
   
   const isAdminUser =
     user?.role === "System Administrator" ||
@@ -814,7 +816,12 @@ useEffect(() => {
     setTaskDescription("");
     setTaskPriority("Medium");
     setTaskStatus("To Do");
-    setTaskAssignee("");
+    
+     // Automatically use logged-in user's ID
+     const storedUser = localStorage.getItem("user");
+     const user = storedUser ? JSON.parse(storedUser) : null;
+     setTaskAssignee(user?.id || "");
+    
     setTaskStartDate("");
     setTaskDueDate("");
 
@@ -920,7 +927,7 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
           priority: taskPriority,
 
           // Selected task assignee
-          assigneeId: taskAssignee || null,
+          assigneeId: taskAssignee,
 
           // Logged-in Project Manager / creator ID
           projectManagerId,
