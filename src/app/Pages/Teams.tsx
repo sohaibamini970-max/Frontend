@@ -605,52 +605,60 @@ export default function Teams() {
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
 
-  useEffect(() => {
-    try {
-      const storedUser =
-        localStorage.getItem("user");
+  const [authReady, setAuthReady] = useState(false);
 
-      if (storedUser) {
-        const parsed = JSON.parse(
-          storedUser
-        );
+useEffect(() => {
+  try {
+    const storedUser = localStorage.getItem("user");
 
-        /*
-          Supports both:
-          
-          {
-            id: "...",
-            role: "Member"
-          }
-
-          and:
-
-          {
-            user: {
-              id: "...",
-              role: "Member"
-            }
-          }
-        */
-
-        const userData =
-          parsed?.user || parsed;
-
-        setCurrentUserRole(
-          userData?.role || "Member"
-        );
-
-        setCurrentUserId(
-          userData?.id
-            ? String(userData.id)
-            : null
-        );
-      }
-    } catch {
+    if (!storedUser) {
       setCurrentUserRole("Member");
       setCurrentUserId(null);
+      return;
     }
-  }, []);
+
+    const parsed = JSON.parse(storedUser);
+
+    const userData = parsed?.user || parsed;
+
+    const userId =
+      userData?.id ??
+      userData?.user_id ??
+      userData?.userId ??
+      parsed?.id ??
+      parsed?.user_id ??
+      parsed?.userId;
+
+    const role =
+      userData?.role ??
+      parsed?.role ??
+      "Member";
+
+    console.log("========== TEAMS AUTH ==========");
+    console.log("Stored user:", parsed);
+    console.log("Detected role:", role);
+    console.log("Detected user ID:", userId);
+    console.log("=================================");
+
+    setCurrentUserRole(role);
+    setCurrentUserId(
+      userId !== undefined &&
+      userId !== null
+        ? String(userId)
+        : null
+    );
+  } catch (error) {
+    console.error(
+      "Failed to read logged-in user:",
+      error
+    );
+
+    setCurrentUserRole("Member");
+    setCurrentUserId(null);
+  } finally {
+    setAuthReady(true);
+  }
+}, []);
 
   /* =========================================================
      MANAGEMENT PERMISSION
@@ -735,60 +743,126 @@ export default function Teams() {
      LOAD DATA
   ========================================================= */
 
-  const loadData = async () => {
-    try {
-      setRefreshing(true);
-      setError("");
+const loadData = async () => {
+  try {
+    setRefreshing(true);
+    setError("");
 
-      const projectData =
-        await fetchProjects();
+    console.log("========== LOAD TEAMS DATA ==========");
+    console.log("Current role:", currentUserRole);
+    console.log("Current user ID:", currentUserId);
+    console.log("Can manage:", canManageTeams);
 
-      setProjects(projectData);
+    const projectData = await fetchProjects();
 
-      setExpandedProjects(
-        projectData.map(
-          (project) => project.id
-        )
-      );
+    setProjects(projectData);
 
+    setExpandedProjects(
+      projectData.map(
+        (project) => project.id
+      )
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | MEMBER
+    |--------------------------------------------------------------------------
+    |
+    | Members DO NOT call:
+    |   /users
+    |   /teams/available-members
+    |
+    | They only need:
+    |   projects
+    |   tasks
+    |   their team
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    if (currentUserRole === "Member") {
       const [
         taskData,
-        allUsersData,
         teamsData,
-        unassignedData,
       ] = await Promise.all([
         fetchTasks(projectData),
-        fetchAllUsers(),
         fetchTeamsWithMembers(),
-        fetchUnassignedMembers(),
       ]);
 
+      console.log(
+        "Member teams:",
+        teamsData
+      );
+
       setTasks(taskData);
-      setAllMembers(allUsersData);
       setTeams(teamsData);
 
-      setUnassignedMembers(
-        unassignedData
-      );
-    } catch (err: any) {
-      console.error(
-        "Teams workspace error:",
-        err
-      );
+      // Member does not need management datasets
+      setAllMembers([]);
+      setUnassignedMembers([]);
 
-      setError(
-        err?.message ||
-          "Unable to load workspace data."
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      return;
     }
-  };
+
+    /*
+    |--------------------------------------------------------------------------
+    | MANAGEMENT
+    |--------------------------------------------------------------------------
+    |
+    | Preserve existing behavior for:
+    | Project Manager
+    | Executive Manager
+    | System Administrator
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    const [
+      taskData,
+      allUsersData,
+      teamsData,
+      unassignedData,
+    ] = await Promise.all([
+      fetchTasks(projectData),
+      fetchAllUsers(),
+      fetchTeamsWithMembers(),
+      fetchUnassignedMembers(),
+    ]);
+
+    setTasks(taskData);
+    setAllMembers(allUsersData);
+    setTeams(teamsData);
+    setUnassignedMembers(
+      unassignedData
+    );
+
+  } catch (err: any) {
+    console.error(
+      "Teams workspace error:",
+      err
+    );
+
+    setError(
+      err?.message ||
+        "Unable to load workspace data."
+    );
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   useEffect(() => {
-    loadData();
-  }, []);
+  if (!authReady) {
+    return;
+  }
+
+  loadData();
+}, [
+  authReady,
+  currentUserRole,
+  currentUserId,
+]);
 
   /* =========================================================
      PROJECT FILTER
