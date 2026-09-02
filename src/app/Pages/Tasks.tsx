@@ -2075,19 +2075,30 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
                   <label className="mb-2 block text-xs font-bold text-gray-950">
                     Assignee
                   </label>
-
-                  <input
-                    type="text"
-                     value={
-                      users.find((user) => user.id === taskAssignee)?.full_name ||
-                      currentUser?.full_name ||
-                      "Current User"
+                   <select
+                    value={taskAssignee}
+                    onChange={(event) =>
+                      setTaskAssignee(
+                        event.target.value
+                      )
                     }
                     className="h-11 w-full rounded-lg border-2 border-gray-400 bg-gray-50 px-3.5 text-sm font-semibold text-gray-950 outline-none focus:border-gray-800 focus:bg-white focus:ring-2 focus:ring-gray-200"
-                  
-                  />
-                </div>
+                  >
+                    <option value="">
+                      Select team member
+                    </option>
 
+                    {users.map((user) => (
+                      <option
+                        key={user.id}
+                        value={user.id}
+                      >
+                        {user.full_name}
+                      </option>
+                    ))}
+                  </select>
+                  
+                </div>
                 <div>
                   <label className="mb-2 block text-xs font-bold text-gray-950">
                     Start date
