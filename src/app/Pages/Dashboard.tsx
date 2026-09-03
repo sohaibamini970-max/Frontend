@@ -1097,184 +1097,208 @@ export default function Dashboard() {
         {/* =================================================
             ROW 1 — PROJECTS OVERVIEW
         ================================================= */}
+<section className="mb-7 overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
 
-        <section className="mb-7 overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
+  {/* =========================================================
+      HEADER
+  ========================================================= */}
+  <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
 
-          <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+    <div>
+      <div className="flex items-center gap-3">
 
-            <div>
-              <div className="flex items-center gap-3">
+        <h2 className="text-[12px] font-bold text-[#172633]">
+          Projects Overview
+        </h2>
 
-                <h2 className="text-[12px] font-bold text-[#172633]">
-                  Projects Overview
-                </h2>
+        <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[13px] font-bold text-[#557bd2]">
+          {projectOverview.length}
+        </span>
 
-                <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[13px] font-bold text-[#557bd2]">
-                  {projectOverview.length}
-                </span>
+      </div>
 
-              </div>
+      <p className="mt-1.5 text-[12px] text-[#7b8794]">
+        Track project progress and task completion at a glance
+      </p>
+    </div>
 
-              <p className="mt-1.5 text-[12px] text-[#7b8794]">
-                Track project progress and task completion at a glance
-              </p>
-            </div>
+    <div className="flex w-fit items-center gap-2.5 rounded-xl border border-[#dfe5ea] bg-[#fafbfd] px-4 py-3">
 
-            <div className="flex w-fit items-center gap-2.5 rounded-xl border border-[#dfe5ea] bg-[#fafbfd] px-4 py-3">
+      <CalendarDays
+        size={15}
+        className="text-[#557bd2]"
+      />
 
-              <CalendarDays
-                size={15}
-                className="text-[#557bd2]"
-              />
+      <span className="text-[13px] font-semibold text-[#53616d]">
+        Data:{" "}
+        {new Date().toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}
+      </span>
 
-              <span className="text-[13px] font-semibold text-[#53616d]">
-                Data: {" "}
-                {new Date().toLocaleDateString(
-                  "en-US",
-                  {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
+    </div>
+
+  </div>
+
+  {/* =========================================================
+      EMPTY STATE
+  ========================================================= */}
+  {projectOverview.length === 0 ? (
+
+    <div className="flex min-h-[330px] items-center justify-center px-5">
+
+      <EmptyState
+        title={
+          isProjectManager
+            ? "No projects assigned to you"
+            : isMember
+            ? "No assigned projects yet"
+            : "No projects available"
+        }
+        description={
+          isProjectManager
+            ? "Projects assigned to you will appear here."
+            : isMember
+            ? "Projects will appear here when tasks are assigned to you."
+            : "Projects will appear here once they are created."
+        }
+      />
+
+    </div>
+
+  ) : (
+
+    /* =========================================================
+       CHART
+    ========================================================= */
+    <div className="px-5 pb-6 pt-7 sm:px-7 sm:pb-7">
+
+      <div className="relative">
+
+        {/* =====================================================
+            ONLY BOTTOM BASELINE
+            No horizontal background/grid lines
+        ===================================================== */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-[72px] h-px bg-[#6f7b87]" />
+
+        {/* =====================================================
+            PROJECT BARS
+        ===================================================== */}
+        <div className="relative grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+
+          {projectOverview.map(
+            (
+              {
+                project,
+                totalTasks,
+                completedTasks,
+                progress,
+              },
+              index
+            ) => {
+
+              const color =
+                PROJECT_OVERVIEW_COLORS[
+                  index % PROJECT_OVERVIEW_COLORS.length
+                ];
+
+              return (
+                <button
+                  key={project.id}
+                  type="button"
+                  onClick={() =>
+                    setSelectedOverviewProject(project)
                   }
-                )}
-              </span>
+                  className="group flex min-w-0 flex-col items-center rounded-xl px-2 pt-1 transition hover:bg-[#fafbfd]"
+                >
 
-            </div>
-          </div>
+                  {/* =================================================
+                      PERCENTAGE
+                  ================================================= */}
+                  <div className="mb-3 h-6">
 
-          {projectOverview.length === 0 ? (
+                    <span className="text-[15px] font-bold text-[#172633] transition group-hover:text-[#557bd2]">
+                      {progress}%
+                    </span>
 
-            <div className="flex min-h-[330px] items-center justify-center px-5">
-              <EmptyState
-                title={
-                  isProjectManager
-                    ? "No projects assigned to you"
-                    : isMember
-                    ? "No assigned projects yet"
-                    : "No projects available"
-                }
-                description={
-                  isProjectManager
-                    ? "Projects assigned to you will appear here."
-                    : isMember
-                    ? "Projects will appear here when tasks are assigned to you."
-                    : "Projects will appear here once they are created."
-                }
-              />
-            </div>
+                  </div>
 
-          ) : (
+                  {/* =================================================
+                      BAR AREA
+                      Same size / width as your current chart
+                  ================================================= */}
+                  <div className="relative flex h-[200px] w-full max-w-[42px] items-end justify-center">
 
-            <div className="px-5 pb-6 pt-7 sm:px-7 sm:pb-7">
+                    {/* Very subtle background column */}
+                    <div
+                      className={`absolute bottom-0 h-full w-full rounded-t-xl opacity-[0.035] ${color.bar}`}
+                    />
 
-              <div className="relative">
+                    {/* Actual progress bar */}
+                    <div
+                      className={`relative z-10 w-full rounded-t-xl bg-gradient-to-t ${color.bar} shadow-[0_8px_18px_rgba(85,123,210,0.16)] transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_12px_25px_rgba(85,123,210,0.22)]`}
+                      style={{
+                        height: `${Math.max(
+                          progress,
+                          progress === 0 ? 2 : 8
+                        )}%`,
+                      }}
+                    >
 
-                <div className="pointer-events-none absolute inset-x-0 bottom-[95px] top-0 flex flex-col justify-between">
+                      {/* Soft highlight inside bar */}
+                      <div className="absolute inset-x-0 top-0 h-12 rounded-t-xl bg-white/10" />
 
-                  <div className="h-px w-full bg-[#edf0f3]" />
-                  <div className="h-px w-full bg-[#edf0f3]" />
-                  <div className="h-px w-full bg-[#edf0f3]" />
-                  <div className="h-px w-full bg-[#edf0f3]" />
-                  <div className="h-px w-full bg-[#edf0f3]" />
-                  <div className="h-px w-full bg-[#edf0f3]" />
+                    </div>
 
-                </div>
+                  </div>
 
-                <div className="relative grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                  {/* =================================================
+                      PROJECT NAME
+                      No icon
+                  ================================================= */}
+                  <div className="mt-3 min-h-[40px] w-full text-center">
 
-                  {projectOverview.map(
-                    (
-                      {
-                        project,
-                        totalTasks,
-                        completedTasks,
-                        progress,
-                      },
-                      index
-                    ) => {
+                    <p className="line-clamp-2 text-[11px] font-bold uppercase leading-5 text-[#172633] transition group-hover:text-[#557bd2]">
+                      {project.name}
+                    </p>
 
-                      const color =
-                        PROJECT_OVERVIEW_COLORS[
-                          index %
-                            PROJECT_OVERVIEW_COLORS.length
-                        ];
+                  </div>
 
-                      return (
-                        <button
-                          key={project.id}
-                          type="button"
-                          onClick={() =>
-                            setSelectedOverviewProject(
-                              project
-                            )
-                          }
-                          className="group flex min-w-0 flex-col items-center rounded-xl px-2 pt-1 transition hover:bg-[#fafbfd]"
-                        >
-
-                          <div className="mb-3 h-6">
-                            <span className="text-[15px] font-bold text-[#172633] transition group-hover:text-[#557bd2]">
-                              {progress}%
-                            </span>
-                          </div>
-
-                          <div className="relative flex h-[200px] w-full max-w-[42px] items-end justify-center">
-
-                            <div className="absolute bottom-0 h-full w-full rounded-t-xl bg-[#BDBBBB]" />
-
-                            <div
-                              className={`relative z-10 w-full rounded-t-xl bg-gradient-to-t ${color.bar} shadow-[0_8px_18px_rgba(85,123,210,0.18)] transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_12px_25px_rgba(85,123,210,0.25)]`}
-                              style={{
-                                height: `${Math.max(
-                                  progress,
-                                  progress === 0
-                                    ? 2
-                                    : 8
-                                )}%`,
-                              }}
-                            >
-                              <div className="absolute inset-x-0 top-0 h-14 rounded-t-xl bg-white/10" />
-                            </div>
-
-                          </div>
-
-                          <div className="mt-3 min-h-[40px] w-full text-center">
-
-                            <p className="line-clamp-2 text-[11px] font-bold uppercase leading-5 text-[#172633]">
-                              {project.name}
-                            </p>
-
-                          </div>
-
-                        </button>
-                      );
-                    }
-                  )}
-
-                </div>
-              </div>
-
-              <div className="mt-6 flex items-center justify-center">
-
-                <div className="flex items-center gap-2.5 rounded-full bg-[#f7f9fb] px-5 py-2.5">
-
-                  <Eye
-                    size={18}
-                    className="text-[#557bd2]"
-                  />
-
-                  <span className="text-[14px] font-medium text-[#7b8794]">
-                    Click any project bar to view detailed progress
-                  </span>
-
-                </div>
-
-              </div>
-
-            </div>
+                </button>
+              );
+            }
           )}
 
-        </section>
+        </div>
 
+      </div>
+
+      {/* =========================================================
+          BOTTOM INSTRUCTION
+      ========================================================= */}
+      <div className="mt-6 flex items-center justify-center">
+
+        <div className="flex items-center gap-2.5 rounded-full bg-[#f7f9fb] px-5 py-2.5">
+
+          <Eye
+            size={18}
+            className="text-[#557bd2]"
+          />
+
+          <span className="text-[14px] font-medium text-[#7b8794]">
+            Click any project bar to view detailed progress
+          </span>
+
+        </div>
+
+      </div>
+
+    </div>
+  )}
+
+</section>
         {/* =================================================
             ROW 2 — ACTIVE PROJECTS
         ================================================= */}
