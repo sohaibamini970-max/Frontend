@@ -1105,11 +1105,11 @@ export default function Dashboard() {
             <div>
               <div className="flex items-center gap-3">
 
-                <h2 className="text-[19px] font-bold text-[#172633]">
+                <h2 className="text-[12px] font-bold text-[#172633]">
                   Projects Overview
                 </h2>
 
-                <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[11px] font-bold text-[#557bd2]">
+                <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[13px] font-bold text-[#557bd2]">
                   {projectOverview.length}
                 </span>
 
@@ -1127,8 +1127,8 @@ export default function Dashboard() {
                 className="text-[#557bd2]"
               />
 
-              <span className="text-[11px] font-semibold text-[#53616d]">
-                Data as of{" "}
+              <span className="text-[13px] font-semibold text-[#53616d]">
+                Data: {" "}
                 {new Date().toLocaleDateString(
                   "en-US",
                   {
@@ -1217,7 +1217,7 @@ export default function Dashboard() {
                             </span>
                           </div>
 
-                          <div className="relative flex h-[200px] w-full max-w-[62px] items-end justify-center">
+                          <div className="relative flex h-[200px] w-full max-w-[42px] items-end justify-center">
 
                             <div className="absolute bottom-0 h-full w-full rounded-t-xl bg-[#BDBBBB]" />
 
@@ -1237,31 +1237,11 @@ export default function Dashboard() {
 
                           </div>
 
-                          <div
-                            className={`mt-4 flex h-10 w-10 items-center justify-center rounded-xl ${color.icon} shadow-sm transition group-hover:scale-105`}
-                          >
-                            <FolderKanban size={17} />
-                          </div>
-
                           <div className="mt-3 min-h-[40px] w-full text-center">
 
                             <p className="line-clamp-2 text-[11px] font-bold uppercase leading-5 text-[#172633]">
                               {project.name}
                             </p>
-
-                          </div>
-
-                          <div className="mt-3 flex items-center gap-1.5 rounded-full bg-[#f5f7f9] px-3 py-1.5">
-
-                            <CheckCircle2
-                              size={11}
-                              className="text-[#438d5d]"
-                            />
-
-                            <span className="text-[9px] font-semibold text-[#697783]">
-                              {completedTasks}/
-                              {totalTasks} tasks
-                            </span>
 
                           </div>
 
@@ -1278,11 +1258,11 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2.5 rounded-full bg-[#f7f9fb] px-5 py-2.5">
 
                   <Eye
-                    size={14}
+                    size={18}
                     className="text-[#557bd2]"
                   />
 
-                  <span className="text-[10px] font-medium text-[#7b8794]">
+                  <span className="text-[14px] font-medium text-[#7b8794]">
                     Click any project bar to view detailed progress
                   </span>
 
