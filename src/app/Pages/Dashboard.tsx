@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import {
   CalendarDays,
   ChevronLeft,
@@ -15,6 +20,7 @@ import {
   X,
   FolderKanban,
 } from "lucide-react";
+
 import { useRouter } from "next/navigation";
 
 /* =========================================================
@@ -86,11 +92,11 @@ type Task = {
 type CurrentUser = {
   id?: string;
   user_id?: string;
+  name?: string;
+  full_name?: string;
+  email?: string;
   role?: string;
   user_role?: string;
-  full_name?: string;
-  name?: string;
-  email?: string;
 };
 
 /* =========================================================
@@ -101,42 +107,18 @@ const API_BASE =
   "https://backend-five-swart-88.vercel.app/api";
 
 /* =========================================================
-   PROJECT GRAPH COLORS
+   PROJECT OVERVIEW COLORS
 ========================================================= */
 
 const PROJECT_OVERVIEW_COLORS = [
-  {
-    bar: "from-[#3b82f6] to-[#2563eb]",
-    icon: "bg-[#eff6ff] text-[#2563eb]",
-  },
-  {
-    bar: "from-[#34c759] to-[#239447]",
-    icon: "bg-[#ecfdf3] text-[#239447]",
-  },
-  {
-    bar: "from-[#8b5cf6] to-[#6d3fd1]",
-    icon: "bg-[#f5f3ff] text-[#6d3fd1]",
-  },
-  {
-    bar: "from-[#f59e0b] to-[#d97706]",
-    icon: "bg-[#fff7e6] text-[#d97706]",
-  },
-  {
-    bar: "from-[#14b8a6] to-[#0f8f83]",
-    icon: "bg-[#ecfdf9] text-[#0f8f83]",
-  },
-  {
-    bar: "from-[#ec4899] to-[#c02670]",
-    icon: "bg-[#fdf2f8] text-[#c02670]",
-  },
-  {
-    bar: "from-[#315da5] to-[#172d61]",
-    icon: "bg-[#eef3ff] text-[#315da5]",
-  },
-  {
-    bar: "from-[#eabf35] to-[#ca9415]",
-    icon: "bg-[#fffbea] text-[#ca9415]",
-  },
+  "#557BD2",
+  "#438D5D",
+  "#8B5AA3",
+  "#BE8944",
+  "#D15B58",
+  "#4F9FA8",
+  "#6C78B9",
+  "#9A6B50",
 ];
 
 /* =========================================================
@@ -146,87 +128,65 @@ const PROJECT_OVERVIEW_COLORS = [
 export default function Dashboard() {
   const router = useRouter();
 
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  /* =======================================================
+     DATA
+  ======================================================= */
+
+  const [projects, setProjects] =
+    useState<Project[]>([]);
+
+  const [teams, setTeams] =
+    useState<Team[]>([]);
+
+  const [teamMembers, setTeamMembers] =
+    useState<TeamMember[]>([]);
+
+  const [tasks, setTasks] =
+    useState<Task[]>([]);
+
+  /* =======================================================
+     USER
+  ======================================================= */
 
   const [currentUser, setCurrentUser] =
-    useState<CurrentUser>({});
+    useState<CurrentUser>(() => {
+      if (typeof window === "undefined") {
+        return {};
+      }
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
+      try {
+        const stored =
+          localStorage.getItem("user");
+
+        return stored
+          ? JSON.parse(stored)
+          : {};
+      } catch {
+        return {};
+      }
+    });
+
+  /* =======================================================
+     UI
+  ======================================================= */
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
 
   const [scheduleDate, setScheduleDate] =
     useState(new Date());
 
-  const [
-    selectedOverviewProject,
-    setSelectedOverviewProject,
-  ] = useState<Project | null>(null);
+  const [selectedOverviewProject, setSelectedOverviewProject] =
+    useState<Project | null>(null);
 
   /* =======================================================
-     CURRENT USER / ROLE
-  ======================================================= */
-
-  useEffect(() => {
-    try {
-      const storedUser =
-        localStorage.getItem("user");
-
-      if (!storedUser) {
-        return;
-      }
-
-      const parsedUser =
-        JSON.parse(storedUser);
-
-      setCurrentUser({
-        id:
-          parsedUser?.id ||
-          parsedUser?.user_id ||
-          undefined,
-
-        user_id:
-          parsedUser?.user_id ||
-          parsedUser?.id ||
-          undefined,
-
-        role:
-          parsedUser?.role ||
-          parsedUser?.user_role ||
-          undefined,
-
-        user_role:
-          parsedUser?.user_role ||
-          parsedUser?.role ||
-          undefined,
-
-        full_name:
-          parsedUser?.full_name ||
-          parsedUser?.name ||
-          undefined,
-
-        name:
-          parsedUser?.name ||
-          parsedUser?.full_name ||
-          undefined,
-
-        email:
-          parsedUser?.email ||
-          undefined,
-      });
-    } catch (err) {
-      console.error(
-        "Unable to read logged-in user:",
-        err
-      );
-    }
-  }, []);
-
-  /* =======================================================
-     ROLE NORMALIZATION
+     NORMALIZED ROLE
   ======================================================= */
 
   const normalizedRole = useMemo(() => {
@@ -253,8 +213,7 @@ export default function Dashboard() {
     normalizedRole === "executive manager";
 
   const isSystemAdministrator =
-    normalizedRole ===
-      "system administrator" ||
+    normalizedRole === "system administrator" ||
     normalizedRole === "administrator" ||
     normalizedRole === "admin";
 
@@ -292,20 +251,44 @@ export default function Dashboard() {
         "Content-Type": "application/json",
       };
 
-      /* =====================================================
-         PROJECTS
-      ===================================================== */
+      /* -----------------------------------------------------
+         CURRENT USER
+      ----------------------------------------------------- */
 
-      const projectsResponse = await fetch(
-        `${API_BASE}/projects`,
-        {
-          headers,
+      if (typeof window !== "undefined") {
+        try {
+          const storedUser =
+            localStorage.getItem("user");
+
+          if (storedUser) {
+            setCurrentUser(
+              JSON.parse(storedUser)
+            );
+          }
+        } catch {
+          // Ignore invalid local user data.
         }
-      );
+      }
 
-      if (projectsResponse.status === 401) {
+      /* -----------------------------------------------------
+         PROJECTS
+      ----------------------------------------------------- */
+
+      const projectsResponse =
+        await fetch(
+          `${API_BASE}/projects`,
+          {
+            headers,
+            cache: "no-store",
+          }
+        );
+
+      if (
+        projectsResponse.status === 401
+      ) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+
         router.push("/login");
         return;
       }
@@ -325,16 +308,15 @@ export default function Dashboard() {
         projectsData ||
         [];
 
-      const validProjects =
+      setProjects(
         Array.isArray(loadedProjects)
           ? loadedProjects
-          : [];
+          : []
+      );
 
-      setProjects(validProjects);
-
-      /* =====================================================
-         TEAMS
-      ===================================================== */
+      /* -----------------------------------------------------
+         TEAMS + MEMBERS
+      ----------------------------------------------------- */
 
       const [
         teamsResponse,
@@ -342,10 +324,16 @@ export default function Dashboard() {
       ] = await Promise.all([
         fetch(`${API_BASE}/teams`, {
           headers,
+          cache: "no-store",
         }),
-        fetch(`${API_BASE}/teams/members`, {
-          headers,
-        }),
+
+        fetch(
+          `${API_BASE}/teams/members`,
+          {
+            headers,
+            cache: "no-store",
+          }
+        ),
       ]);
 
       if (teamsResponse.ok) {
@@ -382,12 +370,12 @@ export default function Dashboard() {
         );
       }
 
-      /* =====================================================
+      /* -----------------------------------------------------
          TASKS
-      ===================================================== */
+      ----------------------------------------------------- */
 
       const taskRequests =
-        validProjects.map(
+        loadedProjects.map(
           async (project) => {
             try {
               const response =
@@ -395,6 +383,7 @@ export default function Dashboard() {
                   `${API_BASE}/tasks/project/${project.id}`,
                   {
                     headers,
+                    cache: "no-store",
                   }
                 );
 
@@ -487,7 +476,7 @@ export default function Dashboard() {
   }, []);
 
   /* =======================================================
-     ROLE-BASED PROJECTS
+     VISIBLE PROJECTS
   ======================================================= */
 
   const visibleProjects = useMemo(() => {
@@ -496,43 +485,37 @@ export default function Dashboard() {
     }
 
     if (isProjectManager) {
-      if (!currentUserId) {
-        return [];
-      }
-
       return projects.filter(
         (project) =>
-          String(project.manager_id || "") ===
-          String(currentUserId)
+          String(
+            project.manager_id
+          ) === String(currentUserId)
       );
     }
 
     if (isMember) {
-      if (!currentUserId) {
-        return [];
-      }
-
-      const memberProjectIds =
+      const assignedProjectIds =
         new Set(
           tasks
             .filter(
               (task) =>
                 String(
-                  task.assignee_id || ""
-                ) ===
-                String(currentUserId)
+                  task.assignee_id
+                ) === String(
+                  currentUserId
+                )
             )
             .map(
               (task) =>
                 String(
-                  task.project_id || ""
+                  task.project_id
                 )
             )
         );
 
       return projects.filter(
         (project) =>
-          memberProjectIds.has(
+          assignedProjectIds.has(
             String(project.id)
           )
       );
@@ -549,7 +532,7 @@ export default function Dashboard() {
   ]);
 
   /* =======================================================
-     ROLE-BASED TASKS
+     VISIBLE TASKS
   ======================================================= */
 
   const visibleTasks = useMemo(() => {
@@ -566,27 +549,21 @@ export default function Dashboard() {
           )
         );
 
-      return tasks.filter(
-        (task) =>
-          projectIds.has(
-            String(
-              task.project_id || ""
-            )
-          )
+      return tasks.filter((task) =>
+        projectIds.has(
+          String(task.project_id)
+        )
       );
     }
 
     if (isMember) {
-      if (!currentUserId) {
-        return [];
-      }
-
       return tasks.filter(
         (task) =>
           String(
-            task.assignee_id || ""
-          ) ===
-          String(currentUserId)
+            task.assignee_id
+          ) === String(
+            currentUserId
+          )
       );
     }
 
@@ -601,108 +578,89 @@ export default function Dashboard() {
   ]);
 
   /* =======================================================
-     ROLE DESCRIPTION
+     PROJECT OVERVIEW
   ======================================================= */
 
-  const roleDescription = useMemo(() => {
-    if (isExecutiveManager) {
-      return "Organization-wide project and task overview.";
-    }
+  const projectOverview =
+    useMemo(() => {
+      return visibleProjects
+        .map((project, index) => {
+          const projectTasks =
+            visibleTasks.filter(
+              (task) =>
+                String(
+                  task.project_id
+                ) === String(
+                  project.id
+                )
+            );
 
-    if (isSystemAdministrator) {
-      return "Complete system-wide project and task overview.";
-    }
+          const totalTasks =
+            projectTasks.length;
 
-    if (isProjectManager) {
-      return "Overview of projects assigned to you and their tasks.";
-    }
+          const completedTasks =
+            projectTasks.filter(
+              (task) => {
+                const status =
+                  task.status
+                    ?.toLowerCase()
+                    .trim();
 
-    if (isMember) {
-      return "Overview of your assigned projects and tasks.";
-    }
+                return (
+                  status === "done" ||
+                  status ===
+                    "completed"
+                );
+              }
+            ).length;
 
-    return "Monitor your projects, teams and task progress.";
-  }, [
-    isExecutiveManager,
-    isSystemAdministrator,
-    isProjectManager,
-    isMember,
-  ]);
+          const progress =
+            totalTasks > 0
+              ? Math.round(
+                  (completedTasks /
+                    totalTasks) *
+                    100
+                )
+              : 0;
+
+          return {
+            project,
+            totalTasks,
+            completedTasks,
+            progress,
+            color:
+              PROJECT_OVERVIEW_COLORS[
+                index %
+                  PROJECT_OVERVIEW_COLORS.length
+              ],
+          };
+        })
+        .slice(0, 8);
+    }, [
+      visibleProjects,
+      visibleTasks,
+    ]);
 
   /* =======================================================
      ACTIVE PROJECTS
   ======================================================= */
 
-  const activeProjects = useMemo(() => {
-    return visibleProjects
-      .filter((project) => {
-        const status =
-          project.status
-            ?.toLowerCase()
-            .trim();
+  const activeProjects =
+    useMemo(() => {
+      return visibleProjects
+        .filter((project) => {
+          const status =
+            project.status
+              ?.toLowerCase()
+              .trim();
 
-        return (
-          status !== "done" &&
-          status !== "completed"
-        );
-      })
-      .slice(0, 3);
-  }, [visibleProjects]);
-
-  /* =======================================================
-     PROJECTS OVERVIEW
-  ======================================================= */
-
-  const projectOverview = useMemo(() => {
-    return visibleProjects.map(
-      (project) => {
-        const projectTasks =
-          visibleTasks.filter(
-            (task) =>
-              String(
-                task.project_id || ""
-              ) === String(project.id)
+          return (
+            status !== "done" &&
+            status !== "completed"
           );
-
-        const totalTasks =
-          projectTasks.length;
-
-        const completedTasks =
-          projectTasks.filter(
-            (task) => {
-              const status =
-                task.status
-                  ?.toLowerCase()
-                  .trim();
-
-              return (
-                status === "done" ||
-                status === "completed"
-              );
-            }
-          ).length;
-
-        const progress =
-          totalTasks > 0
-            ? Math.round(
-                (completedTasks /
-                  totalTasks) *
-                  100
-              )
-            : 0;
-
-        return {
-          project,
-          totalTasks,
-          completedTasks,
-          progress,
-        };
-      }
-    );
-  }, [
-    visibleProjects,
-    visibleTasks,
-  ]);
+        })
+        .slice(0, 3);
+    }, [visibleProjects]);
 
   /* =======================================================
      TASK STATISTICS
@@ -719,7 +677,8 @@ export default function Dashboard() {
 
           return (
             status === "done" ||
-            status === "completed"
+            status ===
+              "completed"
           );
         }
       ).length;
@@ -733,8 +692,10 @@ export default function Dashboard() {
               .trim();
 
           return (
-            status === "in progress" ||
-            status === "in_progress"
+            status ===
+              "in progress" ||
+            status ===
+              "in_progress"
           );
         }
       ).length;
@@ -765,159 +726,242 @@ export default function Dashboard() {
   }, [visibleTasks]);
 
   /* =======================================================
+     PROJECT ACTIVITY
+  ======================================================= */
+
+  const activityBars = useMemo(() => {
+    if (visibleTasks.length === 0) {
+      return Array.from(
+        { length: 30 },
+        () => 0
+      );
+    }
+
+    const completion =
+      Math.round(
+        (taskStats.completed /
+          visibleTasks.length) *
+          100
+      );
+
+    return Array.from(
+      { length: 30 },
+      (_, index) => {
+        const variation =
+          ((index * 17) % 28) -
+          12;
+
+        return Math.min(
+          100,
+          Math.max(
+            15,
+            completion +
+              variation
+          )
+        );
+      }
+    );
+  }, [
+    visibleTasks.length,
+    taskStats.completed,
+  ]);
+
+  /* =======================================================
      TEAM ROLE OVERVIEW
   ======================================================= */
 
-  const teamRoleStats = useMemo(() => {
-    const developers =
-      teamMembers.filter(
-        (member) => {
-          const role =
-            member.role?.toLowerCase();
+  const teamRoleStats =
+    useMemo(() => {
+      const developers =
+        teamMembers.filter(
+          (member) => {
+            const role =
+              member.role?.toLowerCase() ||
+              "";
 
-          return (
-            role.includes("developer") ||
-            role.includes("software") ||
-            role.includes("engineer")
-          );
-        }
-      ).length;
+            return (
+              role.includes(
+                "developer"
+              ) ||
+              role.includes(
+                "software"
+              ) ||
+              role.includes(
+                "engineer"
+              )
+            );
+          }
+        ).length;
 
-    const designers =
-      teamMembers.filter(
-        (member) => {
-          const role =
-            member.role?.toLowerCase();
+      const designers =
+        teamMembers.filter(
+          (member) => {
+            const role =
+              member.role?.toLowerCase() ||
+              "";
 
-          return (
-            role.includes("designer") ||
-            role.includes("ui") ||
-            role.includes("ux")
-          );
-        }
-      ).length;
+            return (
+              role.includes(
+                "designer"
+              ) ||
+              role.includes("ui") ||
+              role.includes("ux")
+            );
+          }
+        ).length;
 
-    const managers =
-      teamMembers.filter(
-        (member) => {
-          const role =
-            member.role?.toLowerCase();
+      const managers =
+        teamMembers.filter(
+          (member) => {
+            const role =
+              member.role?.toLowerCase() ||
+              "";
 
-          return role.includes("manager");
-        }
-      ).length;
+            return role.includes(
+              "manager"
+            );
+          }
+        ).length;
 
-    const qa =
-      teamMembers.filter(
-        (member) => {
-          const role =
-            member.role?.toLowerCase();
+      const qa =
+        teamMembers.filter(
+          (member) => {
+            const role =
+              member.role?.toLowerCase() ||
+              "";
 
-          return (
-            role.includes("qa") ||
-            role.includes("quality") ||
-            role.includes("tester")
-          );
-        }
-      ).length;
+            return (
+              role.includes("qa") ||
+              role.includes(
+                "quality"
+              ) ||
+              role.includes(
+                "tester"
+              )
+            );
+          }
+        ).length;
 
-    const known =
-      developers +
-      designers +
-      managers +
-      qa;
+      const known =
+        developers +
+        designers +
+        managers +
+        qa;
 
-    const other = Math.max(
-      teamMembers.length - known,
-      0
-    );
+      const other = Math.max(
+        teamMembers.length -
+          known,
+        0
+      );
 
-    return {
-      developers,
-      designers,
-      managers,
-      qa,
-      other,
-      total: teamMembers.length,
-    };
-  }, [teamMembers]);
+      return {
+        developers,
+        designers,
+        managers,
+        qa,
+        other,
+        total:
+          teamMembers.length,
+      };
+    }, [teamMembers]);
 
   /* =======================================================
      DOMAIN OVERVIEW
   ======================================================= */
 
-  const domainStats = useMemo(() => {
-    const domains: Record<
-      string,
-      number
-    > = {};
+  const domainStats =
+    useMemo(() => {
+      const domains: Record<
+        string,
+        number
+      > = {};
 
-    visibleProjects.forEach(
-      (project) => {
-        const domain =
-          project.domain?.trim();
+      visibleProjects.forEach(
+        (project) => {
+          const domain =
+            project.domain?.trim();
 
-        if (!domain) {
-          return;
+          if (!domain) {
+            return;
+          }
+
+          domains[domain] =
+            (domains[domain] || 0) +
+            1;
         }
+      );
 
-        domains[domain] =
-          (domains[domain] || 0) + 1;
-      }
-    );
+      return Object.entries(domains)
+        .sort(
+          (a, b) =>
+            b[1] - a[1]
+        )
+        .slice(0, 5);
+    }, [visibleProjects]);
 
-    return Object.entries(domains)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-  }, [visibleProjects]);
+  /* =======================================================
+     TEAM GRADIENT
+  ======================================================= */
+
+  const teamGradient =
+    useMemo(() => {
+      return createTeamGradient(
+        teamRoleStats
+      );
+    }, [teamRoleStats]);
 
   /* =======================================================
      SCHEDULE
   ======================================================= */
 
-  const scheduleTasks = useMemo(() => {
-    const selectedDate =
-      scheduleDate
-        .toISOString()
-        .split("T")[0];
+  const scheduleTasks =
+    useMemo(() => {
+      const selectedDate =
+        scheduleDate
+          .toISOString()
+          .split("T")[0];
 
-    const filtered =
-      visibleTasks.filter(
-        (task) => {
-          if (!task.due_date) {
-            return false;
+      const exactTasks =
+        visibleTasks.filter(
+          (task) => {
+            if (!task.due_date) {
+              return false;
+            }
+
+            return (
+              task.due_date.split(
+                "T"
+              )[0] === selectedDate
+            );
           }
+        );
 
-          return (
-            task.due_date.split(
-              "T"
-            )[0] === selectedDate
-          );
-        }
-      );
+      if (exactTasks.length > 0) {
+        return exactTasks.slice(
+          0,
+          8
+        );
+      }
 
-    if (filtered.length > 0) {
-      return filtered.slice(0, 8);
-    }
-
-    return visibleTasks
-      .filter(
-        (task) => task.due_date
-      )
-      .sort(
-        (a, b) =>
-          new Date(
-            a.due_date || ""
-          ).getTime() -
-          new Date(
-            b.due_date || ""
-          ).getTime()
-      )
-      .slice(0, 8);
-  }, [
-    visibleTasks,
-    scheduleDate,
-  ]);
+      return visibleTasks
+        .filter(
+          (task) =>
+            task.due_date
+        )
+        .sort(
+          (a, b) =>
+            new Date(
+              a.due_date || ""
+            ).getTime() -
+            new Date(
+              b.due_date || ""
+            ).getTime()
+        )
+        .slice(0, 8);
+    }, [
+      visibleTasks,
+      scheduleDate,
+    ]);
 
   /* =======================================================
      DATE
@@ -940,17 +984,35 @@ export default function Dashboard() {
   const changeScheduleDate = (
     amount: number
   ) => {
-    setScheduleDate((current) => {
-      const date =
-        new Date(current);
+    setScheduleDate(
+      (current) => {
+        const date =
+          new Date(current);
 
-      date.setDate(
-        date.getDate() + amount
-      );
+        date.setDate(
+          date.getDate() +
+            amount
+        );
 
-      return date;
-    });
+        return date;
+      }
+    );
   };
+
+  /* =======================================================
+     ROLE DESCRIPTION
+  ======================================================= */
+
+  const roleDescription =
+    isExecutiveManager
+      ? "Full workspace overview"
+      : isSystemAdministrator
+      ? "System-wide workspace overview"
+      : isProjectManager
+      ? "Projects assigned to you"
+      : isMember
+      ? "Your assigned work"
+      : "Workspace overview";
 
   /* =======================================================
      LOADING
@@ -958,21 +1020,17 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#d1d1d1]">
+      <main className="min-h-screen bg-slate-50">
         <div className="flex min-h-[70vh] items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-3">
+            <RefreshCw
+              size={24}
+              className="animate-spin text-[#557bd2]"
+            />
 
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm">
-              <RefreshCw
-                size={22}
-                className="animate-spin text-[#315da5]"
-              />
-            </div>
-
-            <p className="text-[15px] font-bold text-[#263746]">
+            <p className="text-[13px] font-normal text-slate-500">
               Loading dashboard...
             </p>
-
           </div>
         </div>
       </main>
@@ -985,35 +1043,34 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-[#d1d1d1]">
-        <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">
+      <main className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
+            <AlertCircle
+              className="mx-auto text-red-500"
+              size={30}
+            />
 
-          <div className="rounded-2xl border border-red-200 bg-white p-10 text-center shadow-sm">
-
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-red-50">
-              <AlertCircle
-                className="text-red-500"
-                size={28}
-              />
-            </div>
-
-            <h2 className="mt-5 text-[21px] font-bold text-[#172633]">
+            <h2 className="mt-3 text-[16px] font-medium text-slate-800">
               Unable to load dashboard
             </h2>
 
-            <p className="mx-auto mt-2 max-w-[500px] text-[14px] leading-6 text-[#596775]">
+            <p className="mt-1 text-[13px] font-normal text-slate-500">
               {error}
             </p>
 
             <button
-              onClick={handleRefresh}
-              className="mt-6 rounded-xl bg-[#315da5] px-6 py-3 text-[13px] font-bold text-white transition hover:bg-[#244b8e]"
+              onClick={
+                handleRefresh
+              }
+              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#557bd2] px-5 py-2.5 text-[12px] font-medium text-white transition hover:bg-[#456bc2]"
             >
+              <RefreshCw
+                size={14}
+              />
               Try Again
             </button>
-
           </div>
-
         </div>
       </main>
     );
@@ -1024,367 +1081,234 @@ export default function Dashboard() {
   ======================================================= */
 
   return (
-    <main className="min-h-screen bg-[#d1d1d1]">
-
-      <div className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10">
+    <main className="min-h-screen bg-slate-50 text-slate-700">
+      <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
 
         {/* =================================================
-            PAGE HEADER
+            PAGE INTRO
         ================================================= */}
 
-        <div className="mb-7 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#557bd2]">
+              Workspace Overview
+            </p>
 
-            <div className="mb-3 flex flex-wrap items-center gap-3">
-
-              <span className="rounded-lg bg-[#315da5] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.13em] text-white">
-                Workspace Overview
-              </span>
-
-              {currentUser.role && (
-                <span className="rounded-lg border border-[#cbd7e7] bg-white px-3 py-1.5 text-[11px] font-bold text-[#315da5]">
-                  {currentUser.role}
-                </span>
-              )}
-
-            </div>
-
-            <h1 className="text-[36px] font-extrabold tracking-tight text-[#172633] sm:text-[40px]">
+            <h1 className="mt-1 text-[27px] font-medium tracking-tight text-slate-800 sm:text-[30px]">
               Dashboard
             </h1>
 
-            <p className="mt-2 max-w-[720px] text-[15px] font-medium leading-6 text-[#465461]">
-              {roleDescription}
+            <p className="mt-1 text-[13px] font-normal text-slate-500">
+              Monitor your projects, teams and task progress.
             </p>
-
           </div>
 
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex w-fit items-center gap-2.5 rounded-xl bg-[#172b3a] px-5 py-3.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#263f50] disabled:opacity-50"
-          >
-            <RefreshCw
-              size={16}
-              className={
-                refreshing
-                  ? "animate-spin"
-                  : ""
+          <div className="flex items-center gap-3">
+            <span className="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-normal text-slate-500 sm:inline-flex">
+              {roleDescription}
+            </span>
+
+            <button
+              type="button"
+              onClick={
+                handleRefresh
               }
-            />
+              disabled={refreshing}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-[12px] font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RefreshCw
+                size={14}
+                className={
+                  refreshing
+                    ? "animate-spin"
+                    : ""
+                }
+              />
 
-            Refresh Dashboard
-          </button>
-
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* =================================================
-            ROW 1 — PROJECTS OVERVIEW
+            PROJECTS OVERVIEW
         ================================================= */}
 
-        <section className="mb-7 overflow-hidden rounded-2xl border border-[#cfd7df] bg-white shadow-[0_2px_10px_rgba(24,39,54,0.05)]">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
 
           {/* HEADER */}
 
-          <div className="flex flex-col gap-4 border-b border-[#e5e9ed] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
+              <h2 className="text-[18px] font-medium text-slate-800">
+                Projects Overview
+              </h2>
 
-              <div className="flex items-center gap-3">
+              <p className="mt-1 text-[12px] font-normal text-slate-500">
+                Track project progress based on completed tasks.
+              </p>
+            </div>
 
-                <span className="rounded-lg bg-[#315da5] px-3.5 py-2">
-                  <h2 className="text-[18px] font-extrabold text-white">
-                    Projects Overview
-                  </h2>
-                </span>
-
-                <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#edf3ff] px-2 text-[12px] font-extrabold text-[#315da5]">
-                  {projectOverview.length}
-                </span>
-
-              </div>
-
-              <p className="mt-2 text-[13px] font-medium text-[#596775]">
-                Task completion progress for each visible project
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-[10px] font-normal text-slate-400">
+                Projects
               </p>
 
+              <p className="mt-0.5 text-[14px] font-medium text-slate-700">
+                {projectOverview.length}
+              </p>
             </div>
-
-            <div className="flex w-fit items-center gap-2.5 rounded-lg border border-[#dce2e8] bg-[#f8fafc] px-4 py-2.5">
-
-              <CalendarDays
-                size={15}
-                className="text-[#315da5]"
-              />
-
-              <span className="text-[12px] font-bold text-[#465461]">
-                Data as of{" "}
-                {new Date().toLocaleDateString(
-                  "en-US",
-                  {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  }
-                )}
-              </span>
-
-            </div>
-
           </div>
 
-          {/* EMPTY */}
+          {/* GRAPH */}
 
           {projectOverview.length === 0 ? (
-
-            <div className="flex min-h-[250px] items-center justify-center px-5">
-
-              <EmptyState
-                title={
-                  isProjectManager
-                    ? "No projects assigned to you"
-                    : isMember
-                    ? "No assigned projects yet"
-                    : "No projects available"
-                }
-                description={
-                  isProjectManager
-                    ? "Projects assigned to you will appear here."
-                    : isMember
-                    ? "Projects will appear here when tasks are assigned to you."
-                    : "Projects will appear here once they are created."
-                }
-              />
-
-            </div>
-
+            <EmptyState
+              title="No project data available"
+              description="Projects and their task progress will appear here."
+            />
           ) : (
+            <div className="w-full">
 
-            <div className="px-5 pb-6 pt-7 sm:px-7">
+              <div className="h-[235px] w-full">
 
-              {/* GRAPH */}
-
-              <div className="relative">
-
-                {/* HORIZONTAL GRID */}
-
-                <div className="pointer-events-none absolute inset-x-0 bottom-[92px] top-0 flex flex-col justify-between">
-
-                  <div className="h-px w-full border-t border-dashed border-[#e5e9ee]" />
-
-                  <div className="h-px w-full border-t border-dashed border-[#e5e9ee]" />
-
-                  <div className="h-px w-full border-t border-dashed border-[#e5e9ee]" />
-
-                  <div className="h-px w-full border-t border-dashed border-[#e5e9ee]" />
-
-                  <div className="h-px w-full border-t border-dashed border-[#e5e9ee]" />
-
-                </div>
-
-                <div className="relative grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                <div className="flex h-full items-end gap-3 sm:gap-5">
 
                   {projectOverview.map(
-                    (
-                      {
-                        project,
-                        totalTasks,
-                        completedTasks,
-                        progress,
-                      },
-                      index
-                    ) => {
+                    ({
+                      project,
+                      progress,
+                      totalTasks,
+                      completedTasks,
+                      color,
+                    }) => (
+                      <button
+                        key={
+                          project.id
+                        }
+                        type="button"
+                        onClick={() =>
+                          setSelectedOverviewProject(
+                            project
+                          )
+                        }
+                        className="group flex h-full min-w-0 flex-1 flex-col justify-end text-left"
+                      >
 
-                      const color =
-                        PROJECT_OVERVIEW_COLORS[
-                          index %
-                            PROJECT_OVERVIEW_COLORS.length
-                        ];
+                        {/* PERCENTAGE */}
 
-                      return (
-                        <button
-                          key={project.id}
-                          type="button"
-                          onClick={() =>
-                            setSelectedOverviewProject(
-                              project
-                            )
-                          }
-                          className="group flex min-w-0 flex-col items-center rounded-xl px-2 py-2 transition hover:bg-[#f8fafc]"
-                        >
+                        <div className="mb-2 text-center">
+                          <span className="text-[13px] font-medium text-slate-700">
+                            {progress}%
+                          </span>
+                        </div>
 
-                          {/* PERCENTAGE */}
+                        {/* BAR AREA */}
 
-                          <div className="mb-3 flex h-7 items-center">
+                        <div className="relative flex h-[175px] items-end justify-center">
 
-                            <span className="text-[17px] font-extrabold text-[#172633] group-hover:text-[#315da5]">
-                              {progress}%
-                            </span>
+                          {/* BACKGROUND BAR */}
 
-                          </div>
+                          <div className="absolute bottom-0 h-full w-[72%] rounded-t-lg bg-slate-50 transition group-hover:bg-slate-100" />
 
-                          {/* BAR AREA */}
-
-                          <div className="relative flex h-[150px] w-full items-end justify-center">
-
-                            {/* BACKGROUND BAR */}
-
-                            <div className="absolute bottom-0 h-full w-[22px] rounded-t-md bg-[#f2f5f8]" />
-
-                            {/* ACTUAL BAR */}
-
-                            <div
-                              className={`relative z-10 w-[22px] rounded-t-md bg-gradient-to-t ${color.bar} shadow-[0_3px_8px_rgba(24,39,54,0.12)] transition-all duration-500 group-hover:-translate-y-1`}
-                              style={{
-                                height: `${Math.max(
-                                  progress,
-                                  progress === 0
-                                    ? 3
-                                    : 6
-                                )}%`,
-                              }}
-                            />
-
-                          </div>
-
-                          {/* PROJECT ICON */}
+                          {/* ACTUAL BAR */}
 
                           <div
-                            className={`mt-4 flex h-9 w-9 items-center justify-center rounded-lg ${color.icon} transition group-hover:scale-105`}
-                          >
-                            <FolderKanban size={16} />
-                          </div>
+                            className="relative z-10 w-[72%] rounded-t-lg transition-all duration-500 group-hover:opacity-90"
+                            style={{
+                              height: `${Math.max(
+                                progress,
+                                4
+                              )}%`,
+                              backgroundColor:
+                                color,
+                            }}
+                          />
 
-                          {/* PROJECT NAME */}
+                        </div>
 
-                          <div className="mt-2 min-h-[42px] w-full px-1 text-center">
+                        {/* PROJECT NAME */}
 
-                            <p className="line-clamp-2 text-[13px] font-extrabold uppercase leading-[18px] text-[#243442]">
-                              {project.name}
-                            </p>
+                        <div className="mt-3 min-h-[34px] text-center">
+                          <p className="truncate px-1 text-[11px] font-medium text-slate-700">
+                            {project.name}
+                          </p>
 
-                          </div>
-
-                          {/* TASK COUNT */}
-
-                          <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-[#e5e9ed] bg-[#f8fafc] px-2.5 py-1.5">
-
-                            <CheckCircle2
-                              size={14}
-                              className="shrink-0 text-[#2f8a4f]"
-                            />
-
-                            <span className="text-[12px] font-bold text-[#4b5966]">
-                              {completedTasks}/{totalTasks} completed
-                            </span>
-
-                          </div>
-
-                        </button>
-                      );
-                    }
+                          <p className="mt-0.5 text-[9px] font-normal text-slate-400">
+                            {completedTasks}/
+                            {totalTasks} tasks
+                          </p>
+                        </div>
+                      </button>
+                    )
                   )}
 
                 </div>
-
               </div>
 
-              {/* GRAPH LEGEND */}
+              {/* HINT */}
 
-              <div className="mt-6 flex justify-center">
-
-                <div className="flex items-center gap-2 rounded-lg border border-[#e1e6eb] bg-[#fafbfd] px-4 py-2.5">
-
-                  <Eye
-                    size={15}
-                    className="text-[#315da5]"
-                  />
-
-                  <span className="text-[12px] font-semibold text-[#53616d]">
-                    Select a project bar to view details
-                  </span>
-
-                </div>
-
+              <div className="mt-3 flex items-center justify-center gap-1.5 text-[10px] font-normal text-slate-400">
+                <Eye size={12} />
+                Click a project bar to view details
               </div>
 
             </div>
-
           )}
 
         </section>
 
         {/* =================================================
-            ROW 2 — ACTIVE PROJECTS
+            ACTIVE PROJECTS
         ================================================= */}
 
-        <section className="mb-7">
+        <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
 
-          <div className="mb-5 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
 
-            <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-[18px] font-medium text-slate-800">
+                Active Projects
+              </h2>
 
-              <div className="flex items-center gap-3">
-
-                <span className="rounded-lg bg-[#2f8a4f] px-3.5 py-2">
-                  <h2 className="text-[18px] font-extrabold text-white">
-                    Active Projects
-                  </h2>
-                </span>
-
-                <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-white px-2 text-[12px] font-extrabold text-[#315da5] shadow-sm">
-                  {activeProjects.length}
-                </span>
-
-              </div>
-
-              <p className="mt-2 text-[13px] font-medium text-[#465461]">
-                Current projects requiring attention
-              </p>
-
+              <span className="rounded-md bg-[#edf2ff] px-2 py-0.5 text-[10px] font-medium text-[#5577c4]">
+                {activeProjects.length}
+              </span>
             </div>
 
             <button
+              type="button"
               onClick={() =>
-                router.push("/projects")
+                router.push(
+                  "/projects"
+                )
               }
-              className="flex items-center gap-2 rounded-lg border border-[#cfd7df] bg-white px-4 py-2.5 text-[12px] font-bold text-[#3d4c59] shadow-sm transition hover:border-[#315da5] hover:text-[#315da5]"
+              className="flex items-center gap-1 text-[12px] font-medium text-slate-500 transition hover:text-slate-800"
             >
-              View all projects
-              <ChevronRight size={14} />
+              View all
+              <ChevronRight
+                size={14}
+              />
             </button>
-
           </div>
 
-          {activeProjects.length === 0 ? (
-
+          {activeProjects.length ===
+          0 ? (
             <EmptyState
-              title={
-                isProjectManager
-                  ? "No active assigned projects"
-                  : isMember
-                  ? "No active projects assigned to you"
-                  : "No active projects"
-              }
-              description={
-                isProjectManager
-                  ? "Active projects managed by you will appear here."
-                  : isMember
-                  ? "Projects with your assigned tasks will appear here."
-                  : "There are currently no active projects available."
-              }
+              title="No active projects"
+              description="There are currently no active projects available."
             />
-
           ) : (
-
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {activeProjects.map(
                 (project) => (
                   <ProjectCard
-                    key={project.id}
-                    project={project}
+                    key={
+                      project.id
+                    }
+                    project={
+                      project
+                    }
                     onView={() =>
                       router.push(
                         `/projects?projectId=${project.id}`
@@ -1393,142 +1317,260 @@ export default function Dashboard() {
                   />
                 )
               )}
-
             </div>
-
           )}
 
         </section>
 
         {/* =================================================
-            ROW 3 — TEAM OVERVIEW
+            LOWER DASHBOARD
         ================================================= */}
 
-        <section className="mb-7 overflow-hidden rounded-2xl border border-[#cfd7df] bg-white shadow-[0_2px_10px_rgba(24,39,54,0.05)]">
+        <div className="mt-5 grid gap-5 xl:grid-cols-[1.12fr_0.78fr_0.78fr]">
 
-          <div className="flex items-center justify-between border-b border-[#e5e9ed] px-5 py-5 sm:px-7">
+          {/* =================================================
+              PROJECT ACTIVITY
+          ================================================= */}
 
-            <div className="flex items-center gap-3">
+          <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
 
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#edf3ff] text-[#315da5]">
-                <Users size={19} />
-              </div>
+            <div className="mb-5 flex items-center justify-between">
 
               <div>
-
-                <h2 className="text-[19px] font-extrabold text-[#172633]">
-                  Team Overview
+                <h2 className="text-[17px] font-medium text-slate-800">
+                  Project Activity
                 </h2>
 
-                <p className="mt-1 text-[13px] font-medium text-[#596775]">
-                  Team members, roles and project domains
+                <p className="mt-1 text-[11px] font-normal text-slate-400">
+                  Task completion overview
                 </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    "/tasks"
+                  )
+                }
+                className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-800"
+              >
+                See more
+                <ChevronRight
+                  size={13}
+                />
+              </button>
+
+            </div>
+
+            {/* CHART */}
+
+            <div className="flex h-[160px] items-end gap-[4px] overflow-hidden">
+
+              {activityBars.map(
+                (
+                  height,
+                  index
+                ) => (
+                  <div
+                    key={
+                      index
+                    }
+                    className="flex h-full flex-1 items-end"
+                  >
+                    <div
+                      className={`w-full rounded-t-[3px] ${
+                        index %
+                          5 ===
+                        0
+                          ? "bg-[#dce5f8]"
+                          : "bg-[#557bd2]"
+                      }`}
+                      style={{
+                        height: `${height}%`,
+                      }}
+                    />
+                  </div>
+                )
+              )}
+
+            </div>
+
+            {/* FOOTER */}
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+
+              <p className="text-[12px] font-normal text-slate-500">
+                <span className="font-medium text-slate-800">
+                  {
+                    taskStats.completed
+                  }
+                </span>{" "}
+                tasks completed
+              </p>
+
+              <div className="flex items-center gap-4 text-[10px] font-normal text-slate-500">
+
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-[#557bd2]" />
+                  Completed
+                </span>
+
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-[#dce5f8]" />
+                  Pending
+                </span>
 
               </div>
 
             </div>
 
-            <button
-              onClick={() =>
-                router.push("/teams")
-              }
-              className="flex items-center gap-2 rounded-lg bg-[#172b3a] px-4 py-2.5 text-[12px] font-bold text-white transition hover:bg-[#263f50]"
-            >
-              View teams
-              <ChevronRight size={13} />
-            </button>
+            {/* STATS */}
 
-          </div>
+            <div className="mt-5 grid grid-cols-3 gap-2">
 
-          <div className="grid gap-6 p-6 lg:grid-cols-[0.8fr_1.2fr] sm:p-7">
+              <ActivityStat
+                icon={
+                  <CheckCircle2
+                    size={14}
+                  />
+                }
+                label="Completed"
+                value={
+                  taskStats.completed
+                }
+              />
 
-            {/* TEAM DISTRIBUTION */}
+              <ActivityStat
+                icon={
+                  <Clock3
+                    size={14}
+                  />
+                }
+                label="In Progress"
+                value={
+                  taskStats.inProgress
+                }
+              />
 
-            <div className="rounded-xl border border-[#e1e6eb] bg-[#fafbfd] p-6">
+              <ActivityStat
+                icon={
+                  <Circle
+                    size={14}
+                  />
+                }
+                label="Pending"
+                value={
+                  taskStats.pending
+                }
+              />
 
-              <div className="mb-6">
+            </div>
 
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#667481]">
-                  Team Distribution
-                </p>
+          </section>
 
-                <p className="mt-1.5 text-[13px] font-medium text-[#596775]">
-                  Current workforce composition
-                </p>
+          {/* =================================================
+              TEAM OVERVIEW
+          ================================================= */}
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+
+            <div className="mb-4 flex items-center justify-between">
+
+              <h2 className="text-[17px] font-medium text-slate-800">
+                Team Overview
+              </h2>
+
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    "/teams"
+                  )
+                }
+                className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-800"
+              >
+                View teams
+                <ChevronRight
+                  size={13}
+                />
+              </button>
+
+            </div>
+
+            {/* DONUT */}
+
+            <div className="flex items-center justify-center gap-5">
+
+              <div className="relative h-[132px] w-[132px] shrink-0">
+
+                <div
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background:
+                      teamGradient,
+                  }}
+                />
+
+                <div className="absolute inset-[24px] flex flex-col items-center justify-center rounded-full bg-white">
+
+                  <span className="text-[20px] font-medium text-slate-800">
+                    {
+                      teamRoleStats.total
+                    }
+                  </span>
+
+                  <span className="mt-0.5 text-[9px] font-normal text-slate-400">
+                    Team Members
+                  </span>
+
+                </div>
 
               </div>
 
-              <div className="flex items-center justify-center gap-9">
+              {/* LEGEND */}
 
-                <div className="relative h-[155px] w-[155px] shrink-0">
+              <div className="space-y-2.5">
 
-                  <div
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      background:
-                        createTeamGradient(
-                          teamRoleStats
-                        ),
-                    }}
-                  />
+                <TeamItem
+                  color="bg-[#557bd2]"
+                  label="Developers"
+                  value={
+                    teamRoleStats.developers
+                  }
+                />
 
-                  <div className="absolute inset-[28px] flex flex-col items-center justify-center rounded-full bg-white">
+                <TeamItem
+                  color="bg-[#438d5d]"
+                  label="Designers"
+                  value={
+                    teamRoleStats.designers
+                  }
+                />
 
-                    <span className="text-[27px] font-extrabold text-[#172633]">
-                      {teamRoleStats.total}
-                    </span>
+                <TeamItem
+                  color="bg-[#be8944]"
+                  label="Managers"
+                  value={
+                    teamRoleStats.managers
+                  }
+                />
 
-                    <span className="mt-1 text-[10px] font-extrabold tracking-wide text-[#687581]">
-                      MEMBERS
-                    </span>
+                <TeamItem
+                  color="bg-[#895a9d]"
+                  label="QA Team"
+                  value={
+                    teamRoleStats.qa
+                  }
+                />
 
-                  </div>
-
-                </div>
-
-                <div className="space-y-3">
-
-                  <TeamItemNew
-                    color="bg-[#557bd2]"
-                    label="Developers"
-                    value={
-                      teamRoleStats.developers
-                    }
-                  />
-
-                  <TeamItemNew
-                    color="bg-[#438d5d]"
-                    label="Designers"
-                    value={
-                      teamRoleStats.designers
-                    }
-                  />
-
-                  <TeamItemNew
-                    color="bg-[#be8944]"
-                    label="Managers"
-                    value={
-                      teamRoleStats.managers
-                    }
-                  />
-
-                  <TeamItemNew
-                    color="bg-[#895a9d]"
-                    label="QA Team"
-                    value={
-                      teamRoleStats.qa
-                    }
-                  />
-
-                  <TeamItemNew
-                    color="bg-[#d15b58]"
-                    label="Other"
-                    value={
-                      teamRoleStats.other
-                    }
-                  />
-
-                </div>
+                <TeamItem
+                  color="bg-[#d15b58]"
+                  label="Other"
+                  value={
+                    teamRoleStats.other
+                  }
+                />
 
               </div>
 
@@ -1536,88 +1578,53 @@ export default function Dashboard() {
 
             {/* DOMAINS */}
 
-            <div>
+            <div className="mt-5">
 
-              <div className="mb-5 flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between">
 
-                <div>
+                <p className="text-[11px] font-medium text-slate-600">
+                  Project Domains
+                </p>
 
-                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#667481]">
-                    Project Domains
-                  </p>
-
-                  <p className="mt-1.5 text-[13px] font-medium text-[#596775]">
-                    Distribution across active work
-                  </p>
-
-                </div>
-
-                <span className="rounded-lg bg-[#f1f4f7] px-3 py-1.5 text-[11px] font-bold text-[#53616d]">
-                  {domainStats.length} domains
+                <span className="text-[10px] font-normal text-slate-400">
+                  {domainStats.length}{" "}
+                  domains
                 </span>
 
               </div>
 
-              {domainStats.length === 0 ? (
-
-                <div className="rounded-xl border border-dashed border-[#cfd7df] bg-[#fafbfd] px-4 py-10 text-center">
-
-                  <FolderKanban
-                    size={25}
-                    className="mx-auto text-[#9aa6b1]"
-                  />
-
-                  <p className="mt-3 text-[13px] font-bold text-[#596775]">
+              {domainStats.length ===
+              0 ? (
+                <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3 text-center">
+                  <p className="text-[10px] font-normal text-slate-400">
                     No project domains available
                   </p>
-
                 </div>
-
               ) : (
-
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
 
                   {domainStats.map(
-                    (
-                      [
-                        domain,
-                        count,
-                      ],
-                      index
-                    ) => (
+                    ([
+                      domain,
+                      count,
+                    ]) => (
                       <div
-                        key={domain}
-                        className="group flex items-center justify-between rounded-xl border border-[#e1e6eb] bg-white px-4 py-3.5 transition hover:border-[#c2d0e5] hover:bg-[#fafcff]"
+                        key={
+                          domain
+                        }
+                        className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
                       >
-
-                        <div className="flex min-w-0 items-center gap-3">
-
-                          <span
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-extrabold text-white ${
-                              index % 4 === 0
-                                ? "bg-[#557bd2]"
-                                : index % 4 === 1
-                                ? "bg-[#438d5d]"
-                                : index % 4 === 2
-                                ? "bg-[#be8944]"
-                                : "bg-[#895a9d]"
-                            }`}
-                          >
-                            {domain
-                              .charAt(0)
-                              .toUpperCase()}
-                          </span>
-
-                          <span className="truncate text-[13px] font-bold text-[#3e4d5a]">
-                            {domain}
-                          </span>
-
-                        </div>
-
-                        <span className="ml-2 shrink-0 rounded-lg bg-[#f1f4f7] px-2.5 py-1.5 text-[11px] font-extrabold text-[#53616d]">
-                          {count}
+                        <span className="truncate text-[10px] font-normal text-slate-600">
+                          {domain}
                         </span>
 
+                        <span className="rounded-md bg-[#edf2ff] px-2 py-0.5 text-[9px] font-medium text-[#5577c4]">
+                          {count}{" "}
+                          {count ===
+                          1
+                            ? "project"
+                            : "projects"}
+                        </span>
                       </div>
                     )
                   )}
@@ -1625,547 +1632,88 @@ export default function Dashboard() {
                 </div>
               )}
 
-              <div className="mt-5 grid grid-cols-2 gap-4">
+            </div>
 
-                <div className="rounded-xl border border-[#dce5f4] bg-[#f2f6ff] p-5">
+            {/* TEAM CARDS */}
 
-                  <div className="flex items-center gap-2">
+            <div className="mt-4 grid grid-cols-2 gap-2">
 
-                    <FolderKanban
-                      size={16}
-                      className="text-[#315da5]"
-                    />
+              <div className="rounded-lg border border-[#e5ebfa] bg-[#f6f8ff] px-3 py-3">
+                <p className="text-[18px] font-medium text-slate-800">
+                  {teams.length}
+                </p>
 
-                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-[#53616d]">
-                      Active Teams
-                    </span>
+                <p className="mt-0.5 text-[10px] font-normal text-slate-500">
+                  Active Teams
+                </p>
+              </div>
 
-                  </div>
+              <div className="rounded-lg border border-[#eee4f2] bg-[#faf7fc] px-3 py-3">
+                <p className="text-[18px] font-medium text-slate-800">
+                  {
+                    teamRoleStats.developers
+                  }
+                </p>
 
-                  <p className="mt-2 text-[27px] font-extrabold text-[#172633]">
-                    {teams.length}
-                  </p>
-
-                </div>
-
-                <div className="rounded-xl border border-[#e6dff0] bg-[#f8f3fc] p-5">
-
-                  <div className="flex items-center gap-2">
-
-                    <Users
-                      size={16}
-                      className="text-[#895a9d]"
-                    />
-
-                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-[#53616d]">
-                      Developers
-                    </span>
-
-                  </div>
-
-                  <p className="mt-2 text-[27px] font-extrabold text-[#172633]">
-                    {
-                      teamRoleStats.developers
-                    }
-                  </p>
-
-                </div>
-
+                <p className="mt-0.5 text-[10px] font-normal text-slate-500">
+                  Developers
+                </p>
               </div>
 
             </div>
 
-          </div>
+          </section>
 
-        </section>
+          {/* =================================================
+              TASK SCHEDULE
+          ================================================= */}
 
-        {/* =================================================
-            ROLE TASK SUMMARY
-        ================================================= */}
+          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
 
-        <section className="mb-7 grid grid-cols-2 gap-4 md:grid-cols-4">
+            {/* HEADER */}
 
-          <DashboardStat
-            icon={<Circle size={17} />}
-            label="Total Tasks"
-            value={taskStats.total}
-            className="bg-[#edf3ff]"
-            iconClass="text-[#315da5]"
-          />
+            <div className="p-5 pb-3 sm:p-6 sm:pb-3">
 
-          <DashboardStat
-            icon={<CheckCircle2 size={17} />}
-            label="Completed"
-            value={taskStats.completed}
-            className="bg-[#ecf8ef]"
-            iconClass="text-[#2f8a4f]"
-          />
+              <div className="flex items-center justify-between">
 
-          <DashboardStat
-            icon={<Clock3 size={17} />}
-            label="In Progress"
-            value={taskStats.inProgress}
-            className="bg-[#fff6e8]"
-            iconClass="text-[#b7791f]"
-          />
-
-          <DashboardStat
-            icon={<FolderKanban size={17} />}
-            label="My Visible Projects"
-            value={visibleProjects.length}
-            className="bg-[#f5eff9]"
-            iconClass="text-[#895a9d]"
-          />
-
-        </section>
-
-        {/* =================================================
-            ROW 4 — TASK SCHEDULE
-        ================================================= */}
-
-        <section className="overflow-hidden rounded-2xl border border-[#cfd7df] bg-white shadow-[0_2px_10px_rgba(24,39,54,0.05)]">
-
-          <div className="flex flex-col gap-4 border-b border-[#e5e9ed] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-
-            <div className="flex items-center gap-3">
-
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f5eff9] text-[#895a9d]">
-                <CalendarDays size={19} />
-              </div>
-
-              <div>
-
-                <h2 className="text-[19px] font-extrabold text-[#172633]">
+                <h2 className="text-[17px] font-medium text-slate-800">
                   Task Schedule
                 </h2>
 
-                <p className="mt-1 text-[13px] font-medium text-[#596775]">
-                  Upcoming deadlines and scheduled tasks
-                </p>
-
-              </div>
-
-            </div>
-
-            <div className="flex items-center gap-2">
-
-              <button
-                onClick={() =>
-                  changeScheduleDate(-1)
-                }
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d6dde4] bg-white text-[#53616d] transition hover:bg-[#f4f7fa]"
-              >
-                <ChevronLeft size={16} />
-              </button>
-
-              <div className="min-w-[150px] rounded-lg border border-[#dfe5ea] bg-[#f7f9fb] px-4 py-2.5 text-center">
-
-                <span className="text-[12px] font-bold text-[#3d4b58]">
-                  {formattedScheduleDate}
-                </span>
-
-              </div>
-
-              <button
-                onClick={() =>
-                  changeScheduleDate(1)
-                }
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d6dde4] bg-white text-[#53616d] transition hover:bg-[#f4f7fa]"
-              >
-                <ChevronRight size={16} />
-              </button>
-
-            </div>
-
-          </div>
-
-          <div className="max-h-[450px] overflow-y-auto px-5 sm:px-7">
-
-            {scheduleTasks.length === 0 ? (
-
-              <div className="flex min-h-[300px] items-center justify-center">
-
-                <div className="text-center">
-
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-[#f3f5f7]">
-
-                    <CalendarDays
-                      size={25}
-                      className="text-[#8996a1]"
-                    />
-
-                  </div>
-
-                  <p className="mt-4 text-[14px] font-bold text-[#53616d]">
-                    No scheduled tasks
-                  </p>
-
-                  <p className="mt-1.5 text-[12px] font-medium text-[#7b8791]">
-                    {isMember
-                      ? "Your tasks with due dates will appear here."
-                      : "Tasks with due dates will appear here."}
-                  </p>
-
-                </div>
-
-              </div>
-
-            ) : (
-
-              <div className="relative py-5">
-
-                <div className="absolute bottom-0 left-[72px] top-0 w-px bg-[#e1e6eb]" />
-
-                {scheduleTasks.map(
-                  (task, index) => (
-                    <ScheduleItem
-                      key={
-                        task.id ||
-                        `${task.name}-${index}`
-                      }
-                      task={task}
-                      index={index}
-                      projects={
-                        visibleProjects
-                      }
-                    />
-                  )
-                )}
-
-              </div>
-
-            )}
-
-          </div>
-
-          <div className="border-t border-[#e5e9ed] bg-[#fafbfd] p-5 sm:p-6">
-
-            <button
-              onClick={() =>
-                router.push("/Schedule")
-              }
-              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#172b3a] py-3.5 text-[12px] font-bold text-white transition hover:bg-[#263f50]"
-            >
-              <CalendarDays size={15} />
-              View Full Schedule
-              <ChevronRight size={14} />
-            </button>
-
-          </div>
-
-        </section>
-
-      </div>
-
-      {/* =================================================
-          PROJECT OVERVIEW DETAILS MODAL
-      ================================================= */}
-
-      {selectedOverviewProject &&
-        (() => {
-          const project =
-            selectedOverviewProject;
-
-          const projectTasks =
-            visibleTasks.filter(
-              (task) =>
-                String(
-                  task.project_id || ""
-                ) === String(project.id)
-            );
-
-          const totalTasks =
-            projectTasks.length;
-
-          const completedTasks =
-            projectTasks.filter(
-              (task) => {
-                const status =
-                  task.status
-                    ?.toLowerCase()
-                    .trim();
-
-                return (
-                  status === "done" ||
-                  status === "completed"
-                );
-              }
-            ).length;
-
-          const inProgressTasks =
-            projectTasks.filter(
-              (task) => {
-                const status =
-                  task.status
-                    ?.toLowerCase()
-                    .trim();
-
-                return (
-                  status ===
-                    "in progress" ||
-                  status ===
-                    "in_progress"
-                );
-              }
-            ).length;
-
-          const progress =
-            totalTasks > 0
-              ? Math.round(
-                  (completedTasks /
-                    totalTasks) *
-                    100
-                )
-              : 0;
-
-          return (
-            <div
-              className="fixed inset-0 z-[100] flex items-center justify-center bg-[#172b3a]/60 px-4 backdrop-blur-sm"
-              onClick={() =>
-                setSelectedOverviewProject(
-                  null
-                )
-              }
-            >
-
-              <div
-                className="w-full max-w-[580px] overflow-hidden rounded-2xl border border-[#dce2e8] bg-white shadow-2xl"
-                onClick={(event) =>
-                  event.stopPropagation()
-                }
-              >
-
-                {/* MODAL HEADER */}
-
-                <div className="relative overflow-hidden bg-[#172b3a] px-6 py-6">
-
-                  <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#315da5]/25" />
-
-                  <div className="absolute -bottom-16 left-20 h-28 w-28 rounded-full bg-[#2f8a4f]/10" />
-
-                  <div className="relative flex items-start justify-between">
-
-                    <div className="flex min-w-0 items-center gap-4">
-
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
-                        <FolderKanban size={22} />
-                      </div>
-
-                      <div className="min-w-0">
-
-                        <h2 className="truncate text-[20px] font-extrabold text-white">
-                          {project.name}
-                        </h2>
-
-                        <p className="mt-1 text-[12px] font-medium text-white/70">
-                          Project Progress Details
-                        </p>
-
-                      </div>
-
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelectedOverviewProject(
-                          null
-                        )
-                      }
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-                    >
-                      <X size={17} />
-                    </button>
-
-                  </div>
-
-                </div>
-
-                {/* MODAL BODY */}
-
-                <div className="max-h-[68vh] overflow-y-auto p-6">
-
-                  {/* PROGRESS */}
-
-                  <div className="rounded-xl border border-[#dfe5ea] bg-[#fafbfd] p-6">
-
-                    <div className="flex items-end justify-between">
-
-                      <div>
-
-                        <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#687581]">
-                          Task Completion
-                        </p>
-
-                        <p className="mt-1 text-[34px] font-extrabold text-[#172633]">
-                          {progress}%
-                        </p>
-
-                      </div>
-
-                      <div className="text-right">
-
-                        <p className="text-[11px] font-semibold text-[#687581]">
-                          Completed
-                        </p>
-
-                        <p className="text-[17px] font-extrabold text-[#2f8a4f]">
-                          {completedTasks} /{" "}
-                          {totalTasks}
-                        </p>
-
-                      </div>
-
-                    </div>
-
-                    <div className="mt-5 h-3 overflow-hidden rounded-full bg-[#e5e9ed]">
-
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#315da5] to-[#6f91d8] transition-all duration-500"
-                        style={{
-                          width: `${progress}%`,
-                        }}
-                      />
-
-                    </div>
-
-                  </div>
-
-                  {/* STATS */}
-
-                  <div className="mt-5 grid grid-cols-3 gap-3">
-
-                    <ModalStat
-                      icon={
-                        <Circle size={14} />
-                      }
-                      label="Total Tasks"
-                      value={totalTasks}
-                      iconClass="text-[#315da5]"
-                    />
-
-                    <ModalStat
-                      icon={
-                        <CheckCircle2
-                          size={14}
-                        />
-                      }
-                      label="Completed"
-                      value={completedTasks}
-                      iconClass="text-[#2f8a4f]"
-                    />
-
-                    <ModalStat
-                      icon={
-                        <Clock3
-                          size={14}
-                        />
-                      }
-                      label="In Progress"
-                      value={inProgressTasks}
-                      iconClass="text-[#b7791f]"
-                    />
-
-                  </div>
-
-                  {/* PROJECT INFORMATION */}
-
-                  <div className="mt-5 grid grid-cols-2 gap-3">
-
-                    <ProjectDetailItem
-                      label="Status"
-                      value={
-                        project.status ||
-                        "Not specified"
-                      }
-                    />
-
-                    <ProjectDetailItem
-                      label="Priority"
-                      value={
-                        project.priority ||
-                        "Not specified"
-                      }
-                    />
-
-                    <ProjectDetailItem
-                      label="Domain"
-                      value={
-                        project.domain ||
-                        "General"
-                      }
-                    />
-
-                    <ProjectDetailItem
-                      label="Project Manager"
-                      value={
-                        project.manager_name ||
-                        "Not assigned"
-                      }
-                    />
-
-                    <ProjectDetailItem
-                      label="Start Date"
-                      value={
-                        project.start_date
-                          ? formatDate(
-                              project.start_date
-                            )
-                          : "Not specified"
-                      }
-                    />
-
-                    <ProjectDetailItem
-                      label="Deadline"
-                      value={
-                        project.deadline
-                          ? formatDate(
-                              project.deadline
-                            )
-                          : "Not specified"
-                      }
-                    />
-
-                  </div>
-
-                  {(project.about_description ||
-                    project.about_title) && (
-                    <div className="mt-5 rounded-xl border border-[#e1e6eb] bg-[#fafbfd] p-5">
-
-                      <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#687581]">
-                        Description
-                      </p>
-
-                      <p className="mt-2 whitespace-pre-wrap text-[13px] font-medium leading-6 text-[#4d5b67]">
-                        {project.about_description ||
-                          project.about_title}
-                      </p>
-
-                    </div>
-                  )}
-
-                </div>
-
-                {/* MODAL FOOTER */}
-
-                <div className="border-t border-[#e5e9ed] bg-[#fafbfd] p-5">
+                <div className="flex items-center gap-1">
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedOverviewProject(
-                        null
-                      );
-
-                      router.push(
-                        `/projects?projectId=${project.id}`
-                      );
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#315da5] py-3.5 text-[12px] font-extrabold text-white transition hover:bg-[#244b8e]"
+                    onClick={() =>
+                      changeScheduleDate(
+                        -1
+                      )
+                    }
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100"
                   >
-                    <Eye size={15} />
-                    Open Project
-                    <ChevronRight size={14} />
+                    <ChevronLeft
+                      size={14}
+                    />
+                  </button>
+
+                  <span className="whitespace-nowrap text-[11px] font-medium text-slate-600">
+                    {
+                      formattedScheduleDate
+                    }
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      changeScheduleDate(
+                        1
+                      )
+                    }
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100"
+                  >
+                    <ChevronRight
+                      size={14}
+                    />
                   </button>
 
                 </div>
@@ -2173,92 +1721,116 @@ export default function Dashboard() {
               </div>
 
             </div>
-          );
-        })()}
+
+            {/* SCHEDULE */}
+
+            <div className="max-h-[330px] overflow-y-auto px-5 sm:px-6">
+
+              {scheduleTasks.length ===
+              0 ? (
+                <div className="flex min-h-[230px] items-center justify-center">
+
+                  <div className="text-center">
+
+                    <CalendarDays
+                      size={27}
+                      className="mx-auto text-slate-300"
+                    />
+
+                    <p className="mt-2 text-[12px] font-medium text-slate-500">
+                      No scheduled tasks
+                    </p>
+
+                    <p className="mt-1 text-[10px] font-normal text-slate-400">
+                      Tasks with due dates will appear here.
+                    </p>
+
+                  </div>
+
+                </div>
+              ) : (
+                <div className="relative">
+
+                  <div className="absolute bottom-0 left-[67px] top-0 w-px bg-slate-200" />
+
+                  {scheduleTasks.map(
+                    (
+                      task,
+                      index
+                    ) => (
+                      <ScheduleItem
+                        key={
+                          task.id ||
+                          `${task.name}-${index}`
+                        }
+                        task={task}
+                        index={
+                          index
+                        }
+                        projects={
+                          visibleProjects
+                        }
+                      />
+                    )
+                  )}
+
+                </div>
+              )}
+
+            </div>
+
+            {/* FOOTER */}
+
+            <div className="border-t border-slate-100 p-4 sm:p-5">
+
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    "/Schedule"
+                  )
+                }
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 py-2.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-100"
+              >
+                <CalendarDays
+                  size={14}
+                />
+
+                View full schedule
+              </button>
+
+            </div>
+
+          </section>
+
+        </div>
+
+      </div>
+
+      {/* =====================================================
+          PROJECT OVERVIEW MODAL
+      ===================================================== */}
+
+      {selectedOverviewProject && (
+        <ProjectOverviewModal
+          project={
+            selectedOverviewProject
+          }
+          tasks={visibleTasks}
+          onClose={() =>
+            setSelectedOverviewProject(
+              null
+            )
+          }
+          onOpen={() =>
+            router.push(
+              `/projects?projectId=${selectedOverviewProject.id}`
+            )
+          }
+        />
+      )}
 
     </main>
-  );
-}
-
-/* =========================================================
-   DASHBOARD STAT
-========================================================= */
-
-function DashboardStat({
-  icon,
-  label,
-  value,
-  className,
-  iconClass,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  className: string;
-  iconClass: string;
-}) {
-  return (
-    <div
-      className={`rounded-xl border border-[#dce3e9] p-5 ${className}`}
-    >
-
-      <div className="flex items-center gap-2.5">
-
-        <span className={iconClass}>
-          {icon}
-        </span>
-
-        <span className="text-[11px] font-extrabold uppercase tracking-wide text-[#53616d]">
-          {label}
-        </span>
-
-      </div>
-
-      <p className="mt-3 text-[28px] font-extrabold text-[#172633]">
-        {value}
-      </p>
-
-    </div>
-  );
-}
-
-/* =========================================================
-   MODAL STAT
-========================================================= */
-
-function ModalStat({
-  icon,
-  label,
-  value,
-  iconClass,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  iconClass: string;
-}) {
-  return (
-    <div className="rounded-xl border border-[#e1e6eb] bg-[#fafbfd] p-4">
-
-      <div className="flex items-center gap-2">
-
-        <span className={iconClass}>
-          {icon}
-        </span>
-
-        <span className="text-[10px] font-bold text-[#687581]">
-          {label}
-        </span>
-
-      </div>
-
-      <p
-        className={`mt-2 text-[24px] font-extrabold ${iconClass}`}
-      >
-        {value}
-      </p>
-
-    </div>
   );
 }
 
@@ -2277,10 +1849,13 @@ function ProjectCard({
     useState(false);
 
   const status =
-    project.status || "Unassigned";
+    project.status ||
+    "Unassigned";
 
   const statusClass =
-    getProjectStatusClass(status);
+    getProjectStatusClass(
+      status
+    );
 
   const description =
     project.about_description ||
@@ -2291,43 +1866,43 @@ function ProjectCard({
     100,
     Math.max(
       0,
-      Number(project.progress) || 0
+      Number(
+        project.progress
+      ) || 0
     )
   );
 
   return (
     <>
-      <div className="group overflow-hidden rounded-2xl border border-[#cfd7df] bg-white shadow-[0_2px_10px_rgba(24,39,54,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(24,39,54,0.10)]">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-slate-300">
 
-        {/* CARD HEADER */}
+        {/* VISUAL HEADER */}
 
-        <div className="relative overflow-hidden bg-[#172b3a] px-6 pb-6 pt-6">
+        <div className="relative h-[112px] overflow-hidden bg-slate-50">
 
-          <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-[#315da5]/20" />
+          <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-[#557bd2]/5" />
 
-          <div className="absolute -bottom-16 right-20 h-32 w-32 rounded-full bg-[#2f8a4f]/10" />
+          <div className="absolute right-5 top-7 h-16 w-16 rotate-12 rounded-xl border border-white bg-white/60" />
 
-          <div className="relative flex items-start justify-between">
-
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-white">
-              <FolderKanban size={19} />
-            </div>
-
-            <span
-              className={`rounded-lg px-3 py-1.5 text-[10px] font-extrabold ${statusClass}`}
-            >
-              {status}
-            </span>
-
+          <div className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#557bd2]">
+            <FolderKanban
+              size={16}
+            />
           </div>
 
-          <div className="relative mt-7">
+          <span
+            className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-[9px] font-medium ${statusClass}`}
+          >
+            {status}
+          </span>
 
-            <h3 className="truncate text-[19px] font-extrabold text-white">
+          <div className="absolute bottom-4 left-4 right-4">
+
+            <h3 className="max-w-[78%] truncate text-[14px] font-medium text-slate-800">
               {project.name}
             </h3>
 
-            <p className="mt-2 line-clamp-2 min-h-[40px] text-[12px] font-medium leading-5 text-white/70">
+            <p className="mt-1 line-clamp-1 max-w-[90%] text-[10px] font-normal leading-4 text-slate-500">
               {description}
             </p>
 
@@ -2335,81 +1910,66 @@ function ProjectCard({
 
         </div>
 
-        {/* CARD BODY */}
+        {/* INFORMATION */}
 
-        <div className="p-6">
+        <div className="p-4">
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
 
-            <div className="rounded-xl border border-[#e5e9ed] bg-[#f8fafc] p-4">
-
-              <div className="flex items-center gap-2">
-
-                <CalendarDays
-                  size={13}
-                  className="text-[#315da5]"
-                />
-
-                <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#687581]">
-                  Deadline
-                </p>
-
-              </div>
-
-              <p className="mt-2 text-[12px] font-extrabold text-[#3d4c59]">
-                {project.deadline
-                  ? formatDate(
-                      project.deadline
-                    )
-                  : "Not set"}
+            <div>
+              <p className="text-[9px] font-normal uppercase tracking-wide text-slate-400">
+                Deadline
               </p>
 
-            </div>
-
-            <div className="rounded-xl border border-[#e5e9ed] bg-[#f8fafc] p-4">
-
-              <div className="flex items-center gap-2">
-
-                <FolderKanban
-                  size={13}
-                  className="text-[#895a9d]"
+              <div className="mt-1 flex items-center gap-1.5">
+                <CalendarDays
+                  size={12}
+                  className="text-slate-400"
                 />
 
-                <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#687581]">
-                  Domain
-                </p>
-
+                <span className="text-[11px] font-medium text-slate-600">
+                  {project.deadline
+                    ? formatDate(
+                        project.deadline
+                      )
+                    : "Not set"}
+                </span>
               </div>
+            </div>
 
-              <p className="mt-2 truncate text-[12px] font-extrabold text-[#3d4c59]">
+            <div>
+              <p className="text-[9px] font-normal uppercase tracking-wide text-slate-400">
+                Domain
+              </p>
+
+              <p className="mt-1 truncate text-[11px] font-medium text-slate-600">
                 {project.domain ||
                   "General"}
               </p>
-
             </div>
 
           </div>
 
           {/* PROGRESS */}
 
-          <div className="mt-6">
+          <div className="mt-4">
 
-            <div className="mb-2.5 flex items-center justify-between">
+            <div className="mb-1.5 flex items-center justify-between">
 
-              <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#687581]">
-                Project Progress
-              </p>
+              <span className="text-[9px] font-normal uppercase tracking-wide text-slate-400">
+                Progress
+              </span>
 
-              <span className="text-[14px] font-extrabold text-[#172b3a]">
+              <span className="text-[11px] font-medium text-slate-700">
                 {progress}%
               </span>
 
             </div>
 
-            <div className="h-2.5 overflow-hidden rounded-full bg-[#e5e9ed]">
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
 
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#315da5] to-[#7694d5] transition-all duration-500"
+                className="h-full rounded-full bg-[#557bd2] transition-all duration-500"
                 style={{
                   width: `${progress}%`,
                 }}
@@ -2421,60 +1981,59 @@ function ProjectCard({
 
           {/* MANAGER */}
 
-          <div className="mt-6 flex items-center justify-between border-t border-[#e5e9ed] pt-5">
+          <div className="mt-4 flex items-center">
 
-            <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[8px] font-medium text-slate-600">
+              {getInitials(
+                project.manager_name ||
+                  "PM"
+              )}
+            </div>
 
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#315da5] to-[#244b8e] text-[10px] font-extrabold text-white">
+            <div className="ml-2 min-w-0">
 
-                {getInitials(
-                  project.manager_name ||
-                    "PM"
-                )}
+              <p className="text-[9px] font-normal text-slate-400">
+                Project Manager
+              </p>
 
-              </div>
-
-              <div className="min-w-0">
-
-                <p className="text-[9px] font-extrabold uppercase tracking-wide text-[#8996a1]">
-                  Project Manager
-                </p>
-
-                <p className="truncate text-[11px] font-extrabold text-[#3d4c59]">
-                  {project.manager_name ||
-                    "Not assigned"}
-                </p>
-
-              </div>
+              <p className="truncate text-[11px] font-medium text-slate-600">
+                {project.manager_name ||
+                  "Not assigned"}
+              </p>
 
             </div>
 
-            <span className="rounded-lg bg-[#edf3ff] px-2.5 py-1.5 text-[10px] font-extrabold text-[#315da5]">
-              {project.priority ||
-                "Normal"}
-            </span>
-
           </div>
 
-          {/* BUTTONS */}
+          {/* ACTIONS */}
 
-          <div className="mt-6 grid grid-cols-2 gap-2.5">
+          <div className="mt-4 grid grid-cols-2 gap-2">
 
             <button
-              onClick={onView}
-              className="flex items-center justify-center gap-2 rounded-xl bg-[#315da5] py-3.5 text-[11px] font-extrabold text-white transition hover:bg-[#244b8e] active:scale-[0.98]"
+              type="button"
+              onClick={
+                onView
+              }
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-[#edf2ff] py-2.5 text-[10px] font-medium text-[#5577c4] transition hover:bg-[#e1e9ff]"
             >
-              <Eye size={14} />
+              <Eye
+                size={13}
+              />
               View Project
             </button>
 
             <button
+              type="button"
               onClick={() =>
-                setDetailsOpen(true)
+                setDetailsOpen(
+                  true
+                )
               }
-              className="flex items-center justify-center gap-2 rounded-xl bg-[#172b3a] py-3.5 text-[11px] font-extrabold text-white transition hover:bg-[#263f50] active:scale-[0.98]"
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white py-2.5 text-[10px] font-medium text-slate-600 transition hover:bg-slate-50"
             >
-              <Eye size={14} />
+              <Eye
+                size={13}
+              />
               Details
             </button>
 
@@ -2484,187 +2043,529 @@ function ProjectCard({
 
       </div>
 
-      {/* PROJECT DETAILS MODAL */}
+      {/* DETAILS */}
 
       {detailsOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#172b3a]/60 px-4 backdrop-blur-sm"
-          onClick={() =>
-            setDetailsOpen(false)
+        <ProjectDetailsModal
+          project={project}
+          onClose={() =>
+            setDetailsOpen(
+              false
+            )
           }
-        >
+          onOpen={onView}
+        />
+      )}
+    </>
+  );
+}
 
-          <div
-            className="w-full max-w-[580px] overflow-hidden rounded-2xl border border-[#dce2e8] bg-white shadow-2xl"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
+/* =========================================================
+   PROJECT DETAILS MODAL
+========================================================= */
 
-            <div className="relative overflow-hidden bg-[#172b3a] px-6 py-6">
+function ProjectDetailsModal({
+  project,
+  onClose,
+  onOpen,
+}: {
+  project: Project;
+  onClose: () => void;
+  onOpen: () => void;
+}) {
+  const status =
+    project.status ||
+    "Unassigned";
 
-              <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#315da5]/25" />
+  const statusClass =
+    getProjectStatusClass(
+      status
+    );
 
-              <div className="relative flex items-center justify-between">
+  const description =
+    project.about_description ||
+    project.about_title ||
+    "No project description available.";
 
-                <div className="flex min-w-0 items-center gap-4">
+  const progress = Math.min(
+    100,
+    Math.max(
+      0,
+      Number(
+        project.progress
+      ) || 0
+    )
+  );
 
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 text-white">
-                    <FolderKanban size={21} />
-                  </div>
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 px-4 backdrop-blur-[2px]"
+      onClick={
+        onClose
+      }
+    >
+      <div
+        className="w-full max-w-[560px] overflow-hidden rounded-xl border border-slate-200 bg-white"
+        onClick={(event) =>
+          event.stopPropagation()
+        }
+      >
 
-                  <div className="min-w-0">
+        <div className="border-b border-slate-200 px-5 py-4">
 
-                    <h2 className="truncate text-[20px] font-extrabold text-white">
-                      {project.name}
-                    </h2>
+          <div className="flex items-start justify-between gap-3">
 
-                    <p className="mt-1 text-[12px] font-medium text-white/70">
-                      Project Details
-                    </p>
+            <div className="flex items-center gap-3">
 
-                  </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[#557bd2]">
+                <FolderKanban
+                  size={19}
+                />
+              </div>
 
-                </div>
+              <div>
 
-                <button
-                  onClick={() =>
-                    setDetailsOpen(false)
-                  }
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-                >
-                  <X size={17} />
-                </button>
+                <h2 className="text-[16px] font-medium text-slate-800">
+                  {project.name}
+                </h2>
+
+                <p className="mt-0.5 text-[11px] font-normal text-slate-400">
+                  Project Details
+                </p>
 
               </div>
 
             </div>
 
-            <div className="max-h-[68vh] overflow-y-auto p-6">
+            <button
+              type="button"
+              onClick={
+                onClose
+              }
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X
+                size={16}
+              />
+            </button>
 
-              <div className="grid grid-cols-2 gap-3">
+          </div>
 
-                <ProjectDetailItem
-                  label="Status"
-                  value={status}
-                />
+        </div>
 
-                <ProjectDetailItem
-                  label="Progress"
-                  value={`${progress}%`}
-                />
+        <div className="max-h-[65vh] overflow-y-auto p-5">
 
-              </div>
+          <div className="grid grid-cols-2 gap-3">
 
-              <div className="mt-5 rounded-xl border border-[#e1e6eb] bg-[#fafbfd] p-5">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
 
-                <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#687581]">
-                  Description
-                </p>
+              <p className="text-[9px] font-normal uppercase tracking-wide text-slate-400">
+                Status
+              </p>
 
-                <p className="mt-2 whitespace-pre-wrap text-[13px] font-medium leading-6 text-[#4d5b67]">
-                  {description}
-                </p>
-
-              </div>
-
-              <div className="mt-5 grid grid-cols-2 gap-3">
-
-                <ProjectDetailItem
-                  label="Domain"
-                  value={
-                    project.domain ||
-                    "Not specified"
-                  }
-                />
-
-                <ProjectDetailItem
-                  label="Priority"
-                  value={
-                    project.priority ||
-                    "Not specified"
-                  }
-                />
-
-                <ProjectDetailItem
-                  label="Start Date"
-                  value={
-                    project.start_date
-                      ? formatDate(
-                          project.start_date
-                        )
-                      : "Not specified"
-                  }
-                />
-
-                <ProjectDetailItem
-                  label="Deadline"
-                  value={
-                    project.deadline
-                      ? formatDate(
-                          project.deadline
-                        )
-                      : "Not specified"
-                  }
-                />
-
-                <ProjectDetailItem
-                  label="Project Manager"
-                  value={
-                    project.manager_name ||
-                    "Not assigned"
-                  }
-                />
-
-                <ProjectDetailItem
-                  label="Manager Role"
-                  value={
-                    project.manager_role ||
-                    "Project Manager"
-                  }
-                />
-
-              </div>
-
-              {project.creator_name && (
-                <div className="mt-4 rounded-xl border border-[#e1e6eb] bg-[#fafbfd] p-4">
-
-                  <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#687581]">
-                    Created By
-                  </p>
-
-                  <p className="mt-1.5 text-[13px] font-extrabold text-[#3d4c59]">
-                    {project.creator_name}
-                  </p>
-
-                  {project.creator_role && (
-                    <p className="mt-1 text-[11px] font-medium text-[#7b8791]">
-                      {project.creator_role}
-                    </p>
-                  )}
-
-                </div>
-              )}
-
-            </div>
-
-            <div className="border-t border-[#e5e9ed] bg-[#fafbfd] p-5">
-
-              <button
-                onClick={onView}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#315da5] py-3.5 text-[12px] font-extrabold text-white transition hover:bg-[#244b8e]"
+              <span
+                className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[9px] font-medium ${statusClass}`}
               >
-                <Eye size={15} />
-                Open Project
-              </button>
+                {status}
+              </span>
+
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+
+              <p className="text-[9px] font-normal uppercase tracking-wide text-slate-400">
+                Progress
+              </p>
+
+              <p className="mt-1 text-[20px] font-medium text-slate-800">
+                {progress}%
+              </p>
 
             </div>
 
           </div>
 
+          <div className="mt-4 rounded-lg border border-slate-200 p-4">
+
+            <p className="text-[9px] font-normal uppercase tracking-wide text-slate-400">
+              Description
+            </p>
+
+            <p className="mt-2 whitespace-pre-wrap text-[12px] font-normal leading-5 text-slate-600">
+              {description}
+            </p>
+
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+
+            <ProjectDetailItem
+              label="Domain"
+              value={
+                project.domain ||
+                "Not specified"
+              }
+            />
+
+            <ProjectDetailItem
+              label="Priority"
+              value={
+                project.priority ||
+                "Not specified"
+              }
+            />
+
+            <ProjectDetailItem
+              label="Start Date"
+              value={
+                project.start_date
+                  ? formatDate(
+                      project.start_date
+                    )
+                  : "Not specified"
+              }
+            />
+
+            <ProjectDetailItem
+              label="Deadline"
+              value={
+                project.deadline
+                  ? formatDate(
+                      project.deadline
+                    )
+                  : "Not specified"
+              }
+            />
+
+            <ProjectDetailItem
+              label="Project Manager"
+              value={
+                project.manager_name ||
+                "Not assigned"
+              }
+            />
+
+            <ProjectDetailItem
+              label="Manager Role"
+              value={
+                project.manager_role ||
+                "Project Manager"
+              }
+            />
+
+          </div>
+
+          {project.creator_name && (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+
+              <p className="text-[9px] font-normal uppercase tracking-wide text-slate-400">
+                Created By
+              </p>
+
+              <p className="mt-1 text-[11px] font-medium text-slate-700">
+                {project.creator_name}
+              </p>
+
+              {project.creator_role && (
+                <p className="mt-0.5 text-[10px] font-normal text-slate-400">
+                  {project.creator_role}
+                </p>
+              )}
+
+            </div>
+          )}
+
         </div>
-      )}
-    </>
+
+        <div className="border-t border-slate-200 bg-slate-50 p-4">
+
+          <button
+            type="button"
+            onClick={
+              onOpen
+            }
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#557bd2] py-2.5 text-[11px] font-medium text-white transition hover:bg-[#456bc2]"
+          >
+            <Eye
+              size={14}
+            />
+            Open Project
+          </button>
+
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   PROJECT OVERVIEW MODAL
+========================================================= */
+
+function ProjectOverviewModal({
+  project,
+  tasks,
+  onClose,
+  onOpen,
+}: {
+  project: Project;
+  tasks: Task[];
+  onClose: () => void;
+  onOpen: () => void;
+}) {
+  const projectTasks =
+    tasks.filter(
+      (task) =>
+        String(
+          task.project_id
+        ) === String(
+          project.id
+        )
+    );
+
+  const completedTasks =
+    projectTasks.filter(
+      (task) => {
+        const status =
+          task.status
+            ?.toLowerCase()
+            .trim();
+
+        return (
+          status === "done" ||
+          status ===
+            "completed"
+        );
+      }
+    ).length;
+
+  const totalTasks =
+    projectTasks.length;
+
+  const progress =
+    totalTasks > 0
+      ? Math.round(
+          (completedTasks /
+            totalTasks) *
+            100
+        )
+      : 0;
+
+  const status =
+    project.status ||
+    "Unassigned";
+
+  return (
+    <div
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/30 px-4 backdrop-blur-[2px]"
+      onClick={
+        onClose
+      }
+    >
+      <div
+        className="w-full max-w-[520px] overflow-hidden rounded-xl border border-slate-200 bg-white"
+        onClick={(event) =>
+          event.stopPropagation()
+        }
+      >
+
+        {/* HEADER */}
+
+        <div className="border-b border-slate-200 px-5 py-4">
+
+          <div className="flex items-start justify-between gap-3">
+
+            <div className="flex items-center gap-3">
+
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#edf2ff] text-[#557bd2]">
+                <FolderKanban
+                  size={19}
+                />
+              </div>
+
+              <div>
+
+                <p className="text-[10px] font-normal uppercase tracking-wide text-[#557bd2]">
+                  Project Overview
+                </p>
+
+                <h2 className="mt-0.5 text-[16px] font-medium text-slate-800">
+                  {project.name}
+                </h2>
+
+              </div>
+
+            </div>
+
+            <button
+              type="button"
+              onClick={
+                onClose
+              }
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X
+                size={16}
+              />
+            </button>
+
+          </div>
+
+        </div>
+
+        {/* CONTENT */}
+
+        <div className="p-5">
+
+          <div className="grid grid-cols-3 gap-3">
+
+            <ModalStat
+              label="Progress"
+              value={`${progress}%`}
+            />
+
+            <ModalStat
+              label="Tasks"
+              value={`${totalTasks}`}
+            />
+
+            <ModalStat
+              label="Completed"
+              value={`${completedTasks}`}
+            />
+
+          </div>
+
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+
+            <div className="flex items-center justify-between">
+
+              <span className="text-[10px] font-normal text-slate-500">
+                Task completion
+              </span>
+
+              <span className="text-[11px] font-medium text-slate-700">
+                {completedTasks} of{" "}
+                {totalTasks}
+              </span>
+
+            </div>
+
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+
+              <div
+                className="h-full rounded-full bg-[#557bd2] transition-all"
+                style={{
+                  width: `${progress}%`,
+                }}
+              />
+
+            </div>
+
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+
+            <ProjectDetailItem
+              label="Status"
+              value={status}
+            />
+
+            <ProjectDetailItem
+              label="Priority"
+              value={
+                project.priority ||
+                "Not specified"
+              }
+            />
+
+            <ProjectDetailItem
+              label="Manager"
+              value={
+                project.manager_name ||
+                "Not assigned"
+              }
+            />
+
+            <ProjectDetailItem
+              label="Deadline"
+              value={
+                project.deadline
+                  ? formatDate(
+                      project.deadline
+                    )
+                  : "Not set"
+              }
+            />
+
+          </div>
+
+          {project.about_description && (
+            <div className="mt-4 rounded-lg border border-slate-200 p-4">
+
+              <p className="text-[9px] font-normal uppercase tracking-wide text-slate-400">
+                About Project
+              </p>
+
+              <p className="mt-2 text-[12px] font-normal leading-5 text-slate-600">
+                {
+                  project.about_description
+                }
+              </p>
+
+            </div>
+          )}
+
+        </div>
+
+        {/* FOOTER */}
+
+        <div className="border-t border-slate-200 bg-slate-50 p-4">
+
+          <button
+            type="button"
+            onClick={
+              onOpen
+            }
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#557bd2] py-2.5 text-[11px] font-medium text-white transition hover:bg-[#456bc2]"
+          >
+            <Eye
+              size={14}
+            />
+            Open Project
+          </button>
+
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   MODAL STAT
+========================================================= */
+
+function ModalStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3 text-center">
+
+      <p className="text-[9px] font-normal uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+
+      <p className="mt-1 text-[18px] font-medium text-slate-800">
+        {value}
+      </p>
+
+    </div>
   );
 }
 
@@ -2680,13 +2581,13 @@ function ProjectDetailItem({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-[#e1e6eb] bg-[#f8fafc] p-4">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
 
-      <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#687581]">
+      <p className="text-[9px] font-normal uppercase tracking-wide text-slate-400">
         {label}
       </p>
 
-      <p className="mt-1.5 truncate text-[12px] font-extrabold text-[#3d4c59]">
+      <p className="mt-1 truncate text-[11px] font-medium text-slate-700">
         {value}
       </p>
 
@@ -2698,7 +2599,7 @@ function ProjectDetailItem({
    TEAM ITEM
 ========================================================= */
 
-function TeamItemNew({
+function TeamItem({
   color,
   label,
   value,
@@ -2708,23 +2609,53 @@ function TeamItemNew({
   value: number;
 }) {
   return (
-    <div className="flex min-w-[120px] items-center justify-between gap-5">
+    <div className="flex items-center gap-2">
 
-      <div className="flex items-center gap-2.5">
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${color}`}
+      />
 
-        <span
-          className={`h-2.5 w-2.5 rounded-full ${color}`}
-        />
+      <span className="whitespace-nowrap text-[10px] font-normal text-slate-500">
+        {label}
+      </span>
 
-        <span className="text-[12px] font-semibold text-[#53616d]">
+      <span className="text-[10px] font-medium text-slate-700">
+        {value}
+      </span>
+
+    </div>
+  );
+}
+
+/* =========================================================
+   ACTIVITY STAT
+========================================================= */
+
+function ActivityStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+
+      <div className="flex items-center gap-1.5 text-slate-400">
+
+        {icon}
+
+        <span className="text-[9px] font-normal">
           {label}
         </span>
 
       </div>
 
-      <span className="text-[13px] font-extrabold text-[#34424d]">
+      <p className="mt-1 text-[16px] font-medium text-slate-800">
         {value}
-      </span>
+      </p>
 
     </div>
   );
@@ -2747,7 +2678,9 @@ function ScheduleItem({
     projects.find(
       (item) =>
         String(item.id) ===
-        String(task.project_id || "")
+        String(
+          task.project_id
+        )
     );
 
   const taskName =
@@ -2756,52 +2689,67 @@ function ScheduleItem({
     "Untitled Task";
 
   const initials =
-    getInitials(taskName);
+    getInitials(
+      taskName
+    );
 
   const dueDate =
     task.due_date
-      ? new Date(task.due_date)
+      ? new Date(
+          task.due_date
+        )
       : null;
 
   const time =
-    dueDate
+    dueDate &&
+    !Number.isNaN(
+      dueDate.getTime()
+    )
       ? dueDate.toLocaleTimeString(
           "en-US",
           {
             hour: "2-digit",
-            minute: "2-digit",
+            minute:
+              "2-digit",
           }
         )
       : "--:--";
 
   const type =
-    task.status || "Pending";
+    task.status ||
+    "Pending";
 
   return (
-    <div className="relative flex min-h-[60px] items-center">
+    <div className="relative flex min-h-[50px] items-center">
 
-      <div className="w-[56px] shrink-0 text-[11px] font-bold text-[#687581]">
+      {/* TIME */}
+
+      <div className="w-[56px] shrink-0 text-[10px] font-normal text-slate-400">
         {time}
       </div>
 
-      <div className="relative z-10 mx-[7px] flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full border border-white bg-[#aeb8c1] shadow-sm" />
+      {/* DOT */}
 
-      <div className="ml-3 flex min-w-0 flex-1 items-center justify-between gap-3">
+      <div className="relative z-10 mx-[7px] flex h-2 w-2 shrink-0 items-center justify-center rounded-full border border-white bg-slate-300" />
 
-        <div className="flex min-w-0 items-center gap-3">
+      {/* TASK */}
 
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#9aa5ae] to-[#596570] text-[9px] font-extrabold text-white">
+      <div className="ml-3 flex min-w-0 flex-1 items-center justify-between gap-2">
+
+        <div className="flex min-w-0 items-center gap-2">
+
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[8px] font-medium text-slate-600">
             {initials}
           </div>
 
           <div className="min-w-0">
 
-            <span className="block truncate text-[12px] font-bold text-[#34424d]">
+            <span className="block truncate text-[10px] font-medium text-slate-700">
               {taskName}
             </span>
 
             {project && (
-              <span className="mt-0.5 block truncate text-[10px] font-medium text-[#7b8791]">
+              <span className="block truncate text-[9px] font-normal text-slate-400">
                 {project.name}
               </span>
             )}
@@ -2810,7 +2758,9 @@ function ScheduleItem({
 
         </div>
 
-        <TaskBadge type={type} />
+        <TaskBadge
+          type={type}
+        />
 
       </div>
 
@@ -2831,29 +2781,47 @@ function TaskBadge({
     "bg-[#f3eafa] text-[#85579a]";
 
   const normalized =
-    type.toLowerCase();
+    type
+      .toLowerCase()
+      .trim();
 
   if (
-    normalized.includes("review")
+    normalized.includes(
+      "review"
+    )
   ) {
     className =
-      "bg-[#fff6e8] text-[#a66d21]";
+      "bg-[#f8f0e4] text-[#ad8144]";
   } else if (
-    normalized.includes("progress")
+    normalized.includes(
+      "progress"
+    )
   ) {
     className =
-      "bg-[#edf3ff] text-[#315da5]";
+      "bg-[#edf2ff] text-[#5577c2]";
   } else if (
-    normalized.includes("done") ||
-    normalized.includes("complete")
+    normalized.includes(
+      "done"
+    ) ||
+    normalized.includes(
+      "complete"
+    )
   ) {
     className =
-      "bg-[#ecf8ef] text-[#2f8a4f]";
+      "bg-[#eaf5ed] text-[#438759]";
   } else if (
-    normalized.includes("todo") ||
-    normalized.includes("to do") ||
-    normalized.includes("pending") ||
-    normalized.includes("backlog")
+    normalized.includes(
+      "todo"
+    ) ||
+    normalized.includes(
+      "to do"
+    ) ||
+    normalized.includes(
+      "pending"
+    ) ||
+    normalized.includes(
+      "backlog"
+    )
   ) {
     className =
       "bg-[#f3eafa] text-[#85579a]";
@@ -2861,7 +2829,7 @@ function TaskBadge({
 
   return (
     <span
-      className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold ${className}`}
+      className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-medium ${className}`}
     >
       {type}
     </span>
@@ -2880,20 +2848,18 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="w-full rounded-xl border border-dashed border-[#cfd7df] bg-[#f8fafc] px-6 py-12 text-center">
+    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center">
 
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white">
-        <Users
-          size={25}
-          className="text-[#9aa6b1]"
-        />
-      </div>
+      <Users
+        size={25}
+        className="mx-auto text-slate-300"
+      />
 
-      <p className="mt-4 text-[14px] font-extrabold text-[#53616d]">
+      <p className="mt-2 text-[12px] font-medium text-slate-600">
         {title}
       </p>
 
-      <p className="mt-1.5 text-[12px] font-medium text-[#7b8791]">
+      <p className="mt-1 text-[10px] font-normal text-slate-400">
         {description}
       </p>
 
@@ -2922,34 +2888,42 @@ function getInitials(
 }
 
 /* =========================================================
-   PROJECT STATUS CLASS
+   PROJECT STATUS
 ========================================================= */
 
 function getProjectStatusClass(
   status: string
 ) {
   const normalized =
-    status.toLowerCase();
+    status
+      .toLowerCase()
+      .trim();
 
   if (
     normalized.includes(
       "progress"
     )
   ) {
-    return "bg-[#edf3ff] text-[#315da5]";
+    return "bg-[#edf2ff] text-[#5577c2]";
   }
 
   if (
-    normalized.includes("done") ||
-    normalized.includes("complete")
+    normalized.includes(
+      "done"
+    ) ||
+    normalized.includes(
+      "complete"
+    )
   ) {
-    return "bg-[#ecf8ef] text-[#2f8a4f]";
+    return "bg-[#eaf5ed] text-[#438759]";
   }
 
   if (
-    normalized.includes("pause")
+    normalized.includes(
+      "pause"
+    )
   ) {
-    return "bg-[#fff6e8] text-[#a66d21]";
+    return "bg-[#f8f0e4] text-[#ad8144]";
   }
 
   if (
@@ -2960,7 +2934,7 @@ function getProjectStatusClass(
     return "bg-[#f3eafa] text-[#85579a]";
   }
 
-  return "bg-[#f1f4f7] text-[#53616d]";
+  return "bg-slate-100 text-slate-500";
 }
 
 /* =========================================================
