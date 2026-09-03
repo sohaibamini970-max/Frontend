@@ -2090,160 +2090,132 @@ export default function Projects() {
 
                                 </div>
 
-                                {/* THREE DOTS */}
+                              {/* THREE DOTS */}
 
-                                <div className="absolute right-3 top-3">
+<div className="absolute right-3 top-3">
 
-                                  <button
-                                    type="button"
-                                    onClick={(
-                                      e
-                                    ) => {
-                                      e.stopPropagation();
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
 
-                                      setOpenProjectMenu(
-                                        openProjectMenu ===
-                                          project.id
-                                          ? null
-                                          : project.id
-                                      );
-                                    }}
-                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                                  >
-                                    <MoreVertical
-                                      size={
-                                        17
-                                      }
-                                    />
-                                  </button>
+      setOpenProjectMenu(
+        openProjectMenu === project.id
+          ? null
+          : project.id
+      );
+    }}
+    className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+  >
+    <MoreVertical size={17} />
+  </button>
 
-                                  {openProjectMenu ===
-                                    project.id && (
-                                    <div
-                                      className="absolute right-0 top-9 z-50 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
-                                      onClick={(
-                                        e
-                                      ) =>
-                                        e.stopPropagation()
-                                      }
-                                    >
+  {openProjectMenu === project.id && (
+    <div
+      className="absolute right-0 top-9 z-50 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+      onClick={(e) => e.stopPropagation()}
+    >
 
-                                      {/* MANAGEMENT OPTIONS */}
+      {/* MANAGEMENT OPTIONS */}
 
-                                      {canManageProjects && (
-                                        <>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              openEditProject(
-                                                project
-                                              )
-                                            }
-                                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                          >
-                                            <Edit3
-                                              size={
-                                                16
-                                              }
-                                              className="text-gray-500"
-                                            />
-                                            Update Project
-                                          </button>
+      {canManageProjects && (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              openEditProject(project);
+              setOpenProjectMenu(null);
+            }}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Edit3
+              size={16}
+              className="text-gray-500"
+            />
+            Update Project
+          </button>
 
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              openDeadlineModal(
-                                                project
-                                              )
-                                            }
-                                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                          >
-                                            <Calendar
-                                              size={
-                                                16
-                                              }
-                                              className="text-gray-500"
-                                            />
-                                            Update Deadline
-                                          </button>
+          <button
+            type="button"
+            onClick={() => {
+              openDeadlineModal(project);
+              setOpenProjectMenu(null);
+            }}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Calendar
+              size={16}
+              className="text-gray-500"
+            />
+            Update Deadline
+          </button>
+        </>
+      )}
 
-                                      {isProjectManager && (
-                                              <>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    openStatusModal(project);
-                                                    setOpenProjectMenu(null);
-                                                  }}
-                                                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                                >
-                                                  <CheckCircle2
-                                                    size={16}
-                                                    className="text-gray-500"
-                                                  />
-                                                  Change Status
-                                                </button>
-                                            
-                                                <div className="my-1 border-t border-gray-100" />
-                                              </>
-                                            )}
+      {/* PROJECT MANAGER - CHANGE STATUS */}
 
-                                      {/* EVERY ROLE CAN VIEW */}
+      {isProjectManager && (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              openStatusModal(project);
+              setOpenProjectMenu(null);
+            }}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <CheckCircle2
+              size={16}
+              className="text-gray-500"
+            />
+            Change Status
+          </button>
 
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          openViewProject(
-                                            project
-                                          )
-                                        }
-                                        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                      >
-                                        <Eye
-                                          size={
-                                            16
-                                          }
-                                          className="text-gray-500"
-                                        />
-                                        View Project
-                                      </button>
+          <div className="my-1 border-t border-gray-100" />
+        </>
+      )}
 
-                                      {/* DELETE */}
+      {/* EVERY ROLE CAN VIEW */}
 
-                                      {canManageProjects && (
-                                        <>
-                                          <div className="my-1 border-t border-gray-100" />
+      <button
+        type="button"
+        onClick={() => {
+          openViewProject(project);
+          setOpenProjectMenu(null);
+        }}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+      >
+        <Eye
+          size={16}
+          className="text-gray-500"
+        />
+        View Project
+      </button>
 
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              openDeleteProject(
-                                                project
-                                              )
-                                            }
-                                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50"
-                                          >
-                                            <Trash2
-                                              size={
-                                                16
-                                              }
-                                            />
-                                            Delete Project
-                                          </button>
-                                        </>
-                                      )}
+      {/* DELETE */}
 
-                                    </div>
-                                  )}
+      {canManageProjects && (
+        <>
+          <div className="my-1 border-t border-gray-100" />
 
-                                </div>
+          <button
+            type="button"
+            onClick={() => {
+              openDeleteProject(project);
+              setOpenProjectMenu(null);
+            }}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50"
+          >
+            <Trash2 size={16} />
+            Delete Project
+          </button>
+        </>
+      )}
 
-                              </div>
+    </div>
+  )}
 
-                            </div>
-                          </div>
-
+</div>
                           {/* OBJECTIVE */}
 
                           <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
