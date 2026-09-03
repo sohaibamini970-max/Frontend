@@ -976,40 +976,72 @@ const getFileIcon = (fileType: string) => {
     }
   };
 const handlePreviewAttachment = async (attachment: Attachment) => {
-  setSelectedAttachmentForPreview(attachment);
-  setPreviewModalOpen(true);
-  setPreviewBlobUrl(null);
-  setPreviewLoading(true);
+    setSelectedAttachmentForPreview(attachment);
+    setPreviewModalOpen(true);
+    setPreviewBlobUrl(null);
+    setPreviewLoading(true);
 
-  try {
-    const response = await fetch(
-      `${API_BASE}/attachments/${attachment.id}/preview`,
-      {
-        headers: authHeaders(),
-      }
-    );
+    try {
+        const response = await fetch(
+            `${API_BASE}/attachments/${attachment.id}/preview`,
+            {
+                method: "GET",
+                headers: {
+                    ...authHeaders(),
+                },
+                cache: "no-store",
+            }
+        );
 
-    if (!response.ok) {
-      throw new Error("Failed to load preview");
+        if (!response.ok) {
+            const errorData = await response
+                .json()
+                .catch(() => ({}));
+
+            throw new Error(
+                errorData.message ||
+                    `Preview failed (${response.status})`
+            );
+        }
+
+        const blob = await response.blob();
+
+        if (!blob.size) {
+            throw new Error("The server returned an empty file.");
+        }
+
+        console.log("Preview blob:", {
+            type: blob.type,
+            size: blob.size,
+        });
+
+        const url = window.URL.createObjectURL(blob);
+
+        setPreviewBlobUrl(url);
+    } catch (error) {
+        console.error("Preview error:", error);
+
+        setPreviewBlobUrl(null);
+
+        alert(
+            error instanceof Error
+                ? error.message
+                : "Failed to preview file."
+        );
+    } finally {
+        setPreviewLoading(false);
+    }
+};
+
+  const closePreviewModal = () => {
+    if (previewBlobUrl) {
+        window.URL.revokeObjectURL(previewBlobUrl);
     }
 
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    setPreviewBlobUrl(url);
-  } catch (error) {
-    console.error("Preview error:", error);
     setPreviewBlobUrl(null);
-  } finally {
+    setPreviewModalOpen(false);
+    setSelectedAttachmentForPreview(null);
     setPreviewLoading(false);
-  }
-};
-  const closePreviewModal = () => {
-  if (previewBlobUrl) {
-    window.URL.revokeObjectURL(previewBlobUrl);
-  }
-  setPreviewBlobUrl(null);
-  setPreviewModalOpen(false);
-  setSelectedAttachmentForPreview(null);
 };
 
   const handleDeleteAttachment = async (attachmentId: string) => {
@@ -3237,47 +3269,121 @@ const fetchTaskChallenges = async (task: Task) => {
             </div>
 
             {/* Preview Content */}
-           <div className="flex-1 overflow-auto bg-gray-50 p-6">
-           {previewLoading ? (
-          <div className="flex min-h-[400px] items-center justify-center">
+         <div className="flex-1 min-h-0 overflow-auto bg-gray-50 p-4 sm:p-6">
+
+    {previewLoading ? (
+
+        <div className="flex min-h-[450px] items-center justify-center">
+
             <div className="text-center">
-              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
-              <p className="mt-3 text-xs font-semibold text-gray-600">
-                Loading preview...
-              </p>
+
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+
+                <p className="mt-3 text-xs font-semibold text-gray-600">
+
+                    Loading file preview...
+
+                </p>
+
             </div>
-          </div>
-        ) : selectedAttachmentForPreview.file_type.toLowerCase() === "pdf" && previewBlobUrl ? (
-          <iframe
-            src={previewBlobUrl}
-            className="h-full w-full rounded-lg border border-gray-300"
-            title="PDF Preview"
-          />
-        ) : selectedAttachmentForPreview.file_type.toLowerCase() === "txt" && previewBlobUrl ? (
-          <iframe
-            src={previewBlobUrl}
-            className="h-full w-full rounded-lg border border-gray-300 bg-white"
-            title="Text Preview"
-          />
+
+        </div>
+
+    ) : previewBlobUrl ? (
+
+        selectedAttachmentForPreview.file_type.toLowerCase() ===
+
+            "pdf" ? (
+
+            <iframe
+
+                src={previewBlobUrl}
+
+                title={selectedAttachmentForPreview.file_name}
+
+                className="h-[65vh] min-h-[450px] w-full rounded-lg border-2 border-gray-300 bg-white"
+
+            />
+
+        ) : selectedAttachmentForPreview.file_type.toLowerCase() ===
+
+              "txt" ? (
+
+            <iframe
+
+                src={previewBlobUrl}
+
+                title={selectedAttachmentForPreview.file_name}
+
+                className="h-[65vh] min-h-[450px] w-full rounded-lg border-2 border-gray-300 bg-white"
+
+            />
+
         ) : (
-          <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
-              {getFileIcon(selectedAttachmentForPreview.file_type)}
+
+            <div className="flex min-h-[450px] flex-col items-center justify-center text-center">
+
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+
+                    {getFileIcon(
+
+                        selectedAttachmentForPreview.file_type
+
+                    )}
+
+                </div>
+
+                <p className="mt-4 text-sm font-bold text-gray-950">
+
+                    Preview is not available
+
+                </p>
+
+                <p className="mt-2 max-w-md text-xs font-medium text-gray-600">
+
+                    {selectedAttachmentForPreview.file_name}
+
+                </p>
+
+                <p className="mt-1 text-xs text-gray-500">
+
+                    DOC and DOCX files can be downloaded and opened
+
+                    in Microsoft Word.
+
+                </p>
+
             </div>
-            <div>
-              <p className="text-sm font-bold text-gray-950">
-                {selectedAttachmentForPreview.file_name}
-              </p>
-              <p className="mt-2 text-xs text-gray-600">
-                Preview not available for this file type.
-              </p>
-              <p className="mt-1 text-xs text-gray-600">
-                Please download to view the file.
-              </p>
+
+        )
+
+    ) : (
+
+        <div className="flex min-h-[450px] flex-col items-center justify-center text-center">
+
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+
+                <FileText size={24} className="text-red-700" />
+
             </div>
-          </div>
-        )}
-      </div>
+
+            <p className="mt-4 text-sm font-bold text-gray-950">
+
+                Unable to load preview
+
+            </p>
+
+            <p className="mt-2 text-xs text-gray-600">
+
+                The file could not be retrieved from the server.
+
+            </p>
+
+        </div>
+
+    )}
+
+</div>
 
             {/* Preview Footer */}
             <div className="flex gap-2 border-t border-gray-200 bg-[#f5f6f8] px-6 py-4">
