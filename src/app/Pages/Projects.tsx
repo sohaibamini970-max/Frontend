@@ -1554,24 +1554,13 @@ export default function Projects() {
      STATUS MODAL
   ========================================================= */
 
-  const openStatusModal = (
-    project: Project
-  ) => {
-    if (!canManageProjects)
-      return;
-
-    setSelectedProject(project);
-
-    setSelectedNewStatus(
-      project.status === "Done"
-        ? "Done"
-        : "Backlog"
-    );
-
-    setStatusError("");
-    setOpenProjectMenu(null);
-    setStatusModalOpen(true);
-  };
+const openStatusModal = (project: Project) => {
+  setSelectedProject(project);
+  setSelectedNewStatus(project.status === "Done" ? "Done" : "Backlog");
+  setStatusError("");
+  setOpenProjectMenu(null);
+  setStatusModalOpen(true);
+};
 
   /* =========================================================
      CHANGE PROJECT STATUS
