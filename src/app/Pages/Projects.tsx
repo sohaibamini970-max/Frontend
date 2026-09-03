@@ -3842,7 +3842,7 @@ export default function Projects() {
       ===================================================== */}
 
       {statusModalOpen &&
-        canManageProjects &&
+        isProjectManager &&
         selectedProject && (
           <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]">
 
