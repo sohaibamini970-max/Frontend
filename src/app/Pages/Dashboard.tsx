@@ -1098,7 +1098,7 @@ export default function Dashboard() {
             ROW 1 — PROJECTS OVERVIEW
         ================================================= */}
 
-       <section className="mb-7 overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
+       <section className="mb-7 overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white">
 
   <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
 
@@ -1246,7 +1246,7 @@ export default function Dashboard() {
 
                   <div className="mt-2 min-h-[32px] w-full text-center">
 
-                    <p className="line-clamp-2 text-[11px] font-bold uppercase leading-4 text-[#172633]">
+                    <p className="line-clamp-2 text-[15px] font-bold uppercase leading-4 text-[#172633]">
                       {project.name}
                     </p>
 
@@ -1255,11 +1255,11 @@ export default function Dashboard() {
                   <div className="mt-2 flex items-center gap-1 rounded-full bg-[#f5f7f9] px-2.5 py-1">
 
                     <CheckCircle2
-                      size={11}
+                      size={15}
                       className="text-[#438d5d] shrink-0"
                     />
 
-                    <span className="text-[9px] font-semibold text-[#697783]">
+                    <span className="text-[13px] font-semibold text-[#697783]">
                       {completedTasks}/{totalTasks}
                     </span>
 
@@ -1278,11 +1278,11 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 rounded-full bg-[#f7f9fb] px-4 py-2">
 
           <Eye
-            size={13}
+            size={15}
             className="text-[#557bd2] shrink-0"
           />
 
-          <span className="text-[10px] font-medium text-[#7b8794]">
+          <span className="text-[13px] font-medium text-[#7b8794]">
             Click any bar to view details
           </span>
 
