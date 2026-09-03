@@ -17,6 +17,9 @@ import {
   ListTodo,
   FolderKanban,
   Trash2,
+  Download,
+  File,
+  FileText,
 } from "lucide-react";
 
 type ProjectStatus =
@@ -86,6 +89,18 @@ type TaskChallenge = {
   updated_at?: string;
 };
 
+type Attachment = {
+  id: string;
+  task_id: string;
+  file_name: string;
+  file_type: string;
+  mime_type: string;
+  file_size: number;
+  uploaded_by: string;
+  uploader_name?: string;
+  created_at: string;
+};
+
 const API_BASE = "https://backend-five-swart-88.vercel.app/api";
 
 function getToken() {
@@ -124,6 +139,14 @@ function formatDate(date?: string) {
     month: "short",
     day: "numeric",
   });
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 }
 
 function getTodayDate() {
@@ -432,6 +455,19 @@ const [deletingChallenge, setDeletingChallenge] =
 const [challengeCounts, setChallengeCounts] =
   useState<Record<string, number>>({});
 
+// ====================================
+// FILE ATTACHMENT STATE
+// ====================================
+const [attachments, setAttachments] = useState<Record<string, Attachment[]>>({});
+const [selectedFile, setSelectedFile] = useState<File | null>(null);
+const [uploadingAttachment, setUploadingAttachment] = useState(false);
+const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
+const [selectedTaskForAttachment, setSelectedTaskForAttachment] = useState<Task | null>(null);
+const [previewModalOpen, setPreviewModalOpen] = useState(false);
+const [selectedAttachmentForPreview, setSelectedAttachmentForPreview] = useState<Attachment | null>(null);
+const [deletingAttachment, setDeletingAttachment] = useState<string | null>(null);
+const [loadingAttachments, setLoadingAttachments] = useState(false);
+
   const isManagementRole =
   currentUser?.role === "System Administrator" ||
   currentUser?.role === "Executive Manager" ||
@@ -457,6 +493,30 @@ const canReadChallenge = (task: Task) => {
         String(currentUser?.id || "")
     )
   );
+};
+
+// ====================================
+// FILE ATTACHMENT HELPERS
+// ====================================
+const canReadAttachments = (task: Task): boolean => {
+  return (
+    isManagementRole ||
+    (String(task.assignee_id || "") === String(currentUser?.id || ""))
+  );
+};
+
+const getFileIcon = (fileType: string) => {
+  switch (fileType.toLowerCase()) {
+    case "pdf":
+      return <FileText className="text-red-600" size={16} />;
+    case "docx":
+    case "doc":
+      return <FileText className="text-blue-600" size={16} />;
+    case "txt":
+      return <FileText className="text-gray-600" size={16} />;
+    default:
+      return <File className="text-gray-600" size={16} />;
+  }
 };
 
   useEffect(() => {
@@ -815,6 +875,124 @@ const canReadChallenge = (task: Task) => {
     } catch (error) {
       console.error("Failed to fetch users:", error);
     }
+  };
+
+  // ====================================
+  // FILE ATTACHMENT FUNCTIONS
+  // ====================================
+
+  const fetchTaskAttachments = async (taskId: string) => {
+    try {
+      setLoadingAttachments(true);
+
+      const response = await fetch(
+        `${API_BASE}/tasks/${taskId}/attachments`,
+        {
+          headers: authHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to load attachments");
+      }
+
+      setAttachments((prev) => ({
+        ...prev,
+        [taskId]: data.attachments || [],
+      }));
+    } catch (error) {
+      console.error("Fetch attachments error:", error);
+      setAttachments((prev) => ({
+        ...prev,
+        [taskId]: [],
+      }));
+    } finally {
+      setLoadingAttachments(false);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: Attachment) => {
+    try {
+      const response = await fetch(
+        `${API_BASE}/attachments/${attachment.id}/download`,
+        {
+          headers: authHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download file");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = attachment.file_name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download error:", error);
+      alert(error instanceof Error ? error.message : "Failed to download file");
+    }
+  };
+
+  const handlePreviewAttachment = async (attachment: Attachment) => {
+    setSelectedAttachmentForPreview(attachment);
+    setPreviewModalOpen(true);
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this attachment?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingAttachment(attachmentId);
+
+      const response = await fetch(
+        `${API_BASE}/attachments/${attachmentId}`,
+        {
+          method: "DELETE",
+          headers: authHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to delete attachment");
+      }
+
+      if (selectedTaskForAttachment) {
+        await fetchTaskAttachments(selectedTaskForAttachment.id);
+      }
+
+      alert("Attachment deleted successfully");
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert(error instanceof Error ? error.message : "Failed to delete attachment");
+    } finally {
+      setDeletingAttachment(null);
+    }
+  };
+
+  const openAttachmentModal = async (task: Task) => {
+    setSelectedTaskForAttachment(task);
+    setAttachmentModalOpen(true);
+    await fetchTaskAttachments(task.id);
+  };
+
+  const closeAttachmentModal = () => {
+    setAttachmentModalOpen(false);
+    setSelectedTaskForAttachment(null);
+    setSelectedFile(null);
   };
 
   const filteredProjects = useMemo(() => {
@@ -1873,6 +2051,21 @@ const fetchTaskChallenges = async (task: Task) => {
 
                                         <div className="relative flex shrink-0 items-center gap-2">
 
+                                          {/* FILES BUTTON - Only show if attachments exist */}
+                                          {canReadAttachments(task) && (attachments[task.id]?.length || 0) > 0 && (
+                                            <button
+                                              onClick={() => openAttachmentModal(task)}
+                                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 text-[10px] font-bold text-amber-800 hover:bg-amber-100"
+                                              title="View task files"
+                                            >
+                                              <File size={13} />
+                                              Files
+                                              <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-900">
+                                                {attachments[task.id]?.length || 0}
+                                              </span>
+                                            </button>
+                                          )}
+
                                          {canReadChallenge(task) && (
                                           <button
                                             onClick={() => openChallenges(task)}
@@ -2147,6 +2340,7 @@ const fetchTaskChallenges = async (task: Task) => {
         </div>
       </main>
 
+      {/* Your existing modals (create task, challenges) remain unchanged */}
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
@@ -2402,9 +2596,6 @@ const fetchTaskChallenges = async (task: Task) => {
                             selectedProject?.start_date
                           );
                         
-                          // Task start date must be:
-                          // 1. Today or later
-                          // 2. Project start date or later
                           if (projectStartDate && projectStartDate > today) {
                             return projectStartDate;
                           }
@@ -2517,7 +2708,7 @@ const fetchTaskChallenges = async (task: Task) => {
         </div>
       )}
 
-      {/* Challengez model */}
+      {/* Challenges Modal - Unchanged */}
       {challengeModalOpen && selectedChallengeTask && (
   <div
     className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
@@ -2531,81 +2722,46 @@ const fetchTaskChallenges = async (task: Task) => {
     }}
   >
     <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border-2 border-gray-500 bg-white shadow-2xl">
-
-      {/* Challenge Modal Header */}
-
-<div className="shrink-0 border-b border-gray-200 bg-white px-5 py-3">
-
-  <div className="flex items-center justify-between gap-3">
-
-    <div className="min-w-0">
-
-      <div className="flex items-center gap-2">
-
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100">
-
-          <Flag size={16} className="text-violet-700" />
-
+      <div className="shrink-0 border-b border-gray-200 bg-white px-5 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100">
+                <Flag size={16} className="text-violet-700" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-bold text-gray-950">
+                  Task Challenges
+                </h2>
+                <p className="truncate text-[11px] text-gray-500">
+                  {selectedChallengeTask?.name}
+                </p>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={closeChallenges}
+            disabled={savingChallenge}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Close challenges"
+          >
+            <X size={18} />
+          </button>
         </div>
-
-        <div className="min-w-0">
-
-          <h2 className="truncate text-base font-bold text-gray-950">
-
-            Task Challenges
-
-          </h2>
-
-          <p className="truncate text-[11px] text-gray-500">
-
-            {selectedChallengeTask?.name}
-
-          </p>
-
-        </div>
-
       </div>
 
-    </div>
-
-    <button
-
-      type="button"
-
-      onClick={closeChallenges}
-
-      disabled={savingChallenge}
-
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
-
-      aria-label="Close challenges"
-
-    >
-
-      <X size={18} />
-
-    </button>
-
-  </div>
-
-</div>
-
-      {/* CONTENT */}
       <div className="overflow-y-auto bg-[#eef1f4] px-6 py-6">
-
-        {/* EXISTING CHALLENGES */}
         <div>
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-gray-950">
                 Reported challenges
               </h3>
-
               <p className="mt-1 text-xs font-medium text-gray-600">
                 Challenges already reported for this task.
               </p>
             </div>
-
             <span className="rounded-full border border-violet-300 bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-800">
               {challenges.length}{" "}
               {challenges.length === 1
@@ -2615,12 +2771,10 @@ const fetchTaskChallenges = async (task: Task) => {
           </div>
 
           <div className="mt-4 space-y-3">
-
             {loadingChallenges ? (
               <div className="flex min-h-[130px] items-center justify-center rounded-xl border-2 border-gray-300 bg-white">
                 <div className="text-center">
                   <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
-
                   <p className="mt-2 text-xs font-semibold text-gray-600">
                     Loading challenges...
                   </p>
@@ -2631,11 +2785,9 @@ const fetchTaskChallenges = async (task: Task) => {
                 <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-600">
                   <Flag size={18} />
                 </div>
-
                 <p className="mt-3 text-sm font-bold text-gray-950">
                   No challenges reported
                 </p>
-
                 <p className="mt-1 text-xs font-medium text-gray-600">
                   No problems or challenges have been recorded for this task yet.
                 </p>
@@ -2647,26 +2799,20 @@ const fetchTaskChallenges = async (task: Task) => {
                   className="rounded-xl border-2 border-gray-300 bg-white p-4 shadow-sm"
                 >
                   <div className="flex items-start gap-3">
-
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-xs font-bold text-violet-800">
                       {index + 1}
                     </div>
-
                     <div className="min-w-0 flex-1">
-
                       <div className="flex items-start justify-between gap-3">
-
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">
                             Reported by
                           </p>
-
                           <p className="mt-0.5 text-xs font-bold text-gray-950">
                             {challenge.author_name ||
                               "Member"}
                           </p>
                         </div>
-
                         {(isManagementRole ||
                           String(challenge.user_id) ===
                             String(currentUser?.id)) && (
@@ -2691,15 +2837,12 @@ const fetchTaskChallenges = async (task: Task) => {
                             )}
                           </button>
                         )}
-
                       </div>
-
                       <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3.5 py-3">
                         <p className="whitespace-pre-wrap text-xs font-medium leading-relaxed text-gray-800">
                           {challenge.challenge}
                         </p>
                       </div>
-
                       {challenge.created_at && (
                         <p className="mt-2 text-[10px] font-medium text-gray-500">
                           {formatDate(
@@ -2707,7 +2850,6 @@ const fetchTaskChallenges = async (task: Task) => {
                           )}
                         </p>
                       )}
-
                     </div>
                   </div>
                 </div>
@@ -2716,26 +2858,19 @@ const fetchTaskChallenges = async (task: Task) => {
           </div>
         </div>
 
-        {/* MEMBER INPUT */}
         {canWriteChallenge(selectedChallengeTask) && (
           <div className="mt-6 rounded-xl border-2 border-violet-300 bg-violet-50 p-4">
-
             <div className="flex items-start gap-3">
-
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-violet-700 shadow-sm">
                 <Flag size={16} />
               </div>
-
               <div className="min-w-0 flex-1">
-
                 <h3 className="text-sm font-bold text-gray-950">
                   Report a problem or challenge
                 </h3>
-
                 <p className="mt-1 text-xs font-medium leading-relaxed text-gray-700">
                   Describe any problem, blocker, difficulty, or challenge you faced while performing this task.
                 </p>
-
                 <textarea
                   value={challengeText}
                   onChange={(event) =>
@@ -2747,7 +2882,6 @@ const fetchTaskChallenges = async (task: Task) => {
                   rows={5}
                   className="mt-4 w-full resize-none rounded-lg border-2 border-gray-400 bg-white px-3.5 py-3 text-sm font-medium text-gray-950 caret-gray-950 outline-none placeholder:text-gray-500 focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
                 />
-
                 <div className="mt-3 flex justify-end">
                   <button
                     onClick={handleAddChallenge}
@@ -2770,25 +2904,21 @@ const fetchTaskChallenges = async (task: Task) => {
                     )}
                   </button>
                 </div>
-
               </div>
             </div>
           </div>
         )}
 
-        {/* MANAGEMENT MESSAGE */}
         {isManagementRole && (
           <div className="mt-3 rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
             <div className="flex gap-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700">
                 <Users size={15} />
               </div>
-
               <div>
                 <p className="text-xs font-bold text-gray-950">
                   Management view
                 </p>
-
                 <p className="mt-1 text-[11px] font-medium leading-relaxed text-gray-700">
                   You can review the challenges reported by the member assigned to this task. Only the assigned Member can submit new challenges.
                 </p>
@@ -2796,12 +2926,9 @@ const fetchTaskChallenges = async (task: Task) => {
             </div>
           </div>
         )}
-
       </div>
 
-      {/* FOOTER */}
       <div className="flex justify-end border-t-2 border-gray-300 bg-[#f5f6f8] px-6 py-4">
-
         <button
           onClick={closeChallenges}
           disabled={savingChallenge}
@@ -2809,13 +2936,249 @@ const fetchTaskChallenges = async (task: Task) => {
         >
           Close
         </button>
-
       </div>
     </div>
   </div>
 )}
+
+      {/* FILE ATTACHMENT MODAL */}
+      {attachmentModalOpen && selectedTaskForAttachment && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !uploadingAttachment) {
+              closeAttachmentModal();
+            }
+          }}
+        >
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border-2 border-gray-500 bg-white shadow-2xl">
+            {/* Header */}
+            <div className="shrink-0 border-b border-gray-200 bg-white px-5 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+                      <File size={16} className="text-amber-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="truncate text-base font-bold text-gray-950">
+                        Task Files
+                      </h2>
+                      <p className="truncate text-[11px] text-gray-500">
+                        {selectedTaskForAttachment?.name}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeAttachmentModal}
+                  disabled={uploadingAttachment}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Close"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="overflow-y-auto bg-[#eef1f4] px-6 py-6">
+              {/* Files List */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-950">
+                      Files
+                    </h3>
+                    <p className="mt-1 text-xs font-medium text-gray-600">
+                      All files attached to this task.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">
+                    {attachments[selectedTaskForAttachment.id]?.length || 0} File{(attachments[selectedTaskForAttachment.id]?.length || 0) !== 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {loadingAttachments ? (
+                    <div className="flex min-h-[130px] items-center justify-center rounded-xl border-2 border-gray-300 bg-white">
+                      <div className="text-center">
+                        <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+                        <p className="mt-2 text-xs font-semibold text-gray-600">
+                          Loading files...
+                        </p>
+                      </div>
+                    </div>
+                  ) : (attachments[selectedTaskForAttachment.id]?.length || 0) === 0 ? (
+                    <div className="rounded-xl border-2 border-dashed border-gray-400 bg-white px-5 py-10 text-center">
+                      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-600">
+                        <File size={18} />
+                      </div>
+                      <p className="mt-3 text-sm font-bold text-gray-950">
+                        No files attached
+                      </p>
+                      <p className="mt-1 text-xs font-medium text-gray-600">
+                        No attachments have been added to this task yet.
+                      </p>
+                    </div>
+                  ) : (
+                    (attachments[selectedTaskForAttachment.id] || []).map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="rounded-xl border-2 border-gray-300 bg-white p-4 shadow-sm"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100">
+                            {getFileIcon(attachment.file_type)}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-bold text-gray-950 break-words">
+                                  {attachment.file_name}
+                                </p>
+                                <p className="mt-1 text-[10px] font-medium text-gray-600">
+                                  {formatFileSize(attachment.file_size)} • Uploaded by {attachment.uploader_name || "User"}
+                                </p>
+                                <p className="mt-1 text-[10px] text-gray-500">
+                                  {new Date(attachment.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+
+                              <div className="flex shrink-0 gap-2">
+                                <button
+                                  onClick={() => handlePreviewAttachment(attachment)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                  title="Preview file"
+                                >
+                                  <FileText size={14} />
+                                </button>
+
+                                <button
+                                  onClick={() => handleDownloadAttachment(attachment)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
+                                  title="Download file"
+                                >
+                                  <Download size={14} />
+                                </button>
+
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => handleDeleteAttachment(attachment.id)}
+                                    disabled={deletingAttachment === attachment.id}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                                    title="Delete file"
+                                  >
+                                    {deletingAttachment === attachment.id ? (
+                                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-red-600" />
+                                    ) : (
+                                      <Trash2 size={14} />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end border-t-2 border-gray-300 bg-[#f5f6f8] px-6 py-4">
+              <button
+                onClick={closeAttachmentModal}
+                disabled={uploadingAttachment}
+                className="h-10 rounded-lg border-2 border-gray-400 bg-white px-5 text-sm font-semibold text-gray-900 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FILE PREVIEW MODAL */}
+      {previewModalOpen && selectedAttachmentForPreview && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setPreviewModalOpen(false);
+            }
+          }}
+        >
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border-2 border-gray-500 bg-white shadow-2xl">
+            {/* Preview Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-5 py-3">
+              <div>
+                <h2 className="text-base font-bold text-gray-950">
+                  {selectedAttachmentForPreview.file_name}
+                </h2>
+                <p className="mt-1 text-xs font-medium text-gray-600">
+                  {formatFileSize(selectedAttachmentForPreview.file_size)}
+                </p>
+              </div>
+              <button
+                onClick={() => setPreviewModalOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Preview Content */}
+            <div className="flex-1 overflow-auto bg-gray-50 p-6">
+              {selectedAttachmentForPreview.file_type.toLowerCase() === "pdf" ? (
+                <iframe
+                  src={`${API_BASE}/attachments/${selectedAttachmentForPreview.id}/preview`}
+                  className="h-full w-full rounded-lg border border-gray-300"
+                  title="PDF Preview"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+                    {getFileIcon(selectedAttachmentForPreview.file_type)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-950">
+                      {selectedAttachmentForPreview.file_name}
+                    </p>
+                    <p className="mt-2 text-xs text-gray-600">
+                      Preview not available for this file type.
+                    </p>
+                    <p className="mt-1 text-xs text-gray-600">
+                      Please download to view the file.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Preview Footer */}
+            <div className="flex gap-2 border-t border-gray-200 bg-[#f5f6f8] px-6 py-4">
+              <button
+                onClick={() => handleDownloadAttachment(selectedAttachmentForPreview)}
+                className="flex-1 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-green-600 px-4 text-sm font-bold text-white hover:bg-green-700"
+              >
+                <Download size={15} />
+                Download
+              </button>
+              <button
+                onClick={() => setPreviewModalOpen(false)}
+                className="h-10 rounded-lg border-2 border-gray-400 bg-white px-5 text-sm font-semibold text-gray-900 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
-
-
