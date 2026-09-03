@@ -534,7 +534,7 @@ export default function Header() {
   };
 
  return (
-  <header className="border-b border-gray-200 bg-white text-[#18212b] shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+  <header className="border-b border-gray-200 bg-white text-[#D6D0D0] shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
 
     {/* =====================================================
         TOP NAVIGATION
