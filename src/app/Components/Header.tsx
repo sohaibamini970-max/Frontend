@@ -534,7 +534,7 @@ export default function Header() {
   };
 
  return (
-  <header className="border-b border-gray-200 bg-[#DBD7D7] text-[#636060] shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+  <header className="border-b border-gray-200 bg-white text-[#18212b] shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
 
     {/* =====================================================
         TOP NAVIGATION
@@ -838,7 +838,7 @@ export default function Header() {
         DASHBOARD HERO
     ===================================================== */}
 
-    <div className="border-t border-gray-100 bg-[#f8fafb]">
+    <div className="border-t border-gray-100 bg-[#D6D6D6]">
 
       <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">
 
