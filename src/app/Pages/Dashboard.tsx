@@ -670,7 +670,7 @@ export default function Dashboard() {
   ======================================================= */
 
 return (
-  <main className="min-h-screen bg-[#f3f5f7]">
+  <main className="min-h-screen bg-[#c4c4c4]">
     <div className="mx-auto max-w-[1440px] px-5 py-6 sm:px-8 lg:px-10">
 
       {/* =================================================
