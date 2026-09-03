@@ -1217,9 +1217,9 @@ export default function Dashboard() {
                             </span>
                           </div>
 
-                          <div className="relative flex h-[270px] w-full max-w-[82px] items-end justify-center">
+                          <div className="relative flex h-[200px] w-full max-w-[62px] items-end justify-center">
 
-                            <div className="absolute bottom-0 h-full w-full rounded-t-xl bg-[#f7f9fb]" />
+                            <div className="absolute bottom-0 h-full w-full rounded-t-xl bg-[#BDBBBB]" />
 
                             <div
                               className={`relative z-10 w-full rounded-t-xl bg-gradient-to-t ${color.bar} shadow-[0_8px_18px_rgba(85,123,210,0.18)] transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_12px_25px_rgba(85,123,210,0.25)]`}
