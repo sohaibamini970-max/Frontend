@@ -1098,7 +1098,7 @@ export default function Dashboard() {
             ROW 1 — PROJECTS OVERVIEW
         ================================================= */}
 
-        <section className="mb-7 overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
+        <section className="mb-7 h-[200px] overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
 
           <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
 
