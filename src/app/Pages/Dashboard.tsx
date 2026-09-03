@@ -297,6 +297,17 @@ export default function Dashboard() {
         "Content-Type": "application/json",
       };
 
+      const handleRefresh = async () => {
+  setLoading(true);
+  try {
+    await loadDashboard();
+  } catch (error) {
+    console.error("Refresh failed:", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
       /* =====================================================
          PROJECTS
       ===================================================== */
