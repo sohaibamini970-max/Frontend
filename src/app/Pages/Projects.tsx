@@ -2168,27 +2168,26 @@ export default function Projects() {
                                             Update Deadline
                                           </button>
 
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              openStatusModal(
-                                                project
-                                              )
-                                            }
-                                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                          >
-                                            <CheckCircle2
-                                              size={
-                                                16
-                                              }
-                                              className="text-gray-500"
-                                            />
-                                            Change Status
-                                          </button>
-
-                                          <div className="my-1 border-t border-gray-100" />
-                                        </>
-                                      )}
+                                      {isProjectManager && (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    openStatusModal(project);
+                                                    setOpenProjectMenu(null);
+                                                  }}
+                                                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                                >
+                                                  <CheckCircle2
+                                                    size={16}
+                                                    className="text-gray-500"
+                                                  />
+                                                  Change Status
+                                                </button>
+                                            
+                                                <div className="my-1 border-t border-gray-100" />
+                                              </>
+                                            )}
 
                                       {/* EVERY ROLE CAN VIEW */}
 
