@@ -2099,7 +2099,8 @@ const fetchTaskChallenges = async (task: Task) => {
                                         <div className="relative flex shrink-0 items-center gap-2">
 
                                           {/* FILES BUTTON - Only show if attachments exist */}
-                                          {canReadAttachments(task) && (attachments[task.id]?.length || 0) > 0 && (
+                                        {/* FILES BUTTON */}
+                                          {canReadAttachments(task) && (
                                             <button
                                               onClick={() => openAttachmentModal(task)}
                                               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 text-[10px] font-bold text-amber-800 hover:bg-amber-100"
@@ -2107,9 +2108,11 @@ const fetchTaskChallenges = async (task: Task) => {
                                             >
                                               <File size={13} />
                                               Files
-                                              <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-900">
-                                                {attachments[task.id]?.length || 0}
-                                              </span>
+                                              {(attachments[task.id]?.length || 0) > 0 && (
+                                                <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-900">
+                                                  {attachments[task.id]?.length || 0}
+                                                </span>
+                                              )}
                                             </button>
                                           )}
 
