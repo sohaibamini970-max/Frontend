@@ -296,11 +296,6 @@ export default function Dashboard() {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       };
-
-      const handleRefresh = async () => {
-          await loadDashboard();
-      };
-
       /* =====================================================
          PROJECTS
       ===================================================== */
@@ -467,6 +462,10 @@ export default function Dashboard() {
     }
   };
 
+  
+      const handleRefresh = async () => {
+          await loadDashboard();
+      };
   /* =======================================================
      INITIAL LOAD
   ======================================================= */
