@@ -838,7 +838,7 @@ export default function Header() {
         DASHBOARD HERO
     ===================================================== */}
 
-    <div className="border-t border-gray-100 bg-[#D6D6D6]">
+    <div className="border-t border-gray-100 bg-[#E8E6E6]">
 
       <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">
 
