@@ -881,6 +881,39 @@ const getFileIcon = (fileType: string) => {
   // FILE ATTACHMENT FUNCTIONS
   // ====================================
 
+  const handleUploadAttachment = async (taskId: string, file: File) => {
+  try {
+    setUploadingAttachment(true);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(
+      `${API_BASE}/tasks/${taskId}/attachments`,
+      {
+        method: "POST",
+        headers: authHeaders(), // do NOT set Content-Type here, browser sets the multipart boundary
+        body: formData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || data.error || "Failed to upload file"
+      );
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Upload attachment error:", error);
+    throw error;
+  } finally {
+    setUploadingAttachment(false);
+  }
+};
+
   const fetchTaskAttachments = async (taskId: string) => {
     try {
       setLoadingAttachments(true);
@@ -1055,7 +1088,8 @@ const getFileIcon = (fileType: string) => {
     setTaskName("");
     setTaskDescription("");
     setTaskPriority("Medium");
-    setTaskStatus("To Do");
+    setTaskStatus("To Do"); 
+    setSelectedFile(null);
     
      // Automatically use logged-in user's ID
      const storedUser = localStorage.getItem("user");
@@ -1074,6 +1108,7 @@ const getFileIcon = (fileType: string) => {
 
     setTaskName("");
     setTaskDescription("");
+    setSelectedFile(null);
     setTaskPriority("Medium");
     setTaskStatus("To Do");
     setTaskAssignee("");
@@ -1100,6 +1135,7 @@ if (!selectedProject) {
   alert("Selected project not found.");
   return;
 }
+
 
 const projectStartDate = selectedProject.start_date;
 
@@ -1213,6 +1249,17 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
     );
 
     closeModal();
+
+    if (selectedFile) {
+  try {
+    await handleUploadAttachment(createdTask.id, selectedFile);
+  } catch (uploadError) {
+    console.error("Task created but file upload failed:", uploadError);
+    alert(
+      "Task was created, but the file failed to upload. You can attach it later from the task's Files option."
+    );
+  }
+}
 
   } catch (error: any) {
     console.error(
@@ -2452,6 +2499,27 @@ const fetchTaskChallenges = async (task: Task) => {
                     className="w-full resize-none rounded-lg border-2 border-gray-400 bg-gray-50 px-3.5 py-3 text-sm font-semibold text-gray-950 caret-gray-950 outline-none transition placeholder:text-gray-500 focus:border-gray-800 focus:bg-white focus:ring-2 focus:ring-gray-200"
                   />
                 </div>
+
+                <div className="sm:col-span-2">
+  <label className="mb-2 block text-xs font-bold text-gray-950">
+    Attach file (optional)
+  </label>
+
+  <input
+    type="file"
+    onChange={(event) =>
+      setSelectedFile(event.target.files?.[0] || null)
+    }
+    className="block w-full text-sm font-medium text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-gray-900 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-gray-800"
+  />
+
+  {selectedFile && (
+    <p className="mt-2 text-xs font-medium text-gray-600">
+      Selected: {selectedFile.name} (
+      {formatFileSize(selectedFile.size)})
+    </p>
+  )}
+</div>
 
                 <div>
                   <label className="mb-2 block text-xs font-bold text-gray-950">
