@@ -7,8 +7,6 @@ import {
   SlidersHorizontal,
   ChevronDown,
   MoreVertical,
-  ChevronLeft,
-  ChevronRight,
   X,
   Calendar,
   Users,
@@ -22,9 +20,18 @@ import {
   Edit3,
   Eye,
   Trash2,
+  Circle,
+  Clock3,
+  CheckCircle2,
+  ListTodo,
+  AlertCircle,
 } from "lucide-react";
 
 const API_BASE = "https://backend-five-swart-88.vercel.app";
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 type ProjectStatus =
   | "Unassigned"
@@ -51,6 +58,26 @@ type ProjectManager = {
   email?: string;
 };
 
+type TaskStatus =
+  | "To Do"
+  | "In Progress"
+  | "Done"
+  | "Backlog"
+  | string;
+
+type ProjectTask = {
+  id: string;
+  name: string;
+  description?: string;
+  status: TaskStatus;
+  priority?: string;
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+  assigneeEmail?: string | null;
+  startDate?: string | null;
+  dueDate?: string | null;
+};
+
 type Project = {
   id: string;
   name: string;
@@ -69,14 +96,29 @@ type Project = {
   creatorId?: string;
   creatorName?: string;
   creatorRole?: string;
+
+  tasks: ProjectTask[];
+  completedTasks: number;
+  totalTasks: number;
 };
 
+/* =========================================================
+   STYLES
+========================================================= */
+
 const statusStyles: Record<ProjectStatus, string> = {
-  Done: "bg-emerald-50 text-emerald-600 border border-emerald-100",
-  "In Progress": "bg-blue-50 text-blue-600 border border-blue-100",
-  Paused: "bg-orange-50 text-orange-600 border border-orange-100",
-  Backlog: "bg-pink-50 text-pink-600 border border-pink-100",
-  Unassigned: "bg-violet-50 text-violet-600 border border-violet-100",
+  Done: "border border-emerald-100 bg-emerald-50 text-emerald-600",
+  "In Progress": "border border-blue-100 bg-blue-50 text-blue-600",
+  Paused: "border border-orange-100 bg-orange-50 text-orange-600",
+  Backlog: "border border-pink-100 bg-pink-50 text-pink-600",
+  Unassigned: "border border-violet-100 bg-violet-50 text-violet-600",
+};
+
+const taskStatusStyles: Record<string, string> = {
+  Done: "border border-emerald-100 bg-emerald-50 text-emerald-600",
+  "In Progress": "border border-blue-100 bg-blue-50 text-blue-600",
+  "To Do": "border border-gray-200 bg-gray-50 text-gray-600",
+  Backlog: "border border-pink-100 bg-pink-50 text-pink-600",
 };
 
 const logoColors = [
@@ -91,40 +133,18 @@ const logoColors = [
 
 const logoSymbols = ["P", "S", "L", "◆", "◆", "Q", "⚡"];
 
+/* =========================================================
+   HELPERS
+========================================================= */
+
 function ProjectLogo({ index }: { index: number }) {
   return (
     <div
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
         logoColors[index % logoColors.length]
       }`}
     >
       {logoSymbols[index % logoSymbols.length]}
-    </div>
-  );
-}
-
-function ProgressBar({ progress }: { progress: number }) {
-  const progressColor =
-    progress === 0
-      ? "bg-pink-500"
-      : progress <= 50
-      ? "bg-amber-400"
-      : "bg-emerald-500";
-
-  return (
-    <div className="flex min-w-[130px] items-center gap-3">
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
-        <div
-          className={`h-full rounded-full ${progressColor}`}
-          style={{
-            width: `${Math.max(0, Math.min(100, progress))}%`,
-          }}
-        />
-      </div>
-
-      <span className="w-9 text-right text-xs font-medium text-gray-700">
-        {progress}%
-      </span>
     </div>
   );
 }
@@ -147,6 +167,76 @@ function ManagerAvatar({
   );
 }
 
+function ProgressBar({
+  progress,
+  large = false,
+}: {
+  progress: number;
+  large?: boolean;
+}) {
+  const safeProgress = Math.max(0, Math.min(100, progress));
+
+  const progressColor =
+    safeProgress === 0
+      ? "bg-gray-300"
+      : safeProgress < 50
+      ? "bg-amber-400"
+      : safeProgress < 100
+      ? "bg-blue-500"
+      : "bg-emerald-500";
+
+  return (
+    <div className="w-full">
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+          Progress
+        </span>
+
+        <span className="text-xs font-semibold text-gray-700">
+          {safeProgress}%
+        </span>
+      </div>
+
+      <div
+        className={`w-full overflow-hidden rounded-full bg-gray-100 ${
+          large ? "h-2.5" : "h-1.5"
+        }`}
+      >
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
+          style={{ width: `${safeProgress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TaskStatusBadge({ status }: { status: string }) {
+  const style =
+    taskStatusStyles[status] ||
+    "border border-gray-200 bg-gray-50 text-gray-600";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium ${style}`}
+    >
+      {status === "Done" ? (
+        <CheckCircle2 size={11} />
+      ) : status === "In Progress" ? (
+        <Clock3 size={11} />
+      ) : (
+        <Circle size={10} />
+      )}
+
+      {status}
+    </span>
+  );
+}
+
+/* =========================================================
+   MAIN
+========================================================= */
+
 export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectManagers, setProjectManagers] = useState<ProjectManager[]>([]);
@@ -160,9 +250,9 @@ export default function Projects() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
-  const [activeView, setActiveView] = useState<
-    "table" | "assignment"
-  >("table");
+  const [activeView, setActiveView] = useState<"table" | "assignment">(
+    "table"
+  );
 
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -183,53 +273,50 @@ export default function Projects() {
   const [startDate, setStartDate] = useState("");
   const [deadline, setDeadline] = useState("");
   const [dateError, setDateError] = useState("");
-  const [priority, setPriority] =
-    useState<ProjectPriority>("Medium");
+  const [priority, setPriority] = useState<ProjectPriority>("Medium");
 
   /* =========================================================
      ASSIGNMENT
   ========================================================= */
 
   const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] =
-    useState<string | null>(null);
-
-  const [selectedManagerId, setSelectedManagerId] =
-    useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null
+  );
+  const [selectedManagerId, setSelectedManagerId] = useState<string | null>(
+    null
+  );
 
   const dragScrollInterval = useRef<number | null>(null);
 
-  const [openProjectMenu, setOpenProjectMenu] = useState<
-    string | number | null
-  >(null);
-
-  const [dragOverManagerId, setDragOverManagerId] =
-    useState<string | null>(null);
+  const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null);
+  const [dragOverManagerId, setDragOverManagerId] = useState<string | null>(
+    null
+  );
 
   /* =========================================================
      EDIT / DEADLINE / DELETE
   ========================================================= */
 
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [deadlineModalOpen, setDeadlineModalOpen] =
-    useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] =
-    useState(false);
+  const [deadlineModalOpen, setDeadlineModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
-  const [selectedProject, setSelectedProject] =
-    useState<Project | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(
+    null
+  );
 
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDomain, setEditProjectDomain] = useState("");
   const [editAboutTitle, setEditAboutTitle] = useState("");
-  const [editAboutDescription, setEditAboutDescription] =
-    useState("");
+  const [editAboutDescription, setEditAboutDescription] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
   const [editPriority, setEditPriority] =
     useState<ProjectPriority>("Medium");
 
   const [editDateError, setEditDateError] = useState("");
+
   const [savingEdit, setSavingEdit] = useState(false);
   const [savingDeadline, setSavingDeadline] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
@@ -241,30 +328,35 @@ export default function Projects() {
   const [viewModalOpen, setViewModalOpen] = useState(false);
 
   /* =========================================================
+     STATUS
+  ========================================================= */
+
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [selectedNewStatus, setSelectedNewStatus] =
+    useState<ProjectStatus>("Backlog");
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [statusError, setStatusError] = useState("");
+
+  /* =========================================================
      ROLE PERMISSIONS
   ========================================================= */
 
-  const isExecutiveManager =
-    currentUser?.role === "Executive Manager";
+  const isExecutiveManager = currentUser?.role === "Executive Manager";
 
-  const isProjectManager =
-    currentUser?.role === "Project Manager";
+  const isSystemAdministrator =
+    currentUser?.role === "System Administrator";
 
-  /*
-   * IMPORTANT:
-   *
-   * Executive Manager:
-   * create + edit + delete + view + assign
-   *
-   * Project Manager:
-   * view only
-   *
-   * Therefore assignment permission belongs to Executive Manager.
-   */
+  const isProjectManager = currentUser?.role === "Project Manager";
 
-  const canAssignProjects = isExecutiveManager;
+  const isMember = currentUser?.role === "Member";
 
-  const canManageProjects = isExecutiveManager;
+  const canAccessAssignmentBoard =
+    isExecutiveManager || isSystemAdministrator;
+
+  const canManageProjects =
+    isExecutiveManager || isSystemAdministrator;
+
+  const canCreateProjects = isExecutiveManager;
 
   /* =========================================================
      DATE
@@ -291,12 +383,10 @@ export default function Projects() {
 
     try {
       const user = JSON.parse(storedUser);
+
       setCurrentUser(user);
     } catch (error) {
-      console.error(
-        "Unable to read stored user:",
-        error
-      );
+      console.error("Unable to read stored user:", error);
     }
   }, []);
 
@@ -306,13 +396,94 @@ export default function Projects() {
 
   const getAuthHeaders = () => ({
     "Content-Type": "application/json",
-    Authorization: `Bearer ${
-      localStorage.getItem("token") || ""
-    }`,
+    Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
   });
 
   /* =========================================================
-     FETCH PROJECTS
+     FETCH TASKS FOR PROJECT
+  ========================================================= */
+
+  const fetchProjectTasks = async (
+    projectId: string
+  ): Promise<ProjectTask[]> => {
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/tasks/project/${projectId}`,
+        {
+          method: "GET",
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const data = await response.json();
+
+      const rawTasks = Array.isArray(data)
+        ? data
+        : data.tasks || [];
+
+      return rawTasks.map((task: any) => ({
+        id: String(task.id),
+
+        name:
+          task.name ||
+          task.title ||
+          task.task_name ||
+          "Untitled Task",
+
+        description: task.description || "",
+
+        status: task.status || "To Do",
+
+        priority: task.priority || "Medium",
+
+        assigneeId:
+          task.assignee_id != null
+            ? String(task.assignee_id)
+            : task.assigneeId != null
+            ? String(task.assigneeId)
+            : null,
+
+        assigneeName:
+          task.assignee_name ||
+          task.assignee_full_name ||
+          task.assigneeName ||
+          task.assignee?.full_name ||
+          task.assignee?.name ||
+          null,
+
+        assigneeEmail:
+          task.assignee_email ||
+          task.assigneeEmail ||
+          task.assignee?.email ||
+          null,
+
+        startDate:
+          task.start_date ||
+          task.startDate ||
+          null,
+
+        dueDate:
+          task.due_date ||
+          task.dueDate ||
+          task.deadline ||
+          null,
+      }));
+    } catch (error) {
+      console.error(
+        `Unable to load tasks for project ${projectId}:`,
+        error
+      );
+
+      return [];
+    }
+  };
+
+  /* =========================================================
+     FETCH PROJECTS + TASKS
   ========================================================= */
 
   const fetchProjects = async () => {
@@ -320,20 +491,14 @@ export default function Projects() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(
-        `${API_BASE}/api/projects`,
-        {
-          method: "GET",
-          headers: getAuthHeaders(),
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/projects`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
 
-      const contentType =
-        response.headers.get("content-type");
-
+      const contentType = response.headers.get("content-type");
       const isJson =
-        contentType &&
-        contentType.includes("application/json");
+        contentType && contentType.includes("application/json");
 
       if (!response.ok) {
         throw new Error(
@@ -352,41 +517,99 @@ export default function Projects() {
 
       const data = await response.json();
 
-      const formattedProjects: Project[] = (
-        data.projects || []
-      ).map((project: any) => ({
-        id: String(project.id),
-        name: project.name || "Untitled Project",
-        domain: project.domain || "No domain",
-        status:
-          project.status || "Unassigned",
-        aboutTitle:
-          project.about_title || "Project",
-        aboutDescription:
-          project.about_description || "",
-        progress: Number(project.progress || 0),
-        members: [],
-        startDate:
-          project.start_date || "",
-        deadline:
-          project.deadline || "",
-        priority:
-          project.priority || "Medium",
-        managerId: project.manager_id
-          ? String(project.manager_id)
-          : null,
-        managerName:
-          project.manager_name || null,
-        managerEmail:
-          project.manager_email || null,
-        creatorId: project.creator_id
-          ? String(project.creator_id)
-          : undefined,
-        creatorName:
-          project.creator_name || undefined,
-        creatorRole:
-          project.creator_role || undefined,
-      }));
+      const rawProjects = data.projects || [];
+
+      const formattedProjects: Project[] = await Promise.all(
+        rawProjects.map(async (project: any) => {
+          const projectId = String(project.id);
+
+          const tasks = await fetchProjectTasks(projectId);
+
+          const completedTasks = tasks.filter(
+            (task) =>
+              String(task.status).toLowerCase() === "done"
+          ).length;
+
+          const totalTasks = tasks.length;
+
+          const calculatedProgress =
+            totalTasks > 0
+              ? Math.round((completedTasks / totalTasks) * 100)
+              : 0;
+
+          return {
+            id: projectId,
+
+            name:
+              project.name ||
+              "Untitled Project",
+
+            domain:
+              project.domain ||
+              "No domain",
+
+            status:
+              project.status ||
+              "Unassigned",
+
+            aboutTitle:
+              project.about_title ||
+              "Project",
+
+            aboutDescription:
+              project.about_description ||
+              "",
+
+            progress: calculatedProgress,
+
+            members: [],
+
+            startDate:
+              project.start_date ||
+              "",
+
+            deadline:
+              project.deadline ||
+              "",
+
+            priority:
+              project.priority ||
+              "Medium",
+
+            managerId:
+              project.manager_id
+                ? String(project.manager_id)
+                : null,
+
+            managerName:
+              project.manager_name ||
+              null,
+
+            managerEmail:
+              project.manager_email ||
+              null,
+
+            creatorId:
+              project.creator_id
+                ? String(project.creator_id)
+                : undefined,
+
+            creatorName:
+              project.creator_name ||
+              undefined,
+
+            creatorRole:
+              project.creator_role ||
+              undefined,
+
+            tasks,
+
+            completedTasks,
+
+            totalTasks,
+          };
+        })
+      );
 
       setProjects(formattedProjects);
     } catch (error: any) {
@@ -433,39 +656,42 @@ export default function Projects() {
         "bg-violet-100 text-violet-600",
       ];
 
-      const managers: ProjectManager[] = (
-        data.managers || []
-      ).map(
-        (manager: any, index: number) => {
-          const fullName =
-            manager.full_name ||
-            "Project Manager";
+      const managers: ProjectManager[] =
+        (data.managers || []).map(
+          (manager: any, index: number) => {
+            const fullName =
+              manager.full_name ||
+              "Project Manager";
 
-          const initials =
-            fullName
+            const initials = fullName
               .split(" ")
               .filter(Boolean)
               .slice(0, 2)
-              .map(
-                (part: string) =>
-                  part.charAt(0)
+              .map((part: string) =>
+                part.charAt(0)
               )
               .join("")
               .toUpperCase() || "PM";
 
-          return {
-            id: String(manager.id),
-            name: fullName,
-            initials,
-            role:
-              manager.role ||
-              "Project Manager",
-            email: manager.email,
-            color:
-              colors[index % colors.length],
-          };
-        }
-      );
+            return {
+              id: String(manager.id),
+
+              name: fullName,
+
+              initials,
+
+              role:
+                manager.role ||
+                "Project Manager",
+
+              email:
+                manager.email,
+
+              color:
+                colors[index % colors.length],
+            };
+          }
+        );
 
       setProjectManagers(managers);
     } catch (error) {
@@ -488,40 +714,99 @@ export default function Projects() {
   }, []);
 
   /* =========================================================
-     FILTER
+     ROLE-BASED PROJECT FILTERING
+  ========================================================= */
+
+  const roleFilteredProjects = useMemo(() => {
+    if (!currentUser) {
+      return [];
+    }
+
+    /*
+     * Executive Manager + System Administrator
+     * can see all projects.
+     */
+    if (
+      isExecutiveManager ||
+      isSystemAdministrator
+    ) {
+      return projects;
+    }
+
+    /*
+     * Project Manager:
+     * only projects assigned to this manager.
+     */
+    if (isProjectManager) {
+      return projects.filter(
+        (project) =>
+          project.managerId ===
+          String(currentUser.id)
+      );
+    }
+
+    /*
+     * Member:
+     * only projects where at least one task
+     * is assigned to this member.
+     */
+    if (isMember) {
+      return projects.filter((project) =>
+        project.tasks.some(
+          (task) =>
+            task.assigneeId ===
+            String(currentUser.id)
+        )
+      );
+    }
+
+    return [];
+  }, [
+    projects,
+    currentUser,
+    isExecutiveManager,
+    isSystemAdministrator,
+    isProjectManager,
+    isMember,
+  ]);
+
+  /* =========================================================
+     SEARCH + STATUS FILTER
   ========================================================= */
 
   const filteredProjects = useMemo(() => {
-    return projects.filter((project) => {
-      const query =
-        search.toLowerCase().trim();
+    return roleFilteredProjects.filter(
+      (project) => {
+        const query =
+          search.toLowerCase().trim();
 
-      const matchesSearch =
-        !query ||
-        [
-          project.name,
-          project.domain,
-          project.aboutTitle,
-          project.aboutDescription,
-          project.managerName || "",
-        ].some((field) =>
-          field
-            .toLowerCase()
-            .includes(query)
+        const matchesSearch =
+          !query ||
+          [
+            project.name,
+            project.domain,
+            project.aboutTitle,
+            project.aboutDescription,
+            project.managerName || "",
+          ].some((field) =>
+            field
+              .toLowerCase()
+              .includes(query)
+          );
+
+        const matchesStatus =
+          selectedStatus === "All" ||
+          project.status ===
+            selectedStatus;
+
+        return (
+          matchesSearch &&
+          matchesStatus
         );
-
-      const matchesStatus =
-        selectedStatus === "All" ||
-        project.status ===
-          selectedStatus;
-
-      return (
-        matchesSearch &&
-        matchesStatus
-      );
-    });
+      }
+    );
   }, [
-    projects,
+    roleFilteredProjects,
     search,
     selectedStatus,
   ]);
@@ -547,13 +832,14 @@ export default function Projects() {
 
   const handleSaveProject = async () => {
     if (
-      !isExecutiveManager ||
+      !canCreateProjects ||
       !projectName.trim()
     ) {
       return;
     }
 
-    const today = getTodayDate();
+    const today =
+      getTodayDate();
 
     if (
       startDate &&
@@ -586,8 +872,6 @@ export default function Projects() {
       return;
     }
 
-    setDateError("");
-
     try {
       setSavingProject(true);
       setError("");
@@ -597,17 +881,26 @@ export default function Projects() {
         {
           method: "POST",
           headers: getAuthHeaders(),
+
           body: JSON.stringify({
-            name: projectName.trim(),
-            domain: projectDomain.trim(),
+            name:
+              projectName.trim(),
+
+            domain:
+              projectDomain.trim(),
+
             aboutTitle:
               aboutTitle.trim(),
+
             aboutDescription:
               aboutDescription.trim(),
+
             startDate:
               startDate || null,
+
             deadline:
               deadline || null,
+
             priority,
           }),
         }
@@ -623,53 +916,10 @@ export default function Projects() {
         );
       }
 
-      const project =
-        data.project;
-
-      const newProject: Project = {
-        id: String(project.id),
-        name: project.name,
-        domain:
-          project.domain ||
-          "No domain",
-        status:
-          project.status ||
-          "Unassigned",
-        aboutTitle:
-          project.about_title ||
-          "Project",
-        aboutDescription:
-          project.about_description ||
-          "",
-        progress: Number(
-          project.progress || 0
-        ),
-        members: [],
-        startDate:
-          project.start_date || "",
-        deadline:
-          project.deadline || "",
-        priority:
-          project.priority ||
-          "Medium",
-        managerId: null,
-        managerName: null,
-        managerEmail: null,
-        creatorId:
-          project.created_by
-            ? String(
-                project.created_by
-              )
-            : undefined,
-      };
-
-      setProjects((prev) => [
-        newProject,
-        ...prev,
-      ]);
-
       resetForm();
       setModalOpen(false);
+
+      await fetchProjects();
     } catch (error: any) {
       setError(
         error.message ||
@@ -701,7 +951,8 @@ export default function Projects() {
   const handleDragAutoScroll = (
     event: React.DragEvent<HTMLDivElement>
   ) => {
-    if (!canAssignProjects) return;
+    if (!canAccessAssignmentBoard)
+      return;
 
     const mouseY =
       event.clientY;
@@ -714,7 +965,9 @@ export default function Projects() {
 
     let scrollSpeed = 0;
 
-    if (mouseY < scrollZone) {
+    if (
+      mouseY < scrollZone
+    ) {
       const intensity =
         (scrollZone - mouseY) /
         scrollZone;
@@ -729,7 +982,8 @@ export default function Projects() {
       );
     } else if (
       mouseY >
-      viewportHeight - scrollZone
+      viewportHeight -
+        scrollZone
     ) {
       const intensity =
         (mouseY -
@@ -776,7 +1030,7 @@ export default function Projects() {
     event: React.DragEvent<HTMLDivElement>,
     projectId: string
   ) => {
-    if (!canAssignProjects) {
+    if (!canAccessAssignmentBoard) {
       event.preventDefault();
       return;
     }
@@ -792,14 +1046,13 @@ export default function Projects() {
 
   /* =========================================================
      ASSIGN PROJECT
-     EXECUTIVE MANAGER ONLY
   ========================================================= */
 
   const assignProject = async (
     projectId: string,
     managerId: string
   ) => {
-    if (!canAssignProjects) {
+    if (!canAccessAssignmentBoard) {
       return false;
     }
 
@@ -807,16 +1060,19 @@ export default function Projects() {
       setAssigningProject(true);
       setError("");
 
-      const response = await fetch(
-        `${API_BASE}/api/projects/${projectId}/assign`,
-        {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            managerId,
-          }),
-        }
-      );
+      const response =
+        await fetch(
+          `${API_BASE}/api/projects/${projectId}/assign`,
+          {
+            method: "PATCH",
+            headers:
+              getAuthHeaders(),
+
+            body: JSON.stringify({
+              managerId,
+            }),
+          }
+        );
 
       const data =
         await response.json();
@@ -828,48 +1084,7 @@ export default function Projects() {
         );
       }
 
-      const updated =
-        data.project;
-
-      setProjects((prev) =>
-        prev.map((project) =>
-          project.id === projectId
-            ? {
-                ...project,
-                managerId:
-                  updated.project_manager_id
-                    ? String(
-                        updated.project_manager_id
-                      )
-                    : managerId,
-
-                status:
-                  updated.status ||
-                  "Backlog",
-
-                managerName:
-                  data.manager
-                    ?.full_name ||
-                  projectManagers.find(
-                    (m) =>
-                      m.id ===
-                      managerId
-                  )?.name ||
-                  null,
-
-                managerEmail:
-                  data.manager
-                    ?.email ||
-                  projectManagers.find(
-                    (m) =>
-                      m.id ===
-                      managerId
-                  )?.email ||
-                  null,
-              }
-            : project
-        )
-      );
+      await fetchProjects();
 
       return true;
     } catch (error: any) {
@@ -885,24 +1100,7 @@ export default function Projects() {
   };
 
   /* =========================================================
-     DRAG OVER
-  ========================================================= */
-
-  const handleDragOver = (
-    event: React.DragEvent<HTMLDivElement>
-  ) => {
-    if (!canAssignProjects) {
-      return;
-    }
-
-    event.preventDefault();
-
-    event.dataTransfer.dropEffect =
-      "move";
-  };
-
-  /* =========================================================
-     DROP PROJECT ON MANAGER
+     DROP PROJECT
   ========================================================= */
 
   const handleDropOnManager = async (
@@ -913,10 +1111,9 @@ export default function Projects() {
     event.stopPropagation();
 
     stopDragAutoScroll();
-
     setDragOverManagerId(null);
 
-    if (!canAssignProjects) {
+    if (!canAccessAssignmentBoard) {
       return;
     }
 
@@ -936,13 +1133,13 @@ export default function Projects() {
   };
 
   /* =========================================================
-     UNASSIGN PROJECT
+     UNASSIGN
   ========================================================= */
 
   const handleUnassignProject = async (
     projectId: string
   ) => {
-    if (!canAssignProjects) {
+    if (!canAccessAssignmentBoard) {
       return;
     }
 
@@ -970,20 +1167,7 @@ export default function Projects() {
         );
       }
 
-      setProjects((prev) =>
-        prev.map((project) =>
-          project.id === projectId
-            ? {
-                ...project,
-                managerId: null,
-                managerName: null,
-                managerEmail: null,
-                status:
-                  "Unassigned",
-              }
-            : project
-        )
-      );
+      await fetchProjects();
     } catch (error: any) {
       setError(
         error.message ||
@@ -996,22 +1180,19 @@ export default function Projects() {
 
   /* =========================================================
      MANUAL ASSIGN
-     EXECUTIVE MANAGER ONLY
   ========================================================= */
 
   const openManualAssign = (
     projectId: string
   ) => {
-    if (!canAssignProjects) {
+    if (!canAccessAssignmentBoard)
       return;
-    }
 
     setSelectedProjectId(
       projectId
     );
 
     setSelectedManagerId(null);
-
     setAssignModalOpen(true);
   };
 
@@ -1038,7 +1219,7 @@ export default function Projects() {
     };
 
   /* =========================================================
-     UNASSIGNED PROJECTS
+     UNASSIGNED
   ========================================================= */
 
   const unassignedProjects =
@@ -1055,11 +1236,14 @@ export default function Projects() {
 
   const handleRefresh = async () => {
     await fetchProjects();
-    await fetchProjectManagers();
+
+    if (canAccessAssignmentBoard) {
+      await fetchProjectManagers();
+    }
   };
 
   /* =========================================================
-     CLEANUP DRAG
+     CLEANUP
   ========================================================= */
 
   useEffect(() => {
@@ -1074,9 +1258,8 @@ export default function Projects() {
   const openEditProject = (
     project: Project
   ) => {
-    if (!canManageProjects) {
+    if (!canManageProjects)
       return;
-    }
 
     setSelectedProject(project);
 
@@ -1146,8 +1329,6 @@ export default function Projects() {
         return;
       }
 
-      setEditDateError("");
-
       try {
         setSavingEdit(true);
         setError("");
@@ -1159,20 +1340,26 @@ export default function Projects() {
               method: "PATCH",
               headers:
                 getAuthHeaders(),
+
               body: JSON.stringify({
-                name: editProjectName.trim(),
+                name:
+                  editProjectName.trim(),
+
                 domain:
                   editProjectDomain.trim(),
+
                 aboutTitle:
                   editAboutTitle.trim(),
+
                 aboutDescription:
                   editAboutDescription.trim(),
+
                 startDate:
-                  editStartDate ||
-                  null,
+                  editStartDate || null,
+
                 deadline:
-                  editDeadline ||
-                  null,
+                  editDeadline || null,
+
                 priority:
                   editPriority,
               }),
@@ -1189,42 +1376,10 @@ export default function Projects() {
           );
         }
 
-        const updated =
-          data.project;
-
-        setProjects((prev) =>
-          prev.map((project) =>
-            project.id ===
-            selectedProject.id
-              ? {
-                  ...project,
-                  name:
-                    updated.name,
-                  domain:
-                    updated.domain ||
-                    "No domain",
-                  aboutTitle:
-                    updated.about_title ||
-                    "Project",
-                  aboutDescription:
-                    updated.about_description ||
-                    "",
-                  startDate:
-                    updated.start_date ||
-                    "",
-                  deadline:
-                    updated.deadline ||
-                    "",
-                  priority:
-                    updated.priority ||
-                    "Medium",
-                }
-              : project
-          )
-        );
-
         setEditModalOpen(false);
         setSelectedProject(null);
+
+        await fetchProjects();
       } catch (error: any) {
         setError(
           error.message ||
@@ -1236,15 +1391,14 @@ export default function Projects() {
     };
 
   /* =========================================================
-     DEADLINE MODAL
+     DEADLINE
   ========================================================= */
 
   const openDeadlineModal = (
     project: Project
   ) => {
-    if (!canManageProjects) {
+    if (!canManageProjects)
       return;
-    }
 
     setSelectedProject(project);
 
@@ -1253,14 +1407,9 @@ export default function Projects() {
     );
 
     setEditDateError("");
-
     setOpenProjectMenu(null);
     setDeadlineModalOpen(true);
   };
-
-  /* =========================================================
-     UPDATE DEADLINE
-  ========================================================= */
 
   const handleUpdateDeadline =
     async () => {
@@ -1286,7 +1435,6 @@ export default function Projects() {
       try {
         setSavingDeadline(true);
         setError("");
-        setEditDateError("");
 
         const response =
           await fetch(
@@ -1295,6 +1443,7 @@ export default function Projects() {
               method: "PATCH",
               headers:
                 getAuthHeaders(),
+
               body: JSON.stringify({
                 deadline:
                   editDeadline ||
@@ -1313,25 +1462,10 @@ export default function Projects() {
           );
         }
 
-        const updated =
-          data.project;
-
-        setProjects((prev) =>
-          prev.map((project) =>
-            project.id ===
-            selectedProject.id
-              ? {
-                  ...project,
-                  deadline:
-                    updated.deadline ||
-                    "",
-                }
-              : project
-          )
-        );
-
         setDeadlineModalOpen(false);
         setSelectedProject(null);
+
+        await fetchProjects();
       } catch (error: any) {
         setError(
           error.message ||
@@ -1349,12 +1483,10 @@ export default function Projects() {
   const openDeleteProject = (
     project: Project
   ) => {
-    if (!canManageProjects) {
+    if (!canManageProjects)
       return;
-    }
 
     setSelectedProject(project);
-
     setOpenProjectMenu(null);
     setDeleteModalOpen(true);
   };
@@ -1392,16 +1524,10 @@ export default function Projects() {
           );
         }
 
-        setProjects((prev) =>
-          prev.filter(
-            (project) =>
-              project.id !==
-              selectedProject.id
-          )
-        );
-
         setDeleteModalOpen(false);
         setSelectedProject(null);
+
+        await fetchProjects();
       } catch (error: any) {
         setError(
           error.message ||
@@ -1425,6 +1551,143 @@ export default function Projects() {
   };
 
   /* =========================================================
+     STATUS MODAL
+  ========================================================= */
+
+  const openStatusModal = (
+    project: Project
+  ) => {
+    if (!canManageProjects)
+      return;
+
+    setSelectedProject(project);
+
+    setSelectedNewStatus(
+      project.status === "Done"
+        ? "Done"
+        : "Backlog"
+    );
+
+    setStatusError("");
+    setOpenProjectMenu(null);
+    setStatusModalOpen(true);
+  };
+
+  /* =========================================================
+     CHANGE PROJECT STATUS
+  ========================================================= */
+
+  const handleChangeProjectStatus =
+    async () => {
+      if (
+        !selectedProject ||
+        !canManageProjects
+      ) {
+        return;
+      }
+
+      setStatusError("");
+
+      /*
+       * Done validation:
+       *
+       * Every task must be Done.
+       * A project with zero tasks cannot
+       * be marked Done.
+       */
+      if (
+        selectedNewStatus === "Done"
+      ) {
+        const totalTasks =
+          selectedProject.tasks.length;
+
+        const completedTasks =
+          selectedProject.tasks.filter(
+            (task) =>
+              String(
+                task.status
+              ).toLowerCase() ===
+              "done"
+          ).length;
+
+        if (
+          totalTasks === 0
+        ) {
+          setStatusError(
+            "This project cannot be marked Done because it has no tasks."
+          );
+          return;
+        }
+
+        if (
+          completedTasks !==
+          totalTasks
+        ) {
+          setStatusError(
+            `Project cannot be marked Done. ${completedTasks} of ${totalTasks} tasks are completed. All tasks must be Done first.`
+          );
+          return;
+        }
+      }
+
+      try {
+        setSavingStatus(true);
+
+        const response =
+          await fetch(
+            `${API_BASE}/api/projects/${selectedProject.id}/status`,
+            {
+              method: "PATCH",
+              headers:
+                getAuthHeaders(),
+
+              body: JSON.stringify({
+                status:
+                  selectedNewStatus,
+              }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message ||
+              "Unable to update project status."
+          );
+        }
+
+        setStatusModalOpen(false);
+        setSelectedProject(null);
+
+        await fetchProjects();
+      } catch (error: any) {
+        setStatusError(
+          error.message ||
+            "Unable to update project status."
+        );
+      } finally {
+        setSavingStatus(false);
+      }
+    };
+
+  /* =========================================================
+     ROLE LABEL
+  ========================================================= */
+
+  const roleDescription =
+    isExecutiveManager
+      ? "Full project management and assignment access."
+      : isSystemAdministrator
+      ? "Project administration and assignment access."
+      : isProjectManager
+      ? "Showing projects assigned to you."
+      : isMember
+      ? "Showing projects containing your assigned tasks."
+      : "Project access.";
+
+  /* =========================================================
      RETURN
   ========================================================= */
 
@@ -1433,13 +1696,15 @@ export default function Projects() {
       <main className="min-h-[calc(100vh-72px)] bg-[#fafafa] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
         <div className="mx-auto max-w-[1440px]">
 
-          {/* =====================================================
+          {/* =================================================
               HEADER
-          ===================================================== */}
+          ================================================= */}
 
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+
             <div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+
                 <h1 className="text-[28px] font-semibold tracking-[-0.8px] text-gray-900 sm:text-[32px]">
                   Projects
                 </h1>
@@ -1450,11 +1715,18 @@ export default function Projects() {
                     {currentUser.role}
                   </span>
                 )}
+
               </div>
 
               <p className="mt-1 text-sm text-gray-500">
-                Create, organize and assign your team projects.
+                Manage projects, tasks, progress and assignments.
               </p>
+
+              {currentUser && (
+                <p className="mt-1 text-[11px] text-gray-400">
+                  {roleDescription}
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -1475,24 +1747,25 @@ export default function Projects() {
                 />
               </button>
 
-              {isExecutiveManager && (
+              {canCreateProjects && (
                 <button
                   type="button"
                   onClick={() =>
                     setModalOpen(true)
                   }
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white shadow-sm transition hover:bg-[#111c2c] active:scale-[0.98]"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white shadow-sm transition hover:bg-[#111c2c]"
                 >
                   <Plus size={17} />
                   Add project
                 </button>
               )}
+
             </div>
           </div>
 
-          {/* =====================================================
+          {/* =================================================
               ERROR
-          ===================================================== */}
+          ================================================= */}
 
           {error && (
             <div className="mt-5 flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -1518,9 +1791,9 @@ export default function Projects() {
             </div>
           )}
 
-          {/* =====================================================
+          {/* =================================================
               TABS + SEARCH
-          ===================================================== */}
+          ================================================= */}
 
           <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 
@@ -1544,32 +1817,36 @@ export default function Projects() {
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveView(
+              {canAccessAssignmentBoard && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveView(
+                      "assignment"
+                    )
+                  }
+                  className={`relative pb-3 text-sm font-medium ${
+                    activeView ===
                     "assignment"
-                  )
-                }
-                className={`relative pb-3 text-sm font-medium ${
-                  activeView ===
-                  "assignment"
-                    ? "text-gray-900"
-                    : "text-gray-500 hover:text-gray-800"
-                }`}
-              >
-                Assignment Board
+                      ? "text-gray-900"
+                      : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  Assignment Board
 
-                {activeView ===
-                  "assignment" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-gray-900" />
-                )}
-              </button>
+                  {activeView ===
+                    "assignment" && (
+                    <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-gray-900" />
+                  )}
+                </button>
+              )}
+
             </div>
 
             <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
 
               <div className="relative w-full sm:w-[320px]">
+
                 <Search
                   size={17}
                   className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
@@ -1601,6 +1878,7 @@ export default function Projects() {
                 >
                   <SlidersHorizontal size={16} />
                   Filters
+
                   <ChevronDown
                     size={14}
                     className={
@@ -1650,27 +1928,35 @@ export default function Projects() {
                         {status}
                       </button>
                     ))}
+
                   </div>
                 )}
+
               </div>
             </div>
           </div>
 
-          {/* =====================================================
-              TABLE VIEW
-          ===================================================== */}
+          {/* =================================================
+              TABLE / CARD VIEW
+          ================================================= */}
 
           {activeView === "table" && (
-            <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+            <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
 
-              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 sm:px-6">
+              {/* CARD HEADER */}
+
+              <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
 
                 <div>
                   <h2 className="text-sm font-semibold text-gray-900">
-                    All Projects
+                    {isMember
+                      ? "My Project Tasks"
+                      : isProjectManager
+                      ? "My Projects"
+                      : "All Projects"}
                   </h2>
 
-                  <p className="mt-0.5 text-[11px] text-gray-400">
+                  <p className="mt-1 text-[11px] text-gray-400">
                     {filteredProjects.length}{" "}
                     project
                     {filteredProjects.length !==
@@ -1680,12 +1966,28 @@ export default function Projects() {
                   </p>
                 </div>
 
-                {isExecutiveManager && (
-                  <span className="hidden rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-[10px] font-medium text-gray-500 sm:inline-flex">
-                    You can manage projects
+                <div className="flex items-center gap-2">
+
+                  <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[10px] font-medium text-gray-500">
+                    {filteredProjects.reduce(
+                      (sum, project) =>
+                        sum +
+                        project.totalTasks,
+                      0
+                    )}{" "}
+                    tasks
                   </span>
-                )}
+
+                  {canManageProjects && (
+                    <span className="hidden rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[10px] font-medium text-gray-500 sm:inline-flex">
+                      Management access
+                    </span>
+                  )}
+
+                </div>
               </div>
+
+              {/* LOADING */}
 
               {loading ? (
                 <div className="flex min-h-[400px] flex-col items-center justify-center">
@@ -1699,207 +2001,98 @@ export default function Projects() {
                   </p>
 
                   <p className="mt-1 text-xs text-gray-400">
-                    Fetching projects from PostgreSQL
+                    Fetching projects and tasks from PostgreSQL
                   </p>
                 </div>
+              ) : filteredProjects.length === 0 ? (
+                <div className="px-6 py-20 text-center">
+
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
+                    <FolderEmptyIcon />
+                  </div>
+
+                  <h3 className="mt-4 text-sm font-semibold text-gray-900">
+                    No projects found
+                  </h3>
+
+                  <p className="mx-auto mt-1 max-w-md text-sm text-gray-500">
+                    {isMember
+                      ? "You do not have any projects with tasks assigned to you."
+                      : isProjectManager
+                      ? "No projects are currently assigned to you."
+                      : projects.length ===
+                        0
+                      ? canCreateProjects
+                        ? "Create a project to get started."
+                        : "No projects have been created yet."
+                      : "Try changing your search or filter."}
+                  </p>
+
+                </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-2 xl:grid-cols-3">
 
-                  <table className="w-full min-w-[1050px]">
+                  {filteredProjects.map(
+                    (
+                      project,
+                      index
+                    ) => {
+                      const manager =
+                        project.managerId
+                          ? projectManagers.find(
+                              (item) =>
+                                item.id ===
+                                project.managerId
+                            )
+                          : undefined;
 
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-[#fcfcfc]">
+                      const allTasksDone =
+                        project.totalTasks >
+                          0 &&
+                        project.completedTasks ===
+                          project.totalTasks;
 
-                        <th className="px-6 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-gray-400">
-                          Name
-                        </th>
+                      return (
+                        <div
+                          key={
+                            project.id
+                          }
+                          className="group relative overflow-visible rounded-2xl border border-gray-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)]"
+                        >
 
-                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-gray-400">
-                          Status
-                        </th>
+                          {/* TOP */}
 
-                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-gray-400">
-                          About
-                        </th>
+                          <div className="flex items-start gap-3">
 
-                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-gray-400">
-                          Manager
-                        </th>
-
-                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-gray-400">
-                          Progress
-                        </th>
-
-                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-gray-400">
-                          Deadline
-                        </th>
-
-                        <th className="w-12 px-3" />
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {filteredProjects.map(
-                        (
-                          project,
-                          index
-                        ) => {
-                          const manager =
-                            project.managerId
-                              ? projectManagers.find(
-                                  (item) =>
-                                    item.id ===
-                                    project.managerId
-                                )
-                              : undefined;
-
-                          return (
-                            <tr
-                              key={
-                                project.id
+                            <ProjectLogo
+                              index={
+                                index
                               }
-                              className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50/70"
-                            >
-                              <td className="px-6 py-4">
+                            />
 
-                                <div className="flex items-center gap-3">
+                            <div className="min-w-0 flex-1">
 
-                                  <ProjectLogo
-                                    index={
-                                      index
-                                    }
-                                  />
+                              <div className="flex items-start justify-between gap-2">
 
-                                  <div>
-                                    <p className="text-sm font-semibold text-gray-900">
-                                      {
-                                        project.name
-                                      }
-                                    </p>
+                                <div className="min-w-0 pr-5">
 
-                                    <p className="mt-0.5 text-xs text-gray-400">
-                                      {
-                                        project.domain
-                                      }
-                                    </p>
-                                  </div>
-                                </div>
-                              </td>
-
-                              <td className="px-5 py-4">
-                                <span
-                                  className={`inline-flex rounded-md px-2.5 py-1 text-[10px] font-medium ${statusStyles[project.status]}`}
-                                >
-                                  {
-                                    project.status
-                                  }
-                                </span>
-                              </td>
-
-                              <td className="px-5 py-4">
-                                <p className="text-sm font-medium text-gray-800">
-                                  {
-                                    project.aboutTitle
-                                  }
-                                </p>
-
-                                <p className="mt-0.5 max-w-[280px] truncate text-xs text-gray-400">
-                                  {
-                                    project.aboutDescription
-                                  }
-                                </p>
-                              </td>
-
-                              <td className="px-5 py-4">
-
-                                {manager ? (
-                                  <div className="flex items-center gap-2">
-
-                                    <ManagerAvatar
-                                      manager={
-                                        manager
-                                      }
-                                      small
-                                    />
-
-                                    <div>
-                                      <p className="text-xs font-medium text-gray-800">
-                                        {
-                                          project.managerName ||
-                                          manager.name
-                                        }
-                                      </p>
-
-                                      <p className="text-[10px] text-gray-400">
-                                        {
-                                          manager.role
-                                        }
-                                      </p>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-
-                                    <span className="rounded-md border border-violet-100 bg-violet-50 px-2.5 py-1 text-[10px] font-medium text-violet-600">
-                                      Unassigned
-                                    </span>
-
-                                    {canAssignProjects && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          openManualAssign(
-                                            project.id
-                                          )
-                                        }
-                                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] font-medium text-gray-600 hover:bg-gray-50"
-                                      >
-                                        <UserPlus
-                                          size={
-                                            12
-                                          }
-                                        />
-                                        Assign
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </td>
-
-                              <td className="px-5 py-4">
-                                <ProgressBar
-                                  progress={
-                                    project.progress
-                                  }
-                                />
-                              </td>
-
-                              <td className="px-5 py-4">
-
-                                {project.deadline ? (
-                                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
-
-                                    <Calendar
-                                      size={
-                                        13
-                                      }
-                                      className="text-gray-400"
-                                    />
-
+                                  <h3 className="truncate text-sm font-semibold text-gray-900">
                                     {
-                                      project.deadline
+                                      project.name
                                     }
-                                  </div>
-                                ) : (
-                                  <span className="text-xs text-gray-400">
-                                    No deadline
-                                  </span>
-                                )}
-                              </td>
+                                  </h3>
 
-                              <td className="px-3 py-4">
+                                  <p className="mt-0.5 truncate text-[10px] text-gray-400">
+                                    {
+                                      project.domain
+                                    }
+                                  </p>
 
-                                <div className="relative">
+                                </div>
+
+                                {/* THREE DOTS */}
+
+                                <div className="absolute right-3 top-3">
 
                                   <button
                                     type="button"
@@ -1927,7 +2120,7 @@ export default function Projects() {
                                   {openProjectMenu ===
                                     project.id && (
                                     <div
-                                      className="absolute right-0 top-10 z-50 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+                                      className="absolute right-0 top-9 z-50 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
                                       onClick={(
                                         e
                                       ) =>
@@ -1935,8 +2128,9 @@ export default function Projects() {
                                       }
                                     >
 
-                                      {/* EXECUTIVE ONLY */}
-                                      {isExecutiveManager && (
+                                      {/* MANAGEMENT OPTIONS */}
+
+                                      {canManageProjects && (
                                         <>
                                           <button
                                             type="button"
@@ -1973,10 +2167,31 @@ export default function Projects() {
                                             />
                                             Update Deadline
                                           </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              openStatusModal(
+                                                project
+                                              )
+                                            }
+                                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                          >
+                                            <CheckCircle2
+                                              size={
+                                                16
+                                              }
+                                              className="text-gray-500"
+                                            />
+                                            Change Status
+                                          </button>
+
+                                          <div className="my-1 border-t border-gray-100" />
                                         </>
                                       )}
 
-                                      {/* EVERYONE CAN VIEW */}
+                                      {/* EVERY ROLE CAN VIEW */}
+
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -1995,8 +2210,9 @@ export default function Projects() {
                                         View Project
                                       </button>
 
-                                      {/* EXECUTIVE ONLY */}
-                                      {isExecutiveManager && (
+                                      {/* DELETE */}
+
+                                      {canManageProjects && (
                                         <>
                                           <div className="my-1 border-t border-gray-100" />
 
@@ -2018,45 +2234,231 @@ export default function Projects() {
                                           </button>
                                         </>
                                       )}
+
                                     </div>
                                   )}
+
                                 </div>
-                              </td>
-                            </tr>
-                          );
-                        }
-                      )}
-                    </tbody>
-                  </table>
+
+                              </div>
+
+                            </div>
+                          </div>
+
+                          {/* OBJECTIVE */}
+
+                          <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
+
+                            <p className="text-xs font-semibold text-gray-800">
+                              {
+                                project.aboutTitle
+                              }
+                            </p>
+
+                            <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-gray-500">
+                              {project.aboutDescription ||
+                                "No project description provided."}
+                            </p>
+
+                          </div>
+
+                          {/* STATUS / PRIORITY */}
+
+                          <div className="mt-4 flex flex-wrap items-center gap-2">
+
+                            <span
+                              className={`inline-flex rounded-md px-2.5 py-1 text-[10px] font-medium ${
+                                statusStyles[
+                                  project.status
+                                ]
+                              }`}
+                            >
+                              {
+                                project.status
+                              }
+                            </span>
+
+                            <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-medium text-gray-500">
+                              <Flag
+                                size={
+                                  10
+                                }
+                              />
+                              {project.priority ||
+                                "Medium"}
+                            </span>
+
+                            {allTasksDone && (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-medium text-emerald-600">
+                                <CheckCircle2
+                                  size={
+                                    10
+                                  }
+                                />
+                                All tasks done
+                              </span>
+                            )}
+
+                          </div>
+
+                          {/* MANAGER */}
+
+                          <div className="mt-4 flex items-center justify-between">
+
+                            <div className="flex min-w-0 items-center gap-2">
+
+                              {manager ? (
+                                <>
+                                  <ManagerAvatar
+                                    manager={
+                                      manager
+                                    }
+                                    small
+                                  />
+
+                                  <div className="min-w-0">
+                                    <p className="truncate text-[11px] font-semibold text-gray-700">
+                                      {
+                                        project.managerName ||
+                                        manager.name
+                                      }
+                                    </p>
+
+                                    <p className="text-[9px] text-gray-400">
+                                      Project Manager
+                                    </p>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-50 text-violet-500">
+                                    <User
+                                      size={
+                                        14
+                                      }
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <p className="text-[11px] font-semibold text-gray-600">
+                                      Unassigned
+                                    </p>
+
+                                    <p className="text-[9px] text-gray-400">
+                                      No manager
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                            </div>
+
+                            <div className="text-right">
+                              <p className="text-[10px] text-gray-400">
+                                Tasks
+                              </p>
+
+                              <p className="text-xs font-semibold text-gray-700">
+                                {
+                                  project.completedTasks
+                                }
+                                /
+                                {
+                                  project.totalTasks
+                                }
+                              </p>
+                            </div>
+
+                          </div>
+
+                          {/* PROGRESS */}
+
+                          <div className="mt-4">
+                            <ProgressBar
+                              progress={
+                                project.progress
+                              }
+                            />
+                          </div>
+
+                          {/* DATES */}
+
+                          <div className="mt-4 grid grid-cols-2 gap-2">
+
+                            <div className="rounded-lg border border-gray-100 bg-white p-2.5">
+
+                              <div className="flex items-center gap-1.5">
+                                <Calendar
+                                  size={
+                                    12
+                                  }
+                                  className="text-gray-400"
+                                />
+
+                                <span className="text-[9px] font-medium uppercase tracking-wide text-gray-400">
+                                  Start
+                                </span>
+                              </div>
+
+                              <p className="mt-1 text-[10px] font-medium text-gray-700">
+                                {project.startDate ||
+                                  "Not set"}
+                              </p>
+
+                            </div>
+
+                            <div className="rounded-lg border border-gray-100 bg-white p-2.5">
+
+                              <div className="flex items-center gap-1.5">
+                                <Calendar
+                                  size={
+                                    12
+                                  }
+                                  className="text-gray-400"
+                                />
+
+                                <span className="text-[9px] font-medium uppercase tracking-wide text-gray-400">
+                                  Deadline
+                                </span>
+                              </div>
+
+                              <p className="mt-1 text-[10px] font-medium text-gray-700">
+                                {project.deadline ||
+                                  "Not set"}
+                              </p>
+
+                            </div>
+
+                          </div>
+
+                          {/* DARK DETAILS BUTTON */}
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openViewProject(
+                                project
+                              )
+                            }
+                            className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#07111f] text-xs font-medium text-white transition hover:bg-[#111c2c]"
+                          >
+                            <Eye
+                              size={
+                                14
+                              }
+                            />
+                            View Project Details
+                          </button>
+
+                        </div>
+                      );
+                    }
+                  )}
+
                 </div>
               )}
 
-              {!loading &&
-                filteredProjects.length ===
-                  0 && (
-                  <div className="px-6 py-20 text-center">
-
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-                      <Search
-                        size={21}
-                        className="text-gray-400"
-                      />
-                    </div>
-
-                    <h3 className="mt-4 text-sm font-semibold text-gray-900">
-                      No projects found
-                    </h3>
-
-                    <p className="mt-1 text-sm text-gray-500">
-                      {projects.length ===
-                      0
-                        ? isExecutiveManager
-                          ? "Create a project to get started."
-                          : "No projects have been created yet."
-                        : "Try changing your search or filter."}
-                    </p>
-                  </div>
-                )}
+              {/* FOOTER */}
 
               {!loading &&
                 filteredProjects.length >
@@ -2064,90 +2466,69 @@ export default function Projects() {
                   <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3.5">
 
                     <p className="text-xs text-gray-500">
-                      1-
+                      Showing{" "}
                       {
                         filteredProjects.length
                       }{" "}
                       of{" "}
                       {
                         filteredProjects.length
-                      }
+                      }{" "}
+                      projects
                     </p>
 
-                    <div className="flex gap-1">
+                    <div className="flex items-center gap-1 rounded-lg bg-gray-50 px-3 py-1.5 text-[10px] text-gray-500">
+                      <ListTodo
+                        size={
+                          12
+                        }
+                      />
 
-                      <button
-                        disabled
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-300"
-                      >
-                        <ChevronLeft
-                          size={15}
-                        />
-                      </button>
-
-                      <button
-                        disabled
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-300"
-                      >
-                        <ChevronRight
-                          size={15}
-                        />
-                      </button>
-
+                      Tasks calculated from project tasks
                     </div>
+
                   </div>
                 )}
+
             </div>
           )}
 
-          {/* =====================================================
+          {/* =================================================
               ASSIGNMENT BOARD
-          ===================================================== */}
+          ================================================= */}
 
           {activeView ===
-            "assignment" && (
-            <div className="mt-6">
+            "assignment" &&
+            canAccessAssignmentBoard && (
+              <div className="mt-6">
 
-              {/* BOARD HEADER */}
-              <div className="mb-5 rounded-xl border border-gray-200 bg-white p-5">
+                <div className="mb-5 rounded-xl border border-gray-200 bg-white p-5">
 
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-                  <div>
+                    <div>
 
-                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
 
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#07111f] text-white">
-                        <UserPlus
-                          size={17}
-                        />
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#07111f] text-white">
+                          <UserPlus
+                            size={
+                              17
+                            }
+                          />
+                        </div>
+
+                        <h2 className="text-sm font-semibold text-gray-900">
+                          Project Assignment
+                        </h2>
+
                       </div>
 
-                      <h2 className="text-sm font-semibold text-gray-900">
-                        Project Assignment
-                      </h2>
+                      <p className="mt-2 max-w-2xl text-xs leading-relaxed text-gray-500">
+                        Assign projects to Project Managers by dragging an unassigned project onto a manager, or use manual assignment.
+                      </p>
+
                     </div>
-
-                    <p className="mt-2 max-w-2xl text-xs leading-relaxed text-gray-500">
-                      {canAssignProjects
-                        ? "Assign projects to Project Managers by dragging an unassigned project onto a manager. You can also assign projects manually."
-                        : "Project assignment is restricted to Executive Managers. You can view the assignment status but cannot change it."}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-
-                    {!canAssignProjects && (
-                      <div className="hidden rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 sm:block">
-                        <p className="text-[9px] font-medium uppercase tracking-wide text-gray-400">
-                          Access
-                        </p>
-
-                        <p className="mt-0.5 text-xs font-semibold text-gray-700">
-                          View Only
-                        </p>
-                      </div>
-                    )}
 
                     <div className="rounded-lg bg-violet-50 px-3 py-2">
 
@@ -2160,192 +2541,153 @@ export default function Projects() {
                           unassignedProjects.length
                         }
                       </p>
+
                     </div>
+
                   </div>
+
                 </div>
-              </div>
 
-              {/* BOARD */}
-              <div className="mt-5 overflow-x-auto pb-4">
+                <div className="mt-5 overflow-x-auto pb-4">
 
-                <div className="grid min-w-[1150px] grid-cols-[360px_minmax(750px,1fr)] gap-5">
+                  <div className="grid min-w-[1150px] grid-cols-[360px_minmax(750px,1fr)] gap-5">
 
-                  {/* UNASSIGNED */}
-                  <div className="rounded-xl border border-gray-200 bg-white">
+                    {/* UNASSIGNED */}
 
-                    <div className="border-b border-gray-100 px-5 py-4">
+                    <div className="rounded-xl border border-gray-200 bg-white">
 
-                      <div className="flex items-center justify-between">
+                      <div className="border-b border-gray-100 px-5 py-4">
 
-                        <div>
+                        <div className="flex items-center justify-between">
 
-                          <h3 className="text-sm font-semibold text-gray-900">
-                            Unassigned Projects
-                          </h3>
+                          <div>
+                            <h3 className="text-sm font-semibold text-gray-900">
+                              Unassigned Projects
+                            </h3>
 
-                          <p className="mt-1 text-[11px] text-gray-400">
-                            {canAssignProjects
-                              ? "Drag a project to a manager"
-                              : "Projects waiting for assignment"}
-                          </p>
+                            <p className="mt-1 text-[11px] text-gray-400">
+                              Drag a project to a manager
+                            </p>
+                          </div>
+
+                          <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-600">
+                            {
+                              unassignedProjects.length
+                            }
+                          </span>
+
                         </div>
 
-                        <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-600">
-                          {
-                            unassignedProjects.length
-                          }
-                        </span>
                       </div>
-                    </div>
 
-                    <div className="max-h-[650px] space-y-3 overflow-y-auto p-4">
+                      <div className="max-h-[650px] space-y-3 overflow-y-auto p-4">
 
-                      {unassignedProjects.length >
-                      0 ? (
-                        unassignedProjects.map(
-                          (
-                            project,
-                            index
-                          ) => (
-                            <div
-                              key={
-                                project.id
-                              }
-                              draggable={
-                                canAssignProjects
-                              }
-                              onDragStart={(
-                                e
-                              ) =>
-                                handleDragStart(
-                                  e,
+                        {unassignedProjects.length >
+                        0 ? (
+                          unassignedProjects.map(
+                            (
+                              project,
+                              index
+                            ) => (
+                              <div
+                                key={
                                   project.id
-                                )
-                              }
-                              onDragEnd={() =>
-                                stopDragAutoScroll()
-                              }
-                              onDrag={(e) =>
-                                handleDragAutoScroll(
+                                }
+                                draggable
+                                onDragStart={(
                                   e
-                                )
-                              }
-                              className={`group rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition ${
-                                canAssignProjects
-                                  ? "cursor-grab hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md active:cursor-grabbing"
-                                  : "cursor-default"
-                              }`}
-                            >
+                                ) =>
+                                  handleDragStart(
+                                    e,
+                                    project.id
+                                  )
+                                }
+                                onDragEnd={() =>
+                                  stopDragAutoScroll()
+                                }
+                                onDrag={(
+                                  e
+                                ) =>
+                                  handleDragAutoScroll(
+                                    e
+                                  )
+                                }
+                                className="group cursor-grab rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md active:cursor-grabbing"
+                              >
 
-                              <div className="flex items-start gap-3">
+                                <div className="flex items-start gap-3">
 
-                                {canAssignProjects && (
-                                  <div className="mt-1 shrink-0 text-gray-300 transition group-hover:text-gray-500">
+                                  <div className="mt-1 shrink-0 text-gray-300 group-hover:text-gray-500">
                                     <GripVertical
                                       size={
                                         17
                                       }
                                     />
                                   </div>
-                                )}
 
-                                <ProjectLogo
-                                  index={
-                                    index
-                                  }
-                                />
+                                  <ProjectLogo
+                                    index={
+                                      index
+                                    }
+                                  />
 
-                                <div className="min-w-0 flex-1">
+                                  <div className="min-w-0 flex-1">
 
-                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-start justify-between gap-2">
 
-                                    <div className="min-w-0">
+                                      <div className="min-w-0">
 
-                                      <p className="truncate text-sm font-semibold text-gray-900">
-                                        {
-                                          project.name
-                                        }
-                                      </p>
+                                        <p className="truncate text-sm font-semibold text-gray-900">
+                                          {
+                                            project.name
+                                          }
+                                        </p>
 
-                                      <p className="mt-0.5 truncate text-[10px] text-gray-400">
-                                        {
-                                          project.domain
-                                        }
-                                      </p>
+                                        <p className="mt-0.5 truncate text-[10px] text-gray-400">
+                                          {
+                                            project.domain
+                                          }
+                                        </p>
+
+                                      </div>
+
+                                      <span className="shrink-0 rounded-md bg-violet-50 px-2 py-1 text-[9px] font-medium text-violet-600">
+                                        New
+                                      </span>
+
                                     </div>
 
-                                    <span className="shrink-0 rounded-md bg-violet-50 px-2 py-1 text-[9px] font-medium text-violet-600">
-                                      New
-                                    </span>
-                                  </div>
+                                    <p className="mt-3 text-xs font-medium text-gray-700">
+                                      {
+                                        project.aboutTitle
+                                      }
+                                    </p>
 
-                                  <p className="mt-3 text-xs font-medium text-gray-700">
-                                    {
-                                      project.aboutTitle
-                                    }
-                                  </p>
+                                    <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-gray-400">
+                                      {
+                                        project.aboutDescription
+                                      }
+                                    </p>
 
-                                  <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-gray-400">
-                                    {
-                                      project.aboutDescription
-                                    }
-                                  </p>
+                                    <div className="mt-3">
+                                      <ProgressBar
+                                        progress={
+                                          project.progress
+                                        }
+                                      />
+                                    </div>
 
-                                  <div className="mt-3 flex items-center gap-3">
+                                    <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
 
-                                    {project.priority && (
-                                      <div className="flex items-center gap-1">
-                                        <Flag
-                                          size={
-                                            11
-                                          }
-                                          className="text-gray-400"
-                                        />
-
-                                        <span className="text-[10px] text-gray-500">
-                                          {
-                                            project.priority
-                                          }
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {project.deadline && (
-                                      <div className="flex items-center gap-1">
-                                        <Calendar
-                                          size={
-                                            11
-                                          }
-                                          className="text-gray-400"
-                                        />
-
-                                        <span className="text-[10px] text-gray-500">
-                                          {
-                                            project.deadline
-                                          }
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
-
-                                    <span className="flex items-center gap-1.5 text-[10px] text-gray-400">
-
-                                      {canAssignProjects && (
+                                      <span className="flex items-center gap-1.5 text-[10px] text-gray-400">
                                         <GripVertical
                                           size={
                                             12
                                           }
                                         />
-                                      )}
+                                        Drag to assign
+                                      </span>
 
-                                      {canAssignProjects
-                                        ? "Drag to assign"
-                                        : "Awaiting manager"}
-                                    </span>
-
-                                    {canAssignProjects && (
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -2353,7 +2695,7 @@ export default function Projects() {
                                             project.id
                                           )
                                         }
-                                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-gray-600 transition hover:bg-gray-50"
+                                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-gray-600 hover:bg-gray-50"
                                       >
                                         <UserPlus
                                           size={
@@ -2362,226 +2704,235 @@ export default function Projects() {
                                         />
                                         Assign manually
                                       </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        )
-                      ) : (
-                        <div className="flex min-h-[350px] flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-5 text-center">
 
-                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-500">
-                            <Check
-                              size={21}
+                                    </div>
+
+                                  </div>
+
+                                </div>
+
+                              </div>
+                            )
+                          )
+                        ) : (
+                          <div className="flex min-h-[350px] flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-5 text-center">
+
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-500">
+                              <Check
+                                size={
+                                  21
+                                }
+                              />
+                            </div>
+
+                            <p className="mt-4 text-sm font-semibold text-gray-800">
+                              All projects assigned
+                            </p>
+
+                            <p className="mt-1 max-w-[220px] text-xs leading-relaxed text-gray-400">
+                              There are currently no projects waiting for a project manager.
+                            </p>
+
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
+
+                    {/* MANAGERS */}
+
+                    <div className="min-w-0">
+
+                      <div className="mb-3">
+                        <h3 className="text-sm font-semibold text-gray-900">
+                          Project Managers
+                        </h3>
+
+                        <p className="mt-1 text-[11px] text-gray-400">
+                          Drop projects onto a manager to assign them.
+                        </p>
+                      </div>
+
+                      {loadingManagers ? (
+                        <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-gray-200 bg-white">
+
+                          <div className="text-center">
+
+                            <RefreshCw
+                              size={
+                                22
+                              }
+                              className="mx-auto animate-spin text-gray-400"
                             />
+
+                            <p className="mt-3 text-xs text-gray-500">
+                              Loading project managers...
+                            </p>
+
                           </div>
 
-                          <p className="mt-4 text-sm font-semibold text-gray-800">
-                            All projects assigned
-                          </p>
-
-                          <p className="mt-1 max-w-[220px] text-xs leading-relaxed text-gray-400">
-                            Great! There are currently no projects waiting for a project manager.
-                          </p>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                      ) : projectManagers.length ===
+                        0 ? (
+                        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white text-center">
 
-                  {/* MANAGERS */}
-                  <div className="min-w-0">
-
-                    <div className="mb-3">
-
-                      <h3 className="text-sm font-semibold text-gray-900">
-                        Project Managers
-                      </h3>
-
-                      <p className="mt-1 text-[11px] text-gray-400">
-                        {canAssignProjects
-                          ? "Drop projects onto a manager to assign them."
-                          : "Current project manager assignments."}
-                      </p>
-                    </div>
-
-                    {loadingManagers ? (
-                      <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-gray-200 bg-white">
-
-                        <div className="text-center">
-
-                          <RefreshCw
-                            size={22}
-                            className="mx-auto animate-spin text-gray-400"
+                          <Users
+                            size={
+                              25
+                            }
+                            className="text-gray-300"
                           />
 
-                          <p className="mt-3 text-xs text-gray-500">
-                            Loading project managers...
+                          <p className="mt-3 text-sm font-semibold text-gray-700">
+                            No project managers found
                           </p>
+
                         </div>
-                      </div>
-                    ) : projectManagers.length ===
-                      0 ? (
-                      <div className="flex min-h-[300px] flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white text-center">
+                      ) : (
+                        <div className="grid grid-cols-2 gap-4">
 
-                        <Users
-                          size={25}
-                          className="text-gray-300"
-                        />
+                          {projectManagers.map(
+                            (
+                              manager
+                            ) => {
+                              const managerProjects =
+                                filteredProjects.filter(
+                                  (
+                                    project
+                                  ) =>
+                                    project.managerId ===
+                                    manager.id
+                                );
 
-                        <p className="mt-3 text-sm font-semibold text-gray-700">
-                          No project managers found
-                        </p>
+                              const isDragOver =
+                                dragOverManagerId ===
+                                manager.id;
 
-                        <p className="mt-1 max-w-[280px] text-xs text-gray-400">
-                          Create an active user with the Project Manager role in PostgreSQL.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-4">
-
-                        {projectManagers.map(
-                          (manager) => {
-                            const managerProjects =
-                              filteredProjects.filter(
-                                (project) =>
-                                  project.managerId ===
-                                  manager.id
-                              );
-
-                            const isDragOver =
-                              dragOverManagerId ===
-                              manager.id;
-
-                            return (
-                              <div
-                                key={
-                                  manager.id
-                                }
-                                onDragOver={(
-                                  e
-                                ) => {
-                                  if (
-                                    !canAssignProjects
-                                  ) {
-                                    return;
+                              return (
+                                <div
+                                  key={
+                                    manager.id
                                   }
+                                  onDragOver={(
+                                    e
+                                  ) => {
+                                    e.preventDefault();
 
-                                  e.preventDefault();
+                                    e.dataTransfer.dropEffect =
+                                      "move";
 
-                                  e.dataTransfer.dropEffect =
-                                    "move";
+                                    setDragOverManagerId(
+                                      manager.id
+                                    );
+                                  }}
+                                  onDragLeave={() =>
+                                    setDragOverManagerId(
+                                      null
+                                    )
+                                  }
+                                  onDrop={(
+                                    e
+                                  ) =>
+                                    handleDropOnManager(
+                                      e,
+                                      manager.id
+                                    )
+                                  }
+                                  className={`min-h-[280px] rounded-xl border-2 bg-[#f7f7f8] p-3 transition ${
+                                    isDragOver
+                                      ? "border-gray-900 bg-gray-50"
+                                      : "border-gray-200"
+                                  }`}
+                                >
 
-                                  setDragOverManagerId(
-                                    manager.id
-                                  );
-                                }}
-                                onDragLeave={() =>
-                                  setDragOverManagerId(
-                                    null
-                                  )
-                                }
-                                onDrop={(e) =>
-                                  handleDropOnManager(
-                                    e,
-                                    manager.id
-                                  )
-                                }
-                                className={`min-h-[280px] rounded-xl border-2 bg-[#f7f7f8] p-3 transition ${
-                                  isDragOver
-                                    ? "border-gray-900 bg-gray-50"
-                                    : "border-gray-200"
-                                } ${
-                                  canAssignProjects
-                                    ? "hover:border-gray-300"
-                                    : ""
-                                }`}
-                              >
+                                  <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
 
-                                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                                    <div className="flex items-center justify-between">
 
-                                  <div className="flex items-center justify-between">
+                                      <div className="flex min-w-0 items-center gap-3">
 
-                                    <div className="flex min-w-0 items-center gap-3">
-
-                                      <ManagerAvatar
-                                        manager={
-                                          manager
-                                        }
-                                      />
-
-                                      <div className="min-w-0">
-
-                                        <p className="truncate text-sm font-semibold text-gray-900">
-                                          {
-                                            manager.name
+                                        <ManagerAvatar
+                                          manager={
+                                            manager
                                           }
-                                        </p>
+                                        />
 
-                                        <p className="mt-0.5 truncate text-[10px] text-gray-400">
-                                          {
-                                            manager.role
-                                          }
-                                        </p>
+                                        <div className="min-w-0">
+
+                                          <p className="truncate text-sm font-semibold text-gray-900">
+                                            {
+                                              manager.name
+                                            }
+                                          </p>
+
+                                          <p className="mt-0.5 truncate text-[10px] text-gray-400">
+                                            {
+                                              manager.role
+                                            }
+                                          </p>
+
+                                        </div>
+
                                       </div>
-                                    </div>
 
-                                    <div className="shrink-0 text-right">
+                                      <div className="shrink-0 text-right">
 
-                                      <p className="text-lg font-semibold text-gray-900">
-                                        {
-                                          managerProjects.length
-                                        }
-                                      </p>
-
-                                      <p className="text-[9px] uppercase tracking-wide text-gray-400">
-                                        Projects
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="mt-3 space-y-3">
-
-                                  {managerProjects.length >
-                                  0 ? (
-                                    managerProjects.map(
-                                      (
-                                        project,
-                                        index
-                                      ) => (
-                                        <div
-                                          key={
-                                            project.id
+                                        <p className="text-lg font-semibold text-gray-900">
+                                          {
+                                            managerProjects.length
                                           }
-                                          className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
-                                        >
+                                        </p>
 
-                                          <div className="flex items-center gap-2.5">
+                                        <p className="text-[9px] uppercase tracking-wide text-gray-400">
+                                          Projects
+                                        </p>
 
-                                            <ProjectLogo
-                                              index={
-                                                index
-                                              }
-                                            />
+                                      </div>
 
-                                            <div className="min-w-0 flex-1">
+                                    </div>
 
-                                              <p className="truncate text-xs font-semibold text-gray-900">
-                                                {
-                                                  project.name
+                                  </div>
+
+                                  <div className="mt-3 space-y-3">
+
+                                    {managerProjects.length >
+                                    0 ? (
+                                      managerProjects.map(
+                                        (
+                                          project,
+                                          index
+                                        ) => (
+                                          <div
+                                            key={
+                                              project.id
+                                            }
+                                            className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+                                          >
+
+                                            <div className="flex items-center gap-2.5">
+
+                                              <ProjectLogo
+                                                index={
+                                                  index
                                                 }
-                                              </p>
+                                              />
 
-                                              <p className="truncate text-[10px] text-gray-400">
-                                                {
-                                                  project.aboutTitle
-                                                }
-                                              </p>
-                                            </div>
+                                              <div className="min-w-0 flex-1">
 
-                                            {canAssignProjects && (
+                                                <p className="truncate text-xs font-semibold text-gray-900">
+                                                  {
+                                                    project.name
+                                                  }
+                                                </p>
+
+                                                <p className="truncate text-[10px] text-gray-400">
+                                                  {
+                                                    project.aboutTitle
+                                                  }
+                                                </p>
+
+                                              </div>
+
                                               <button
                                                 type="button"
                                                 onClick={() =>
@@ -2600,28 +2951,31 @@ export default function Projects() {
                                                   }
                                                 />
                                               </button>
-                                            )}
-                                          </div>
 
-                                          <div className="mt-3">
-                                            <ProgressBar
-                                              progress={
-                                                project.progress
-                                              }
-                                            />
-                                          </div>
+                                            </div>
 
-                                          <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+                                            <div className="mt-3">
+                                              <ProgressBar
+                                                progress={
+                                                  project.progress
+                                                }
+                                              />
+                                            </div>
 
-                                            <span
-                                              className={`inline-flex rounded-md px-2 py-1 text-[9px] font-medium ${statusStyles[project.status]}`}
-                                            >
-                                              {
-                                                project.status
-                                              }
-                                            </span>
+                                            <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
 
-                                            {canAssignProjects && (
+                                              <span
+                                                className={`inline-flex rounded-md px-2 py-1 text-[9px] font-medium ${
+                                                  statusStyles[
+                                                    project.status
+                                                  ]
+                                                }`}
+                                              >
+                                                {
+                                                  project.status
+                                                }
+                                              </span>
+
                                               <button
                                                 type="button"
                                                 onClick={() =>
@@ -2633,71 +2987,69 @@ export default function Projects() {
                                               >
                                                 Reassign
                                               </button>
-                                            )}
+
+                                            </div>
+
                                           </div>
-                                        </div>
+                                        )
                                       )
-                                    )
-                                  ) : (
-                                    <div className="flex min-h-[150px] flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white/60 px-4 text-center">
+                                    ) : (
+                                      <div className="flex min-h-[150px] flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white/60 px-4 text-center">
 
-                                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-                                        <User
-                                          size={
-                                            17
-                                          }
-                                        />
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+                                          <User
+                                            size={
+                                              17
+                                            }
+                                          />
+                                        </div>
+
+                                        <p className="mt-2 text-xs font-medium text-gray-500">
+                                          Drop project here
+                                        </p>
+
+                                        <p className="mt-1 text-[10px] text-gray-400">
+                                          Projects assigned to{" "}
+                                          {
+                                            manager.name.split(
+                                              " "
+                                            )[0]
+                                          }{" "}
+                                          appear here.
+                                        </p>
+
                                       </div>
+                                    )}
 
-                                      <p className="mt-2 text-xs font-medium text-gray-500">
-                                        {canAssignProjects
-                                          ? "Drop project here"
-                                          : "No projects assigned"}
-                                      </p>
+                                  </div>
 
-                                      <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
-                                        {canAssignProjects
-                                          ? `Projects assigned to ${
-                                              manager.name.split(
-                                                " "
-                                              )[0]
-                                            } appear here.`
-                                          : `No project is currently assigned to ${manager.name}.`}
-                                      </p>
-                                    </div>
-                                  )}
                                 </div>
-                              </div>
-                            );
-                          }
-                        )}
-                      </div>
-                    )}
+                              );
+                            }
+                          )}
+
+                        </div>
+                      )}
+
+                    </div>
+
                   </div>
+
                 </div>
+
               </div>
-            </div>
-          )}
+            )}
+
         </div>
       </main>
 
-      {/* =========================================================
+      {/* =====================================================
           CREATE PROJECT MODAL
-      ========================================================= */}
+      ===================================================== */}
 
       {modalOpen &&
-        isExecutiveManager && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]"
-            onMouseDown={(e) => {
-              if (
-                e.target ===
-                e.currentTarget
-              ) {
-                setModalOpen(false);
-              }
-            }}
-          >
+        canCreateProjects && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]">
 
             <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
 
@@ -2706,16 +3058,21 @@ export default function Projects() {
                 <div>
 
                   <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#07111f] text-white">
-                    <Plus size={19} />
+                    <Plus
+                      size={
+                        19
+                      }
+                    />
                   </div>
 
-                  <h2 className="text-lg font-semibold tracking-tight text-gray-900">
+                  <h2 className="text-lg font-semibold text-gray-900">
                     Create a new project
                   </h2>
 
                   <p className="mt-1 text-xs text-gray-500">
                     Add the essential details to create your project.
                   </p>
+
                 </div>
 
                 <button
@@ -2726,8 +3083,13 @@ export default function Projects() {
                   }}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
                 >
-                  <X size={19} />
+                  <X
+                    size={
+                      19
+                    }
+                  />
                 </button>
+
               </div>
 
               <div className="overflow-y-auto px-6 py-6">
@@ -2735,15 +3097,12 @@ export default function Projects() {
                 <div className="grid gap-5 sm:grid-cols-2">
 
                   <div className="sm:col-span-2">
+
                     <label className="mb-2 block text-xs font-semibold text-gray-700">
-                      Project name
-                      <span className="ml-1 text-red-500">
-                        *
-                      </span>
+                      Project name *
                     </label>
 
                     <input
-                      type="text"
                       value={
                         projectName
                       }
@@ -2755,15 +3114,16 @@ export default function Projects() {
                       placeholder="e.g. ARG Intelligence Platform"
                       className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none placeholder:text-gray-400 focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
                     />
+
                   </div>
 
                   <div>
+
                     <label className="mb-2 block text-xs font-semibold text-gray-700">
                       Project domain
                     </label>
 
                     <input
-                      type="text"
                       value={
                         projectDomain
                       }
@@ -2775,9 +3135,11 @@ export default function Projects() {
                       placeholder="e.g. arg.com"
                       className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none placeholder:text-gray-400 focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
                     />
+
                   </div>
 
                   <div>
+
                     <label className="mb-2 block text-xs font-semibold text-gray-700">
                       Priority
                     </label>
@@ -2788,31 +3150,33 @@ export default function Projects() {
                       }
                       onChange={(e) =>
                         setPriority(
-                          e.target
-                            .value as ProjectPriority
+                          e.target.value as ProjectPriority
                         )
                       }
-                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500"
                     >
                       <option value="Low">
                         Low
                       </option>
+
                       <option value="Medium">
                         Medium
                       </option>
+
                       <option value="High">
                         High
                       </option>
                     </select>
+
                   </div>
 
                   <div className="sm:col-span-2">
+
                     <label className="mb-2 block text-xs font-semibold text-gray-700">
                       Project objective
                     </label>
 
                     <input
-                      type="text"
                       value={
                         aboutTitle
                       }
@@ -2824,9 +3188,11 @@ export default function Projects() {
                       placeholder="e.g. Build internal project management system"
                       className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none placeholder:text-gray-400 focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
                     />
+
                   </div>
 
                   <div className="sm:col-span-2">
+
                     <label className="mb-2 block text-xs font-semibold text-gray-700">
                       Description
                     </label>
@@ -2842,126 +3208,93 @@ export default function Projects() {
                       }
                       placeholder="Describe what this project is about..."
                       rows={4}
-                      className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+                      className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-gray-500"
                     />
+
                   </div>
 
                   <div>
+
                     <label className="mb-2 block text-xs font-semibold text-gray-700">
                       Start date
                     </label>
 
-                    <div className="relative">
+                    <input
+                      type="date"
+                      value={
+                        startDate
+                      }
+                      min={
+                        getTodayDate()
+                      }
+                      onChange={(e) => {
+                        const value =
+                          e.target.value;
 
-                      <Calendar
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                      />
+                        setDateError("");
 
-                      <input
-                        type="date"
-                        value={
-                          startDate
-                        }
-                        min={getTodayDate()}
-                        onChange={(e) => {
-                          const value =
-                            e.target.value;
-
-                          setDateError("");
-
-                          if (
-                            value &&
-                            value <
-                              getTodayDate()
-                          ) {
-                            setDateError(
-                              "Start date must be today or a future date."
-                            );
-
-                            return;
-                          }
-
-                          if (
-                            deadline &&
-                            value &&
-                            deadline <
-                              value
-                          ) {
-                            setDeadline(
-                              ""
-                            );
-                          }
-
-                          setStartDate(
+                        if (
+                          deadline &&
+                          value &&
+                          deadline <
                             value
+                        ) {
+                          setDeadline(
+                            ""
                           );
-                        }}
-                        className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
-                      />
-                    </div>
+                        }
+
+                        setStartDate(
+                          value
+                        );
+                      }}
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-black outline-none focus:border-gray-500"
+                    />
+
                   </div>
 
                   <div>
+
                     <label className="mb-2 block text-xs font-semibold text-gray-700">
                       Deadline
                     </label>
 
-                    <div className="relative">
+                    <input
+                      type="date"
+                      value={
+                        deadline
+                      }
+                      min={
+                        startDate ||
+                        getTodayDate()
+                      }
+                      onChange={(e) => {
+                        const value =
+                          e.target.value;
 
-                      <Calendar
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                      />
+                        setDateError("");
 
-                      <input
-                        type="date"
-                        value={
-                          deadline
-                        }
-                        min={
-                          startDate ||
-                          getTodayDate()
-                        }
-                        onChange={(e) => {
-                          const value =
-                            e.target.value;
-
-                          setDateError("");
-
-                          if (
-                            value &&
-                            value <
-                              getTodayDate()
-                          ) {
-                            setDateError(
-                              "Deadline cannot be before today."
-                            );
-
-                            return;
-                          }
-
-                          if (
-                            startDate &&
-                            value &&
-                            value <
-                              startDate
-                          ) {
-                            setDateError(
-                              "Deadline must be greater than or equal to the start date."
-                            );
-
-                            return;
-                          }
-
-                          setDeadline(
-                            value
+                        if (
+                          startDate &&
+                          value <
+                            startDate
+                        ) {
+                          setDateError(
+                            "Deadline must be greater than or equal to the start date."
                           );
-                        }}
-                        className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
-                      />
-                    </div>
+
+                          return;
+                        }
+
+                        setDeadline(
+                          value
+                        );
+                      }}
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-black outline-none focus:border-gray-500"
+                    />
+
                   </div>
+
                 </div>
 
                 {dateError && (
@@ -2977,7 +3310,11 @@ export default function Projects() {
                   <div className="flex gap-3">
 
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-violet-600 shadow-sm">
-                      <Users size={15} />
+                      <Users
+                        size={
+                          15
+                        }
+                      />
                     </div>
 
                     <div>
@@ -2987,11 +3324,15 @@ export default function Projects() {
                       </p>
 
                       <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
-                        Every newly created project starts as Unassigned. The Executive Manager can assign the project from the Assignment Board.
+                        New projects start as Unassigned. Executive Managers and System Administrators can assign the project from the Assignment Board.
                       </p>
+
                     </div>
+
                   </div>
+
                 </div>
+
               </div>
 
               <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:flex-row sm:justify-end">
@@ -3016,46 +3357,44 @@ export default function Projects() {
                     !projectName.trim() ||
                     savingProject
                   }
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white shadow-sm hover:bg-[#111c2c] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white hover:bg-[#111c2c] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {savingProject ? (
                     <>
                       <RefreshCw
-                        size={14}
+                        size={
+                          14
+                        }
                         className="animate-spin"
                       />
                       Creating...
                     </>
                   ) : (
                     <>
-                      <Plus size={15} />
+                      <Plus
+                        size={
+                          15
+                        }
+                      />
                       Save project
                     </>
                   )}
                 </button>
+
               </div>
+
             </div>
           </div>
         )}
 
-      {/* =========================================================
+      {/* =====================================================
           EDIT PROJECT MODAL
-      ========================================================= */}
+      ===================================================== */}
 
       {editModalOpen &&
-        isExecutiveManager &&
+        canManageProjects &&
         selectedProject && (
-          <div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]"
-            onMouseDown={(e) => {
-              if (
-                e.target ===
-                e.currentTarget
-              ) {
-                setEditModalOpen(false);
-              }
-            }}
-          >
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]">
 
             <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
 
@@ -3064,30 +3403,42 @@ export default function Projects() {
                 <div>
 
                   <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#07111f] text-white">
-                    <Edit3 size={18} />
+                    <Edit3
+                      size={
+                        18
+                      }
+                    />
                   </div>
 
-                  <h2 className="text-lg font-semibold tracking-tight text-gray-900">
+                  <h2 className="text-lg font-semibold text-gray-900">
                     Update project
                   </h2>
 
                   <p className="mt-1 text-xs text-gray-500">
-                    Update the project information and dates.
+                    Update project information and dates.
                   </p>
+
                 </div>
 
                 <button
                   type="button"
                   onClick={() => {
-                    setEditModalOpen(false);
+                    setEditModalOpen(
+                      false
+                    );
                     setSelectedProject(
                       null
                     );
                   }}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"
                 >
-                  <X size={19} />
+                  <X
+                    size={
+                      19
+                    }
+                  />
                 </button>
+
               </div>
 
               <div className="overflow-y-auto px-6 py-6">
@@ -3097,14 +3448,10 @@ export default function Projects() {
                   <div className="sm:col-span-2">
 
                     <label className="mb-2 block text-xs font-semibold text-gray-700">
-                      Project name
-                      <span className="ml-1 text-red-500">
-                        *
-                      </span>
+                      Project name *
                     </label>
 
                     <input
-                      type="text"
                       value={
                         editProjectName
                       }
@@ -3113,8 +3460,9 @@ export default function Projects() {
                           e.target.value
                         )
                       }
-                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500"
                     />
+
                   </div>
 
                   <div>
@@ -3124,7 +3472,6 @@ export default function Projects() {
                     </label>
 
                     <input
-                      type="text"
                       value={
                         editProjectDomain
                       }
@@ -3133,8 +3480,9 @@ export default function Projects() {
                           e.target.value
                         )
                       }
-                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500"
                     />
+
                   </div>
 
                   <div>
@@ -3149,11 +3497,10 @@ export default function Projects() {
                       }
                       onChange={(e) =>
                         setEditPriority(
-                          e.target
-                            .value as ProjectPriority
+                          e.target.value as ProjectPriority
                         )
                       }
-                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500"
                     >
                       <option value="Low">
                         Low
@@ -3165,6 +3512,7 @@ export default function Projects() {
                         High
                       </option>
                     </select>
+
                   </div>
 
                   <div className="sm:col-span-2">
@@ -3174,7 +3522,6 @@ export default function Projects() {
                     </label>
 
                     <input
-                      type="text"
                       value={
                         editAboutTitle
                       }
@@ -3183,8 +3530,9 @@ export default function Projects() {
                           e.target.value
                         )
                       }
-                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500"
                     />
+
                   </div>
 
                   <div className="sm:col-span-2">
@@ -3203,8 +3551,9 @@ export default function Projects() {
                         )
                       }
                       rows={4}
-                      className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
+                      className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm text-black outline-none focus:border-gray-500"
                     />
+
                   </div>
 
                   <div>
@@ -3213,42 +3562,37 @@ export default function Projects() {
                       Start date
                     </label>
 
-                    <div className="relative">
+                    <input
+                      type="date"
+                      value={
+                        editStartDate
+                      }
+                      onChange={(e) => {
+                        const value =
+                          e.target.value;
 
-                      <Calendar
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                      />
-
-                      <input
-                        type="date"
-                        value={
-                          editStartDate
-                        }
-                        onChange={(e) => {
-                          const value =
-                            e.target.value;
-
-                          setEditDateError("");
-
-                          if (
-                            editDeadline &&
-                            value &&
-                            editDeadline <
-                              value
-                          ) {
-                            setEditDeadline(
-                              ""
-                            );
-                          }
-
-                          setEditStartDate(
+                        if (
+                          editDeadline &&
+                          value &&
+                          editDeadline <
                             value
+                        ) {
+                          setEditDeadline(
+                            ""
                           );
-                        }}
-                        className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
-                      />
-                    </div>
+                        }
+
+                        setEditStartDate(
+                          value
+                        );
+
+                        setEditDateError(
+                          ""
+                        );
+                      }}
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-black outline-none focus:border-gray-500"
+                    />
+
                   </div>
 
                   <div>
@@ -3257,35 +3601,29 @@ export default function Projects() {
                       Deadline
                     </label>
 
-                    <div className="relative">
+                    <input
+                      type="date"
+                      value={
+                        editDeadline
+                      }
+                      min={
+                        editStartDate ||
+                        undefined
+                      }
+                      onChange={(e) => {
+                        setEditDeadline(
+                          e.target.value
+                        );
 
-                      <Calendar
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                      />
+                        setEditDateError(
+                          ""
+                        );
+                      }}
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-black outline-none focus:border-gray-500"
+                    />
 
-                      <input
-                        type="date"
-                        value={
-                          editDeadline
-                        }
-                        min={
-                          editStartDate ||
-                          undefined
-                        }
-                        onChange={(e) => {
-                          setEditDeadline(
-                            e.target.value
-                          );
-
-                          setEditDateError(
-                            ""
-                          );
-                        }}
-                        className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
-                      />
-                    </div>
                   </div>
+
                 </div>
 
                 {editDateError && (
@@ -3295,19 +3633,22 @@ export default function Projects() {
                     </p>
                   </div>
                 )}
+
               </div>
 
-              <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:flex-row sm:justify-end">
+              <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
 
                 <button
                   type="button"
                   onClick={() => {
-                    setEditModalOpen(false);
+                    setEditModalOpen(
+                      false
+                    );
                     setSelectedProject(
                       null
                     );
                   }}
-                  className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700"
                 >
                   Cancel
                 </button>
@@ -3321,48 +3662,44 @@ export default function Projects() {
                     !editProjectName.trim() ||
                     savingEdit
                   }
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white shadow-sm hover:bg-[#111c2c] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white disabled:opacity-40"
                 >
                   {savingEdit ? (
                     <>
                       <RefreshCw
-                        size={14}
+                        size={
+                          14
+                        }
                         className="animate-spin"
                       />
                       Updating...
                     </>
                   ) : (
                     <>
-                      <Check size={15} />
+                      <Check
+                        size={
+                          15
+                        }
+                      />
                       Update project
                     </>
                   )}
                 </button>
+
               </div>
+
             </div>
           </div>
         )}
 
-      {/* =========================================================
+      {/* =====================================================
           DEADLINE MODAL
-      ========================================================= */}
+      ===================================================== */}
 
       {deadlineModalOpen &&
-        isExecutiveManager &&
+        canManageProjects &&
         selectedProject && (
-          <div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]"
-            onMouseDown={(e) => {
-              if (
-                e.target ===
-                e.currentTarget
-              ) {
-                setDeadlineModalOpen(
-                  false
-                );
-              }
-            }}
-          >
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]">
 
             <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
 
@@ -3372,7 +3709,9 @@ export default function Projects() {
 
                   <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#07111f] text-white">
                     <Calendar
-                      size={18}
+                      size={
+                        18
+                      }
                     />
                   </div>
 
@@ -3387,8 +3726,8 @@ export default function Projects() {
                         selectedProject.name
                       }
                     </span>
-                    .
                   </p>
+
                 </div>
 
                 <button
@@ -3403,8 +3742,13 @@ export default function Projects() {
                   }}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"
                 >
-                  <X size={18} />
+                  <X
+                    size={
+                      18
+                    }
+                  />
                 </button>
+
               </div>
 
               <div className="px-6 py-6">
@@ -3413,34 +3757,25 @@ export default function Projects() {
                   Deadline
                 </label>
 
-                <div className="relative">
-
-                  <Calendar
-                    size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-
-                  <input
-                    type="date"
-                    value={
-                      editDeadline
-                    }
-                    min={
-                      selectedProject.startDate ||
-                      getTodayDate()
-                    }
-                    onChange={(e) => {
-                      setEditDeadline(
-                        e.target.value
-                      );
-
-                      setEditDateError(
-                        ""
-                      );
-                    }}
-                    className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-black outline-none focus:border-gray-500 focus:ring-4 focus:ring-gray-100"
-                  />
-                </div>
+                <input
+                  type="date"
+                  value={
+                    editDeadline
+                  }
+                  min={
+                    selectedProject.startDate ||
+                    getTodayDate()
+                  }
+                  onChange={(e) => {
+                    setEditDeadline(
+                      e.target.value
+                    );
+                    setEditDateError(
+                      ""
+                    );
+                  }}
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-black outline-none focus:border-gray-500"
+                />
 
                 {editDateError && (
                   <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
@@ -3449,6 +3784,7 @@ export default function Projects() {
                     </p>
                   </div>
                 )}
+
               </div>
 
               <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
@@ -3463,7 +3799,7 @@ export default function Projects() {
                       null
                     );
                   }}
-                  className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700"
                 >
                   Cancel
                 </button>
@@ -3476,48 +3812,311 @@ export default function Projects() {
                   disabled={
                     savingDeadline
                   }
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white hover:bg-[#111c2c] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white disabled:opacity-40"
                 >
                   {savingDeadline ? (
                     <>
                       <RefreshCw
-                        size={14}
+                        size={
+                          14
+                        }
                         className="animate-spin"
                       />
                       Updating...
                     </>
                   ) : (
                     <>
-                      <Check size={15} />
+                      <Check
+                        size={
+                          15
+                        }
+                      />
                       Update deadline
                     </>
                   )}
                 </button>
+
               </div>
+
             </div>
           </div>
         )}
 
-      {/* =========================================================
+      {/* =====================================================
+          STATUS MODAL
+      ===================================================== */}
+
+      {statusModalOpen &&
+        canManageProjects &&
+        selectedProject && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]">
+
+            <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+              <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+
+                <div>
+
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#07111f] text-white">
+                    <CheckCircle2
+                      size={
+                        18
+                      }
+                    />
+                  </div>
+
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Change project status
+                  </h2>
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    Update the status for{" "}
+                    <span className="font-semibold text-gray-700">
+                      {
+                        selectedProject.name
+                      }
+                    </span>
+                  </p>
+
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusModalOpen(
+                      false
+                    );
+                    setSelectedProject(
+                      null
+                    );
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"
+                >
+                  <X
+                    size={
+                      18
+                    }
+                  />
+                </button>
+
+              </div>
+
+              <div className="px-6 py-6">
+
+                <div className="grid grid-cols-2 gap-3">
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedNewStatus(
+                        "Backlog"
+                      )
+                    }
+                    className={`rounded-xl border p-4 text-left transition ${
+                      selectedNewStatus ===
+                      "Backlog"
+                        ? "border-gray-900 bg-gray-50"
+                        : "border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+
+                    <div className="flex items-center gap-2">
+
+                      <Circle
+                        size={
+                          15
+                        }
+                        className="text-pink-500"
+                      />
+
+                      <span className="text-sm font-semibold text-gray-800">
+                        Backlog
+                      </span>
+
+                    </div>
+
+                    <p className="mt-2 text-[10px] leading-relaxed text-gray-400">
+                      Project is active but not completed.
+                    </p>
+
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedNewStatus(
+                        "Done"
+                      )
+                    }
+                    className={`rounded-xl border p-4 text-left transition ${
+                      selectedNewStatus ===
+                      "Done"
+                        ? "border-emerald-500 bg-emerald-50"
+                        : "border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+
+                    <div className="flex items-center gap-2">
+
+                      <CheckCircle2
+                        size={
+                          15
+                        }
+                        className="text-emerald-500"
+                      />
+
+                      <span className="text-sm font-semibold text-gray-800">
+                        Done
+                      </span>
+
+                    </div>
+
+                    <p className="mt-2 text-[10px] leading-relaxed text-gray-400">
+                      All project tasks must be completed.
+                    </p>
+
+                  </button>
+
+                </div>
+
+                {/* TASK CHECK */}
+
+                <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+
+                  <div className="flex items-center justify-between">
+
+                    <div className="flex items-center gap-2">
+
+                      <ListTodo
+                        size={
+                          16
+                        }
+                        className="text-gray-400"
+                      />
+
+                      <span className="text-xs font-semibold text-gray-700">
+                        Task completion
+                      </span>
+
+                    </div>
+
+                    <span className="text-xs font-semibold text-gray-800">
+                      {
+                        selectedProject.completedTasks
+                      }
+                      /
+                      {
+                        selectedProject.totalTasks
+                      }
+                    </span>
+
+                  </div>
+
+                  <div className="mt-3">
+                    <ProgressBar
+                      progress={
+                        selectedProject.progress
+                      }
+                    />
+                  </div>
+
+                </div>
+
+                {selectedNewStatus ===
+                  "Done" &&
+                  selectedProject.completedTasks !==
+                    selectedProject.totalTasks && (
+                    <div className="mt-4 flex gap-3 rounded-xl border border-orange-200 bg-orange-50 p-3">
+
+                      <AlertCircle
+                        size={
+                          17
+                        }
+                        className="mt-0.5 shrink-0 text-orange-500"
+                      />
+
+                      <p className="text-xs leading-relaxed text-orange-700">
+                        The project cannot be marked Done until every task is completed.
+                      </p>
+
+                    </div>
+                  )}
+
+                {statusError && (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+
+                    <p className="text-xs font-medium leading-relaxed text-red-700">
+                      {statusError}
+                    </p>
+
+                  </div>
+                )}
+
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusModalOpen(
+                      false
+                    );
+                    setSelectedProject(
+                      null
+                    );
+                  }}
+                  className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    handleChangeProjectStatus
+                  }
+                  disabled={
+                    savingStatus
+                  }
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  {savingStatus ? (
+                    <>
+                      <RefreshCw
+                        size={
+                          14
+                        }
+                        className="animate-spin"
+                      />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check
+                        size={
+                          15
+                        }
+                      />
+                      Save status
+                    </>
+                  )}
+                </button>
+
+              </div>
+
+            </div>
+          </div>
+        )}
+
+      {/* =====================================================
           DELETE MODAL
-      ========================================================= */}
+      ===================================================== */}
 
       {deleteModalOpen &&
-        isExecutiveManager &&
+        canManageProjects &&
         selectedProject && (
-          <div
-            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]"
-            onMouseDown={(e) => {
-              if (
-                e.target ===
-                e.currentTarget
-              ) {
-                setDeleteModalOpen(
-                  false
-                );
-              }
-            }}
-          >
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]">
 
             <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
 
@@ -3525,7 +4124,9 @@ export default function Projects() {
 
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
                   <Trash2
-                    size={21}
+                    size={
+                      21
+                    }
                     className="text-red-600"
                   />
                 </div>
@@ -3549,6 +4150,7 @@ export default function Projects() {
                     This action will permanently delete the project and all tasks associated with it. This cannot be undone.
                   </p>
                 </div>
+
               </div>
 
               <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
@@ -3566,7 +4168,7 @@ export default function Projects() {
                   disabled={
                     deletingProject
                   }
-                  className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700"
                 >
                   Cancel
                 </button>
@@ -3579,12 +4181,14 @@ export default function Projects() {
                   disabled={
                     deletingProject
                   }
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
                 >
                   {deletingProject ? (
                     <>
                       <RefreshCw
-                        size={14}
+                        size={
+                          14
+                        }
                         className="animate-spin"
                       />
                       Deleting...
@@ -3592,76 +4196,64 @@ export default function Projects() {
                   ) : (
                     <>
                       <Trash2
-                        size={15}
+                        size={
+                          15
+                        }
                       />
-                      Delete project
+                      Delete Project
                     </>
                   )}
                 </button>
+
               </div>
+
             </div>
           </div>
         )}
 
-      {/* =========================================================
-          VIEW PROJECT MODAL
-      ========================================================= */}
+      {/* =====================================================
+          VIEW PROJECT DETAILS
+      ===================================================== */}
 
       {viewModalOpen &&
         selectedProject && (
-          <div
-            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]"
-            onMouseDown={(e) => {
-              if (
-                e.target ===
-                e.currentTarget
-              ) {
-                setViewModalOpen(
-                  false
-                );
-                setSelectedProject(
-                  null
-                );
-              }
-            }}
-          >
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]">
 
-            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+              {/* HEADER */}
 
               <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
 
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
 
                   <ProjectLogo
-                    index={
+                    index={Math.max(
+                      0,
                       projects.findIndex(
                         (p) =>
                           p.id ===
                           selectedProject.id
-                      ) >= 0
-                        ? projects.findIndex(
-                            (p) =>
-                              p.id ===
-                              selectedProject.id
-                          )
-                        : 0
-                    }
+                      )
+                    )}
                   />
 
-                  <div>
+                  <div className="min-w-0">
 
-                    <h2 className="text-lg font-semibold text-gray-900">
+                    <h2 className="truncate text-lg font-semibold text-gray-900">
                       {
                         selectedProject.name
                       }
                     </h2>
 
-                    <p className="mt-0.5 text-xs text-gray-400">
+                    <p className="mt-0.5 truncate text-xs text-gray-400">
                       {
                         selectedProject.domain
                       }
                     </p>
+
                   </div>
+
                 </div>
 
                 <button
@@ -3674,86 +4266,199 @@ export default function Projects() {
                       null
                     );
                   }}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"
                 >
-                  <X size={19} />
+                  <X
+                    size={
+                      19
+                    }
+                  />
                 </button>
+
               </div>
 
-              <div className="space-y-5 px-6 py-6">
+              {/* BODY */}
 
-                <div className="grid gap-4 sm:grid-cols-3">
+              <div className="overflow-y-auto px-6 py-6">
+
+                {/* TOP STATS */}
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+
                     <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
                       Status
                     </p>
 
                     <span
-                      className={`mt-2 inline-flex rounded-md px-2.5 py-1 text-[10px] font-medium ${statusStyles[selectedProject.status]}`}
+                      className={`mt-2 inline-flex rounded-md px-2.5 py-1 text-[10px] font-medium ${
+                        statusStyles[
+                          selectedProject.status
+                        ]
+                      }`}
                     >
                       {
                         selectedProject.status
                       }
                     </span>
+
                   </div>
 
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+
                     <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
                       Priority
                     </p>
 
-                    <p className="mt-2 text-sm font-semibold text-gray-800">
-                      {
-                        selectedProject.priority ||
-                        "Medium"
-                      }
-                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+
+                      <Flag
+                        size={
+                          13
+                        }
+                        className="text-gray-400"
+                      />
+
+                      <p className="text-sm font-semibold text-gray-800">
+                        {
+                          selectedProject.priority
+                        }
+                      </p>
+
+                    </div>
+
                   </div>
 
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                      Tasks
+                    </p>
+
+                    <p className="mt-2 text-sm font-semibold text-gray-800">
+                      {
+                        selectedProject.completedTasks
+                      }
+                      /
+                      {
+                        selectedProject.totalTasks
+                      }{" "}
+                      completed
+                    </p>
+
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+
                     <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
                       Progress
                     </p>
 
-                    <div className="mt-2">
-                      <ProgressBar
-                        progress={
-                          selectedProject.progress
-                        }
-                      />
-                    </div>
+                    <p className="mt-2 text-sm font-semibold text-gray-800">
+                      {
+                        selectedProject.progress
+                      }
+                      %
+                    </p>
+
                   </div>
+
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                {/* PROJECT INFORMATION */}
 
-                  <p className="text-xs font-semibold text-gray-800">
-                    {
-                      selectedProject.aboutTitle
-                    }
-                  </p>
+                <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5">
 
-                  <p className="mt-2 text-sm leading-relaxed text-gray-500">
-                    {
-                      selectedProject.aboutDescription ||
-                      "No project description provided."
-                    }
-                  </p>
+                  <div className="flex items-start justify-between gap-4">
+
+                    <div>
+
+                      <p className="text-xs font-semibold text-gray-800">
+                        {
+                          selectedProject.aboutTitle
+                        }
+                      </p>
+
+                      <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                        {selectedProject.aboutDescription ||
+                          "No project description provided."}
+                      </p>
+
+                    </div>
+
+                  </div>
+
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                {/* PROGRESS */}
+
+                <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5">
+
+                  <div className="mb-3 flex items-center justify-between">
+
+                    <div>
+                      <p className="text-xs font-semibold text-gray-800">
+                        Project Progress
+                      </p>
+
+                      <p className="mt-1 text-[10px] text-gray-400">
+                        Calculated from completed project tasks
+                      </p>
+                    </div>
+
+                    <span className="text-lg font-semibold text-gray-900">
+                      {
+                        selectedProject.progress
+                      }
+                      %
+                    </span>
+
+                  </div>
+
+                  <ProgressBar
+                    progress={
+                      selectedProject.progress
+                    }
+                    large
+                  />
+
+                  <div className="mt-3 flex justify-between text-[10px] text-gray-400">
+
+                    <span>
+                      {
+                        selectedProject.completedTasks
+                      }{" "}
+                      completed
+                    </span>
+
+                    <span>
+                      {
+                        selectedProject.totalTasks
+                      }{" "}
+                      total tasks
+                    </span>
+
+                  </div>
+
+                </div>
+
+                {/* DATE + MANAGER */}
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-3">
 
                   <div className="rounded-xl border border-gray-200 p-4">
 
                     <div className="flex items-center gap-2">
                       <Calendar
-                        size={15}
+                        size={
+                          15
+                        }
                         className="text-gray-400"
                       />
 
                       <p className="text-xs font-semibold text-gray-700">
-                        Start date
+                        Start Date
                       </p>
                     </div>
 
@@ -3763,13 +4468,16 @@ export default function Projects() {
                         "No start date"
                       }
                     </p>
+
                   </div>
 
                   <div className="rounded-xl border border-gray-200 p-4">
 
                     <div className="flex items-center gap-2">
                       <Calendar
-                        size={15}
+                        size={
+                          15
+                        }
                         className="text-gray-400"
                       />
 
@@ -3784,34 +4492,241 @@ export default function Projects() {
                         "No deadline"
                       }
                     </p>
+
                   </div>
-                </div>
 
-                <div className="rounded-xl border border-gray-200 p-5">
+                  <div className="rounded-xl border border-gray-200 p-4">
 
-                  <div className="flex items-center gap-3">
-
-                    <Users
-                      size={17}
-                      className="text-gray-400"
-                    />
-
-                    <div>
+                    <div className="flex items-center gap-2">
+                      <Users
+                        size={
+                          15
+                        }
+                        className="text-gray-400"
+                      />
 
                       <p className="text-xs font-semibold text-gray-700">
                         Project Manager
                       </p>
-
-                      <p className="mt-1 text-sm text-gray-500">
-                        {
-                          selectedProject.managerName ||
-                          "Unassigned"
-                        }
-                      </p>
                     </div>
+
+                    <p className="mt-2 truncate text-sm text-gray-500">
+                      {
+                        selectedProject.managerName ||
+                        "Unassigned"
+                      }
+                    </p>
+
                   </div>
+
                 </div>
+
+                {/* TASKS */}
+
+                <div className="mt-5 overflow-hidden rounded-xl border border-gray-200">
+
+                  <div className="flex flex-col gap-2 border-b border-gray-100 bg-gray-50/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+
+                    <div>
+
+                      <div className="flex items-center gap-2">
+
+                        <ListTodo
+                          size={
+                            16
+                          }
+                          className="text-gray-500"
+                        />
+
+                        <h3 className="text-sm font-semibold text-gray-900">
+                          Project Tasks
+                        </h3>
+
+                      </div>
+
+                      <p className="mt-1 text-[10px] text-gray-400">
+                        Tasks, assignees and completion status
+                      </p>
+
+                    </div>
+
+                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[10px] font-medium text-gray-500">
+                      {
+                        selectedProject.totalTasks
+                      }{" "}
+                      tasks
+                    </span>
+
+                  </div>
+
+                  {selectedProject.tasks.length ===
+                  0 ? (
+                    <div className="px-5 py-12 text-center">
+
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                        <ListTodo
+                          size={
+                            20
+                          }
+                          className="text-gray-400"
+                        />
+                      </div>
+
+                      <p className="mt-3 text-sm font-semibold text-gray-700">
+                        No tasks yet
+                      </p>
+
+                      <p className="mt-1 text-xs text-gray-400">
+                        Tasks created for this project will appear here.
+                      </p>
+
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+
+                      {selectedProject.tasks.map(
+                        (
+                          task,
+                          index
+                        ) => (
+                          <div
+                            key={
+                              task.id
+                            }
+                            className="p-4 transition hover:bg-gray-50/60 sm:px-5"
+                          >
+
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+
+                              <div className="flex min-w-0 flex-1 items-start gap-3">
+
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-[10px] font-semibold text-gray-500">
+                                  {String(
+                                    index +
+                                      1
+                                  ).padStart(
+                                    2,
+                                    "0"
+                                  )}
+                                </div>
+
+                                <div className="min-w-0">
+
+                                  <p className="text-xs font-semibold text-gray-800">
+                                    {
+                                      task.name
+                                    }
+                                  </p>
+
+                                  {task.description && (
+                                    <p className="mt-1 line-clamp-1 text-[10px] text-gray-400">
+                                      {
+                                        task.description
+                                      }
+                                    </p>
+                                  )}
+
+                                  <div className="mt-2 flex flex-wrap items-center gap-2">
+
+                                    <TaskStatusBadge
+                                      status={
+                                        task.status
+                                      }
+                                    />
+
+                                    {task.priority && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                                        <Flag
+                                          size={
+                                            10
+                                          }
+                                        />
+                                        {
+                                          task.priority
+                                        }
+                                      </span>
+                                    )}
+
+                                    {task.dueDate && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                                        <Calendar
+                                          size={
+                                            10
+                                          }
+                                        />
+                                        {
+                                          task.dueDate
+                                        }
+                                      </span>
+                                    )}
+
+                                  </div>
+
+                                </div>
+
+                              </div>
+
+                              {/* ASSIGNEE */}
+
+                              <div className="flex shrink-0 items-center gap-2 sm:w-[180px]">
+
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[10px] font-semibold text-blue-600">
+                                  {task.assigneeName
+                                    ? task.assigneeName
+                                        .split(
+                                          " "
+                                        )
+                                        .filter(
+                                          Boolean
+                                        )
+                                        .slice(
+                                          0,
+                                          2
+                                        )
+                                        .map(
+                                          (
+                                            name
+                                          ) =>
+                                            name.charAt(
+                                              0
+                                            )
+                                        )
+                                        .join(
+                                          ""
+                                        )
+                                        .toUpperCase()
+                                    : "—"}
+                                </div>
+
+                                <div className="min-w-0">
+
+                                  <p className="truncate text-[10px] font-medium text-gray-700">
+                                    {task.assigneeName ||
+                                      "Unassigned"}
+                                  </p>
+
+                                  <p className="text-[9px] text-gray-400">
+                                    Assignee
+                                  </p>
+
+                                </div>
+
+                              </div>
+
+                            </div>
+
+                          </div>
+                        )
+                      )}
+
+                    </div>
+                  )}
+
+                </div>
+
               </div>
+
+              {/* FOOTER */}
 
               <div className="flex justify-end border-t border-gray-100 bg-gray-50/70 px-6 py-4">
 
@@ -3829,31 +4744,20 @@ export default function Projects() {
                 >
                   Close
                 </button>
+
               </div>
+
             </div>
           </div>
         )}
 
-      {/* =========================================================
+      {/* =====================================================
           ASSIGN MODAL
-          EXECUTIVE MANAGER ONLY
-      ========================================================= */}
+      ===================================================== */}
 
       {assignModalOpen &&
-        canAssignProjects && (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]"
-            onMouseDown={(e) => {
-              if (
-                e.target ===
-                e.currentTarget
-              ) {
-                setAssignModalOpen(
-                  false
-                );
-              }
-            }}
-          >
+        canAccessAssignmentBoard && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 px-4 backdrop-blur-[2px]">
 
             <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
 
@@ -3863,7 +4767,9 @@ export default function Projects() {
 
                   <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#07111f] text-white">
                     <UserPlus
-                      size={18}
+                      size={
+                        18
+                      }
                     />
                   </div>
 
@@ -3874,6 +4780,7 @@ export default function Projects() {
                   <p className="mt-1 text-xs text-gray-500">
                     Select a Project Manager for this project.
                   </p>
+
                 </div>
 
                 <button
@@ -3885,8 +4792,13 @@ export default function Projects() {
                   }
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"
                 >
-                  <X size={18} />
+                  <X
+                    size={
+                      18
+                    }
+                  />
                 </button>
+
               </div>
 
               <div className="max-h-[420px] space-y-2 overflow-y-auto px-6 py-5">
@@ -3934,6 +4846,7 @@ export default function Projects() {
                               manager.role
                             }
                           </p>
+
                         </div>
 
                         {selected && (
@@ -3945,24 +4858,12 @@ export default function Projects() {
                             />
                           </div>
                         )}
+
                       </button>
                     );
                   }
                 )}
 
-                {projectManagers.length ===
-                  0 && (
-                  <div className="py-8 text-center">
-                    <Users
-                      size={24}
-                      className="mx-auto text-gray-300"
-                    />
-
-                    <p className="mt-3 text-sm font-medium text-gray-600">
-                      No project managers available
-                    </p>
-                  </div>
-                )}
               </div>
 
               <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
@@ -3974,7 +4875,7 @@ export default function Projects() {
                       false
                     )
                   }
-                  className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700"
                 >
                   Cancel
                 </button>
@@ -3988,12 +4889,14 @@ export default function Projects() {
                     !selectedManagerId ||
                     assigningProject
                   }
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white hover:bg-[#111c2c] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white disabled:opacity-40"
                 >
                   {assigningProject ? (
                     <>
                       <RefreshCw
-                        size={14}
+                        size={
+                          14
+                        }
                         className="animate-spin"
                       />
                       Assigning...
@@ -4001,16 +4904,43 @@ export default function Projects() {
                   ) : (
                     <>
                       <UserPlus
-                        size={15}
+                        size={
+                          15
+                        }
                       />
                       Assign project
                     </>
                   )}
                 </button>
+
               </div>
+
             </div>
           </div>
         )}
     </>
+  );
+}
+
+/* =========================================================
+   EMPTY PROJECT ICON
+========================================================= */
+
+function FolderEmptyIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="text-gray-400"
+    >
+      <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2h7.5A2.5 2.5 0 0 1 21 9.5v7A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-9Z" />
+      <path d="M8 13h8" />
+    </svg>
   );
 }
