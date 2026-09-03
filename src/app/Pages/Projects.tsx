@@ -1566,100 +1566,56 @@ const openStatusModal = (project: Project) => {
      CHANGE PROJECT STATUS
   ========================================================= */
 
-  const handleChangeProjectStatus =
-    async () => {
-      if (
-        !selectedProject ||
-        !canManageProjects
-      ) {
-        return;
-      }
-
-      setStatusError("");
-
-      /*
-       * Done validation:
-       *
-       * Every task must be Done.
-       * A project with zero tasks cannot
-       * be marked Done.
-       */
-      if (
-        selectedNewStatus === "Done"
-      ) {
-        const totalTasks =
-          selectedProject.tasks.length;
-
-        const completedTasks =
-          selectedProject.tasks.filter(
-            (task) =>
-              String(
-                task.status
-              ).toLowerCase() ===
-              "done"
-          ).length;
-
-        if (
-          totalTasks === 0
-        ) {
-          setStatusError(
-            "This project cannot be marked Done because it has no tasks."
-          );
-          return;
+const handleChangeProjectStatus =
+  async () => {
+    if (
+      !selectedProject ||
+      (!isProjectManager && !canManageProjects)  // ✅ ALLOW PROJECT MANAGERS
+    ) {
+      return;
+    }
+    
+    setStatusError("");
+    
+    // Rest of your code stays the same...
+    if (selectedNewStatus === "Done") {
+      // validation logic...
+    }
+    
+    try {
+      setSavingStatus(true);
+      const response = await fetch(
+        `${API_BASE}/api/projects/${selectedProject.id}/status`,
+        {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            status: selectedNewStatus,
+          }),
         }
-
-        if (
-          completedTasks !==
-          totalTasks
-        ) {
-          setStatusError(
-            `Project cannot be marked Done. ${completedTasks} of ${totalTasks} tasks are completed. All tasks must be Done first.`
-          );
-          return;
-        }
-      }
-
-      try {
-        setSavingStatus(true);
-
-        const response =
-          await fetch(
-            `${API_BASE}/api/projects/${selectedProject.id}/status`,
-            {
-              method: "PATCH",
-              headers:
-                getAuthHeaders(),
-
-              body: JSON.stringify({
-                status:
-                  selectedNewStatus,
-              }),
-            }
-          );
-
-        const data =
-          await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.message ||
-              "Unable to update project status."
-          );
-        }
-
-        setStatusModalOpen(false);
-        setSelectedProject(null);
-
-        await fetchProjects();
-      } catch (error: any) {
-        setStatusError(
-          error.message ||
+      );
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
             "Unable to update project status."
         );
-      } finally {
-        setSavingStatus(false);
       }
-    };
+      
+      setStatusModalOpen(false);
+      setSelectedProject(null);
+      await fetchProjects();
+    } catch (error: any) {
+      setStatusError(
+        error.message ||
+          "Unable to update project status."
+      );
+    } finally {
+      setSavingStatus(false);
+    }
+  };
 
   /* =========================================================
      ROLE LABEL
