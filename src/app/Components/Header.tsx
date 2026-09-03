@@ -932,7 +932,7 @@ export default function Header() {
                       {stat.label2}
                     </p>
 
-                    <p className="mt-3 text-[10px] text-gray-400">
+                    <p className="mt-3 text-[11px] text-emerald-600">
                       <span className="font-bold text-emerald-600">
                         {stat.badge}
                       </span>{" "}
