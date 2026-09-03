@@ -106,36 +106,36 @@ const API_BASE =
 
 const PROJECT_OVERVIEW_COLORS = [
   {
-    bar: "from-[#42b5e8] to-[#2d6dcc]",
-    icon: "bg-[#172b3a] text-[#42b5e8]",
+    bar: "from-[#3b82f6] to-[#2563eb]",
+    icon: "bg-[#eff6ff] text-[#2563eb]",
   },
   {
-    bar: "from-[#69d19a] to-[#3ca67d]",
-    icon: "bg-[#172b3a] text-[#69d19a]",
+    bar: "from-[#34c759] to-[#239447]",
+    icon: "bg-[#ecfdf3] text-[#239447]",
   },
   {
-    bar: "from-[#9670ed] to-[#493bc0]",
-    icon: "bg-[#172b3a] text-[#9670ed]",
+    bar: "from-[#8b5cf6] to-[#6d3fd1]",
+    icon: "bg-[#f5f3ff] text-[#6d3fd1]",
   },
   {
-    bar: "from-[#ffb25b] to-[#ed7440]",
-    icon: "bg-[#172b3a] text-[#ffb25b]",
+    bar: "from-[#f59e0b] to-[#d97706]",
+    icon: "bg-[#fff7e6] text-[#d97706]",
   },
   {
-    bar: "from-[#4fc1c2] to-[#218a9b]",
-    icon: "bg-[#172b3a] text-[#4fc1c2]",
+    bar: "from-[#14b8a6] to-[#0f8f83]",
+    icon: "bg-[#ecfdf9] text-[#0f8f83]",
   },
   {
-    bar: "from-[#ed5d91] to-[#bd2f70]",
-    icon: "bg-[#172b3a] text-[#ed5d91]",
+    bar: "from-[#ec4899] to-[#c02670]",
+    icon: "bg-[#fdf2f8] text-[#c02670]",
   },
   {
     bar: "from-[#315da5] to-[#172d61]",
-    icon: "bg-[#172b3a] text-[#7fa8ff]",
+    icon: "bg-[#eef3ff] text-[#315da5]",
   },
   {
-    bar: "from-[#f8d95c] to-[#d8aa2c]",
-    icon: "bg-[#172b3a] text-[#f8d95c]",
+    bar: "from-[#eabf35] to-[#ca9415]",
+    icon: "bg-[#fffbea] text-[#ca9415]",
   },
 ];
 
@@ -225,14 +225,9 @@ export default function Dashboard() {
     }
   }, []);
 
-  /*
-   * Normalizes:
-   * "Project Manager"
-   * "project_manager"
-   * "PROJECT-MANAGER"
-   * into:
-   * "project manager"
-   */
+  /* =======================================================
+     ROLE NORMALIZATION
+  ======================================================= */
 
   const normalizedRole = useMemo(() => {
     return (
@@ -296,6 +291,7 @@ export default function Dashboard() {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       };
+
       /* =====================================================
          PROJECTS
       ===================================================== */
@@ -462,10 +458,26 @@ export default function Dashboard() {
     }
   };
 
-  
-      const handleRefresh = async () => {
-          await loadDashboard();
-      };
+  /* =======================================================
+     REFRESH
+  ======================================================= */
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setError("");
+
+    try {
+      await loadDashboard();
+    } catch (err) {
+      console.error(
+        "Refresh failed:",
+        err
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   /* =======================================================
      INITIAL LOAD
   ======================================================= */
@@ -479,21 +491,9 @@ export default function Dashboard() {
   ======================================================= */
 
   const visibleProjects = useMemo(() => {
-    /*
-     * Executive Manager + System Administrator
-     * -----------------------------------------
-     * Can see every project.
-     */
-
     if (isManagement) {
       return projects;
     }
-
-    /*
-     * Project Manager
-     * ---------------
-     * Can only see projects assigned to them.
-     */
 
     if (isProjectManager) {
       if (!currentUserId) {
@@ -506,13 +506,6 @@ export default function Dashboard() {
           String(currentUserId)
       );
     }
-
-    /*
-     * Member / User
-     * -------------
-     * A member only sees projects for which
-     * they have an assigned task.
-     */
 
     if (isMember) {
       if (!currentUserId) {
@@ -545,11 +538,6 @@ export default function Dashboard() {
       );
     }
 
-    /*
-     * Fallback:
-     * Unknown roles get no project data.
-     */
-
     return [];
   }, [
     projects,
@@ -565,20 +553,9 @@ export default function Dashboard() {
   ======================================================= */
 
   const visibleTasks = useMemo(() => {
-    /*
-     * Executive Manager / System Administrator
-     */
-
     if (isManagement) {
       return tasks;
     }
-
-    /*
-     * Project Manager
-     *
-     * All tasks belonging to projects managed
-     * by the logged-in Project Manager.
-     */
 
     if (isProjectManager) {
       const projectIds =
@@ -598,12 +575,6 @@ export default function Dashboard() {
           )
       );
     }
-
-    /*
-     * Member / User
-     *
-     * Only their own assigned tasks.
-     */
 
     if (isMember) {
       if (!currentUserId) {
@@ -987,17 +958,21 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#DEDAD9]">
+      <main className="min-h-screen bg-[#d1d1d1]">
         <div className="flex min-h-[70vh] items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <RefreshCw
-              size={30}
-              className="animate-spin text-[#557bd2]"
-            />
+          <div className="flex flex-col items-center gap-4">
 
-            <p className="text-[16px] font-semibold text-gray-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm">
+              <RefreshCw
+                size={22}
+                className="animate-spin text-[#315da5]"
+              />
+            </div>
+
+            <p className="text-[15px] font-bold text-[#263746]">
               Loading dashboard...
             </p>
+
           </div>
         </div>
       </main>
@@ -1010,29 +985,35 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-[#DEDAD9]">
-        <div className="mx-auto max-w-[1440px] px-5 py-6 sm:px-8 lg:px-10">
-          <div className="rounded-2xl border border-red-200 bg-white p-10 text-center">
-            <AlertCircle
-              className="mx-auto text-red-500"
-              size={34}
-            />
+      <main className="min-h-screen bg-[#d1d1d1]">
+        <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">
 
-            <h2 className="mt-4 text-[20px] font-bold text-gray-900">
+          <div className="rounded-2xl border border-red-200 bg-white p-10 text-center shadow-sm">
+
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-red-50">
+              <AlertCircle
+                className="text-red-500"
+                size={28}
+              />
+            </div>
+
+            <h2 className="mt-5 text-[21px] font-bold text-[#172633]">
               Unable to load dashboard
             </h2>
 
-            <p className="mt-2 text-[14px] text-gray-500">
+            <p className="mx-auto mt-2 max-w-[500px] text-[14px] leading-6 text-[#596775]">
               {error}
             </p>
 
             <button
               onClick={handleRefresh}
-              className="mt-6 rounded-xl bg-[#557bd2] px-6 py-3 text-[13px] font-bold text-white transition hover:bg-[#456bc2]"
+              className="mt-6 rounded-xl bg-[#315da5] px-6 py-3 text-[13px] font-bold text-white transition hover:bg-[#244b8e]"
             >
               Try Again
             </button>
+
           </div>
+
         </div>
       </main>
     );
@@ -1043,46 +1024,49 @@ export default function Dashboard() {
   ======================================================= */
 
   return (
-    <main className="min-h-screen bg-[#c4c4c4]">
+    <main className="min-h-screen bg-[#d1d1d1]">
+
       <div className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10">
 
         {/* =================================================
             PAGE HEADER
         ================================================= */}
 
-        <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-7 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
 
           <div>
-            <div className="mb-2 flex flex-wrap items-center gap-3">
 
-              <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#557bd2]">
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+
+              <span className="rounded-lg bg-[#315da5] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.13em] text-white">
                 Workspace Overview
-              </p>
+              </span>
 
               {currentUser.role && (
-                <span className="rounded-full border border-[#d5e0f7] bg-[#edf2ff] px-3 py-1.5 text-[11px] font-bold text-[#557bd2]">
+                <span className="rounded-lg border border-[#cbd7e7] bg-white px-3 py-1.5 text-[11px] font-bold text-[#315da5]">
                   {currentUser.role}
                 </span>
               )}
 
             </div>
 
-            <h1 className="text-[36px] font-bold tracking-tight text-[#16212d] sm:text-[38px]">
+            <h1 className="text-[36px] font-extrabold tracking-tight text-[#172633] sm:text-[40px]">
               Dashboard
             </h1>
 
-            <p className="mt-2 max-w-[700px] text-[14px] leading-6 text-[#697783]">
+            <p className="mt-2 max-w-[720px] text-[15px] font-medium leading-6 text-[#465461]">
               {roleDescription}
             </p>
+
           </div>
 
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="flex w-fit items-center gap-2.5 rounded-xl bg-[#172b3a] px-5 py-3 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#223d50] disabled:opacity-50"
+            className="flex w-fit items-center gap-2.5 rounded-xl bg-[#172b3a] px-5 py-3.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#263f50] disabled:opacity-50"
           >
             <RefreshCw
-              size={15}
+              size={16}
               className={
                 refreshing
                   ? "animate-spin"
@@ -1092,208 +1076,245 @@ export default function Dashboard() {
 
             Refresh Dashboard
           </button>
+
         </div>
 
         {/* =================================================
             ROW 1 — PROJECTS OVERVIEW
         ================================================= */}
 
-       <section className="mb-7 overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white">
+        <section className="mb-7 overflow-hidden rounded-2xl border border-[#cfd7df] bg-white shadow-[0_2px_10px_rgba(24,39,54,0.05)]">
 
-  <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+          {/* HEADER */}
 
-    <div>
-      <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-4 border-b border-[#e5e9ed] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
 
-        <div className="rounded-lg bg-gradient-to-br from-[#557bd2] to-[#456bc2] px-3 py-1.5">
-          <h2 className="text-[20px] font-bold text-white">
-            Projects Overview
-          </h2>
-        </div>
+            <div>
 
-        <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[12px] font-bold text-[#557bd2]">
-          {projectOverview.length}
-        </span>
+              <div className="flex items-center gap-3">
 
-      </div>
+                <span className="rounded-lg bg-[#315da5] px-3.5 py-2">
+                  <h2 className="text-[18px] font-extrabold text-white">
+                    Projects Overview
+                  </h2>
+                </span>
 
-      <p className="mt-1.5 text-[13px] text-[#7b8794]">
-        Track project progress at a glance
-      </p>
-    </div>
+                <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#edf3ff] px-2 text-[12px] font-extrabold text-[#315da5]">
+                  {projectOverview.length}
+                </span>
 
-    <div className="flex w-fit items-center gap-2.5 rounded-xl border border-[#dfe5ea] bg-[#fafbfd] px-4 py-3">
+              </div>
 
-      <CalendarDays
-        size={15}
-        className="text-[#557bd2]"
-      />
+              <p className="mt-2 text-[13px] font-medium text-[#596775]">
+                Task completion progress for each visible project
+              </p>
 
-      <span className="text-[12px] font-semibold text-[#53616d]">
-        Data as of{" "}
-        {new Date().toLocaleDateString(
-          "en-US",
-          {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          }
-        )}
-      </span>
+            </div>
 
-    </div>
-  </div>
+            <div className="flex w-fit items-center gap-2.5 rounded-lg border border-[#dce2e8] bg-[#f8fafc] px-4 py-2.5">
 
-  {projectOverview.length === 0 ? (
+              <CalendarDays
+                size={15}
+                className="text-[#315da5]"
+              />
 
-    <div className="flex min-h-[250px] items-center justify-center px-5">
-      <EmptyState
-        title={
-          isProjectManager
-            ? "No projects assigned to you"
-            : isMember
-            ? "No assigned projects yet"
-            : "No projects available"
-        }
-        description={
-          isProjectManager
-            ? "Projects assigned to you will appear here."
-            : isMember
-            ? "Projects will appear here when tasks are assigned to you."
-            : "Projects will appear here once they are created."
-        }
-      />
-    </div>
-
-  ) : (
-
-    <div className="px-4 pb-5 pt-6 sm:px-6">
-
-      <div className="relative">
-
-        <div className="pointer-events-none absolute inset-x-0 bottom-[75px] top-0 flex flex-col justify-between">
-
-          <div className="h-px w-full bg-[#edf0f3]" />
-          <div className="h-px w-full bg-[#edf0f3]" />
-          <div className="h-px w-full bg-[#edf0f3]" />
-          <div className="h-px w-full bg-[#edf0f3]" />
-          <div className="h-px w-full bg-[#edf0f3]" />
-
-        </div>
-
-        <div className="relative grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-
-          {projectOverview.map(
-            (
-              {
-                project,
-                totalTasks,
-                completedTasks,
-                progress,
-              },
-              index
-            ) => {
-
-              const color =
-                PROJECT_OVERVIEW_COLORS[
-                  index %
-                    PROJECT_OVERVIEW_COLORS.length
-                ];
-
-              return (
-                <button
-                  key={project.id}
-                  type="button"
-                  onClick={() =>
-                    setSelectedOverviewProject(
-                      project
-                    )
+              <span className="text-[12px] font-bold text-[#465461]">
+                Data as of{" "}
+                {new Date().toLocaleDateString(
+                  "en-US",
+                  {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
                   }
-                  className="group flex min-w-0 flex-col items-center rounded-xl px-2 py-2 transition hover:bg-[#fafbfd]"
-                >
+                )}
+              </span>
 
-                  <div className="mb-2 h-5">
-                    <span className="text-[16px] font-bold text-[#172633] transition group-hover:text-[#557bd2]">
-                      {progress}%
-                    </span>
-                  </div>
+            </div>
 
-                  <div className="relative flex h-[140px] w-full max-w-[60px] items-end justify-center">
+          </div>
 
-                    <div className="absolute bottom-0 h-full w-full rounded-t-xl bg-[#f7f9fb]" />
+          {/* EMPTY */}
 
-                    <div
-                      className={`relative z-10 w-full rounded-t-xl bg-gradient-to-t ${color.bar} shadow-[0_6px_14px_rgba(85,123,210,0.15)] transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_10px_20px_rgba(85,123,210,0.22)]`}
-                      style={{
-                        height: `${Math.max(
-                          progress,
-                          progress === 0
-                            ? 2
-                            : 6
-                        )}%`,
-                      }}
-                    >
-                      <div className="absolute inset-x-0 top-0 h-10 rounded-t-xl bg-white/10" />
-                    </div>
+          {projectOverview.length === 0 ? (
 
-                  </div>
+            <div className="flex min-h-[250px] items-center justify-center px-5">
 
-                  <div
-                    className={`mt-3 flex h-10 w-10 items-center justify-center rounded-xl ${color.icon} shadow-sm transition group-hover:scale-105`}
-                  >
-                    <FolderKanban size={16} />
-                  </div>
+              <EmptyState
+                title={
+                  isProjectManager
+                    ? "No projects assigned to you"
+                    : isMember
+                    ? "No assigned projects yet"
+                    : "No projects available"
+                }
+                description={
+                  isProjectManager
+                    ? "Projects assigned to you will appear here."
+                    : isMember
+                    ? "Projects will appear here when tasks are assigned to you."
+                    : "Projects will appear here once they are created."
+                }
+              />
 
-                  <div className="mt-2 min-h-[32px] w-full text-center">
+            </div>
 
-                    <p className="line-clamp-2 text-[15px] font-bold uppercase leading-4 text-[#172633]">
-                      {project.name}
-                    </p>
+          ) : (
 
-                  </div>
+            <div className="px-5 pb-6 pt-7 sm:px-7">
 
-                  <div className="mt-2 flex items-center gap-1 rounded-full bg-[#f5f7f9] px-2.5 py-1">
+              {/* GRAPH */}
 
-                    <CheckCircle2
-                      size={15}
-                      className="text-[#438d5d] shrink-0"
-                    />
+              <div className="relative">
 
-                    <span className="text-[13px] font-semibold text-[#697783]">
-                      {completedTasks}/{totalTasks}
-                    </span>
+                {/* HORIZONTAL GRID */}
 
-                  </div>
+                <div className="pointer-events-none absolute inset-x-0 bottom-[92px] top-0 flex flex-col justify-between">
 
-                </button>
-              );
-            }
+                  <div className="h-px w-full border-t border-dashed border-[#e5e9ee]" />
+
+                  <div className="h-px w-full border-t border-dashed border-[#e5e9ee]" />
+
+                  <div className="h-px w-full border-t border-dashed border-[#e5e9ee]" />
+
+                  <div className="h-px w-full border-t border-dashed border-[#e5e9ee]" />
+
+                  <div className="h-px w-full border-t border-dashed border-[#e5e9ee]" />
+
+                </div>
+
+                <div className="relative grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+
+                  {projectOverview.map(
+                    (
+                      {
+                        project,
+                        totalTasks,
+                        completedTasks,
+                        progress,
+                      },
+                      index
+                    ) => {
+
+                      const color =
+                        PROJECT_OVERVIEW_COLORS[
+                          index %
+                            PROJECT_OVERVIEW_COLORS.length
+                        ];
+
+                      return (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() =>
+                            setSelectedOverviewProject(
+                              project
+                            )
+                          }
+                          className="group flex min-w-0 flex-col items-center rounded-xl px-2 py-2 transition hover:bg-[#f8fafc]"
+                        >
+
+                          {/* PERCENTAGE */}
+
+                          <div className="mb-3 flex h-7 items-center">
+
+                            <span className="text-[17px] font-extrabold text-[#172633] group-hover:text-[#315da5]">
+                              {progress}%
+                            </span>
+
+                          </div>
+
+                          {/* BAR AREA */}
+
+                          <div className="relative flex h-[150px] w-full items-end justify-center">
+
+                            {/* BACKGROUND BAR */}
+
+                            <div className="absolute bottom-0 h-full w-[22px] rounded-t-md bg-[#f2f5f8]" />
+
+                            {/* ACTUAL BAR */}
+
+                            <div
+                              className={`relative z-10 w-[22px] rounded-t-md bg-gradient-to-t ${color.bar} shadow-[0_3px_8px_rgba(24,39,54,0.12)] transition-all duration-500 group-hover:-translate-y-1`}
+                              style={{
+                                height: `${Math.max(
+                                  progress,
+                                  progress === 0
+                                    ? 3
+                                    : 6
+                                )}%`,
+                              }}
+                            />
+
+                          </div>
+
+                          {/* PROJECT ICON */}
+
+                          <div
+                            className={`mt-4 flex h-9 w-9 items-center justify-center rounded-lg ${color.icon} transition group-hover:scale-105`}
+                          >
+                            <FolderKanban size={16} />
+                          </div>
+
+                          {/* PROJECT NAME */}
+
+                          <div className="mt-2 min-h-[42px] w-full px-1 text-center">
+
+                            <p className="line-clamp-2 text-[13px] font-extrabold uppercase leading-[18px] text-[#243442]">
+                              {project.name}
+                            </p>
+
+                          </div>
+
+                          {/* TASK COUNT */}
+
+                          <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-[#e5e9ed] bg-[#f8fafc] px-2.5 py-1.5">
+
+                            <CheckCircle2
+                              size={14}
+                              className="shrink-0 text-[#2f8a4f]"
+                            />
+
+                            <span className="text-[12px] font-bold text-[#4b5966]">
+                              {completedTasks}/{totalTasks} completed
+                            </span>
+
+                          </div>
+
+                        </button>
+                      );
+                    }
+                  )}
+
+                </div>
+
+              </div>
+
+              {/* GRAPH LEGEND */}
+
+              <div className="mt-6 flex justify-center">
+
+                <div className="flex items-center gap-2 rounded-lg border border-[#e1e6eb] bg-[#fafbfd] px-4 py-2.5">
+
+                  <Eye
+                    size={15}
+                    className="text-[#315da5]"
+                  />
+
+                  <span className="text-[12px] font-semibold text-[#53616d]">
+                    Select a project bar to view details
+                  </span>
+
+                </div>
+
+              </div>
+
+            </div>
+
           )}
 
-        </div>
-      </div>
+        </section>
 
-      <div className="mt-5 flex items-center justify-center">
-
-        <div className="flex items-center gap-2 rounded-full bg-[#f7f9fb] px-4 py-2">
-
-          <Eye
-            size={15}
-            className="text-[#557bd2] shrink-0"
-          />
-
-          <span className="text-[13px] font-medium text-[#7b8794]">
-            Click any bar to view details
-          </span>
-
-        </div>
-
-      </div>
-
-    </div>
-  )}
-
-</section>
         {/* =================================================
             ROW 2 — ACTIVE PROJECTS
         ================================================= */}
@@ -1306,19 +1327,19 @@ export default function Dashboard() {
 
               <div className="flex items-center gap-3">
 
-                <div className="rounded-lg bg-gradient-to-br from-[#438d5d] to-[#2d7a4a] px-3 py-1.5">
-                  <h2 className="text-[20px] font-bold text-white">
+                <span className="rounded-lg bg-[#2f8a4f] px-3.5 py-2">
+                  <h2 className="text-[18px] font-extrabold text-white">
                     Active Projects
                   </h2>
-                </div>
+                </span>
 
-                <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[12px] font-bold text-[#557bd2]">
+                <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-white px-2 text-[12px] font-extrabold text-[#315da5] shadow-sm">
                   {activeProjects.length}
                 </span>
 
               </div>
 
-              <p className="mt-2 text-[13px] text-[#8b96a3]">
+              <p className="mt-2 text-[13px] font-medium text-[#465461]">
                 Current projects requiring attention
               </p>
 
@@ -1328,7 +1349,7 @@ export default function Dashboard() {
               onClick={() =>
                 router.push("/projects")
               }
-              className="flex items-center gap-2 rounded-lg border border-[#dce2e8] bg-white px-4 py-2.5 text-[12px] font-semibold text-[#53616d] shadow-sm transition hover:border-[#557bd2] hover:text-[#557bd2]"
+              className="flex items-center gap-2 rounded-lg border border-[#cfd7df] bg-white px-4 py-2.5 text-[12px] font-bold text-[#3d4c59] shadow-sm transition hover:border-[#315da5] hover:text-[#315da5]"
             >
               View all projects
               <ChevronRight size={14} />
@@ -1357,7 +1378,7 @@ export default function Dashboard() {
 
           ) : (
 
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 
               {activeProjects.map(
                 (project) => (
@@ -1383,23 +1404,23 @@ export default function Dashboard() {
             ROW 3 — TEAM OVERVIEW
         ================================================= */}
 
-        <section className="mb-7 rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
+        <section className="mb-7 overflow-hidden rounded-2xl border border-[#cfd7df] bg-white shadow-[0_2px_10px_rgba(24,39,54,0.05)]">
 
-          <div className="flex items-center justify-between border-b border-[#edf0f3] px-5 py-6 sm:px-7">
+          <div className="flex items-center justify-between border-b border-[#e5e9ed] px-5 py-5 sm:px-7">
 
             <div className="flex items-center gap-3">
 
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#edf2ff] text-[#557bd2]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#edf3ff] text-[#315da5]">
                 <Users size={19} />
               </div>
 
               <div>
 
-                <h2 className="text-[20px] font-bold text-[#172633]">
+                <h2 className="text-[19px] font-extrabold text-[#172633]">
                   Team Overview
                 </h2>
 
-                <p className="mt-1 text-[12px] text-[#8b96a3]">
+                <p className="mt-1 text-[13px] font-medium text-[#596775]">
                   Team members, roles and project domains
                 </p>
 
@@ -1411,7 +1432,7 @@ export default function Dashboard() {
               onClick={() =>
                 router.push("/teams")
               }
-              className="flex items-center gap-2 rounded-lg bg-[#172b3a] px-4 py-2.5 text-[12px] font-semibold text-white transition hover:bg-[#223d50]"
+              className="flex items-center gap-2 rounded-lg bg-[#172b3a] px-4 py-2.5 text-[12px] font-bold text-white transition hover:bg-[#263f50]"
             >
               View teams
               <ChevronRight size={13} />
@@ -1419,19 +1440,19 @@ export default function Dashboard() {
 
           </div>
 
-          <div className="grid gap-7 p-6 lg:grid-cols-[0.8fr_1.2fr] sm:p-7">
+          <div className="grid gap-6 p-6 lg:grid-cols-[0.8fr_1.2fr] sm:p-7">
 
             {/* TEAM DISTRIBUTION */}
 
-            <div className="rounded-2xl border border-[#edf0f3] bg-[#fafbfd] p-6">
+            <div className="rounded-xl border border-[#e1e6eb] bg-[#fafbfd] p-6">
 
               <div className="mb-6">
 
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#9aa4ae]">
+                <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#667481]">
                   Team Distribution
                 </p>
 
-                <p className="mt-1.5 text-[13px] text-[#7f8a95]">
+                <p className="mt-1.5 text-[13px] font-medium text-[#596775]">
                   Current workforce composition
                 </p>
 
@@ -1439,7 +1460,7 @@ export default function Dashboard() {
 
               <div className="flex items-center justify-center gap-9">
 
-                <div className="relative h-[160px] w-[160px] shrink-0">
+                <div className="relative h-[155px] w-[155px] shrink-0">
 
                   <div
                     className="absolute inset-0 rounded-full"
@@ -1451,13 +1472,13 @@ export default function Dashboard() {
                     }}
                   />
 
-                  <div className="absolute inset-[29px] flex flex-col items-center justify-center rounded-full bg-white shadow-sm">
+                  <div className="absolute inset-[28px] flex flex-col items-center justify-center rounded-full bg-white">
 
-                    <span className="text-[26px] font-bold text-[#172633]">
+                    <span className="text-[27px] font-extrabold text-[#172633]">
                       {teamRoleStats.total}
                     </span>
 
-                    <span className="mt-1 text-[10px] font-bold text-[#9aa4ae]">
+                    <span className="mt-1 text-[10px] font-extrabold tracking-wide text-[#687581]">
                       MEMBERS
                     </span>
 
@@ -1465,7 +1486,7 @@ export default function Dashboard() {
 
                 </div>
 
-                <div className="space-y-3.5">
+                <div className="space-y-3">
 
                   <TeamItemNew
                     color="bg-[#557bd2]"
@@ -1521,17 +1542,17 @@ export default function Dashboard() {
 
                 <div>
 
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#9aa4ae]">
+                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#667481]">
                     Project Domains
                   </p>
 
-                  <p className="mt-1.5 text-[13px] text-[#7f8a95]">
+                  <p className="mt-1.5 text-[13px] font-medium text-[#596775]">
                     Distribution across active work
                   </p>
 
                 </div>
 
-                <span className="rounded-full bg-[#f1f4f7] px-3 py-1.5 text-[10px] font-semibold text-[#697783]">
+                <span className="rounded-lg bg-[#f1f4f7] px-3 py-1.5 text-[11px] font-bold text-[#53616d]">
                   {domainStats.length} domains
                 </span>
 
@@ -1539,14 +1560,14 @@ export default function Dashboard() {
 
               {domainStats.length === 0 ? (
 
-                <div className="rounded-xl border border-dashed border-[#dfe4e9] bg-[#fafbfd] px-4 py-10 text-center">
+                <div className="rounded-xl border border-dashed border-[#cfd7df] bg-[#fafbfd] px-4 py-10 text-center">
 
                   <FolderKanban
                     size={25}
-                    className="mx-auto text-[#c5ccd3]"
+                    className="mx-auto text-[#9aa6b1]"
                   />
 
-                  <p className="mt-3 text-[12px] font-medium text-[#8b96a3]">
+                  <p className="mt-3 text-[13px] font-bold text-[#596775]">
                     No project domains available
                   </p>
 
@@ -1566,13 +1587,13 @@ export default function Dashboard() {
                     ) => (
                       <div
                         key={domain}
-                        className="group flex items-center justify-between rounded-xl border border-[#edf0f3] bg-white px-4 py-3.5 transition hover:border-[#ccd8ed] hover:bg-[#fafcff]"
+                        className="group flex items-center justify-between rounded-xl border border-[#e1e6eb] bg-white px-4 py-3.5 transition hover:border-[#c2d0e5] hover:bg-[#fafcff]"
                       >
 
                         <div className="flex min-w-0 items-center gap-3">
 
                           <span
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-white ${
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-extrabold text-white ${
                               index % 4 === 0
                                 ? "bg-[#557bd2]"
                                 : index % 4 === 1
@@ -1587,13 +1608,13 @@ export default function Dashboard() {
                               .toUpperCase()}
                           </span>
 
-                          <span className="truncate text-[12px] font-semibold text-[#53616d]">
+                          <span className="truncate text-[13px] font-bold text-[#3e4d5a]">
                             {domain}
                           </span>
 
                         </div>
 
-                        <span className="ml-2 shrink-0 rounded-full bg-[#f1f4f7] px-2.5 py-1.5 text-[10px] font-bold text-[#66737e]">
+                        <span className="ml-2 shrink-0 rounded-lg bg-[#f1f4f7] px-2.5 py-1.5 text-[11px] font-extrabold text-[#53616d]">
                           {count}
                         </span>
 
@@ -1606,28 +1627,28 @@ export default function Dashboard() {
 
               <div className="mt-5 grid grid-cols-2 gap-4">
 
-                <div className="rounded-xl bg-gradient-to-br from-[#edf2ff] to-[#f7f9ff] p-5">
+                <div className="rounded-xl border border-[#dce5f4] bg-[#f2f6ff] p-5">
 
                   <div className="flex items-center gap-2">
 
                     <FolderKanban
                       size={16}
-                      className="text-[#557bd2]"
+                      className="text-[#315da5]"
                     />
 
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-[#7c8793]">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-[#53616d]">
                       Active Teams
                     </span>
 
                   </div>
 
-                  <p className="mt-2 text-[27px] font-bold text-[#172633]">
+                  <p className="mt-2 text-[27px] font-extrabold text-[#172633]">
                     {teams.length}
                   </p>
 
                 </div>
 
-                <div className="rounded-xl bg-gradient-to-br from-[#f5eff9] to-[#fbf8fd] p-5">
+                <div className="rounded-xl border border-[#e6dff0] bg-[#f8f3fc] p-5">
 
                   <div className="flex items-center gap-2">
 
@@ -1636,13 +1657,13 @@ export default function Dashboard() {
                       className="text-[#895a9d]"
                     />
 
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-[#7c8793]">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-[#53616d]">
                       Developers
                     </span>
 
                   </div>
 
-                  <p className="mt-2 text-[27px] font-bold text-[#172633]">
+                  <p className="mt-2 text-[27px] font-extrabold text-[#172633]">
                     {
                       teamRoleStats.developers
                     }
@@ -1668,31 +1689,31 @@ export default function Dashboard() {
             icon={<Circle size={17} />}
             label="Total Tasks"
             value={taskStats.total}
-            className="bg-[#edf2ff]"
-            iconClass="text-[#557bd2]"
+            className="bg-[#edf3ff]"
+            iconClass="text-[#315da5]"
           />
 
           <DashboardStat
             icon={<CheckCircle2 size={17} />}
             label="Completed"
             value={taskStats.completed}
-            className="bg-[#eaf5ed]"
-            iconClass="text-[#438d59]"
+            className="bg-[#ecf8ef]"
+            iconClass="text-[#2f8a4f]"
           />
 
           <DashboardStat
             icon={<Clock3 size={17} />}
             label="In Progress"
             value={taskStats.inProgress}
-            className="bg-[#f8f0e4]"
-            iconClass="text-[#be8944]"
+            className="bg-[#fff6e8]"
+            iconClass="text-[#b7791f]"
           />
 
           <DashboardStat
             icon={<FolderKanban size={17} />}
             label="My Visible Projects"
             value={visibleProjects.length}
-            className="bg-[#f3eafa]"
+            className="bg-[#f5eff9]"
             iconClass="text-[#895a9d]"
           />
 
@@ -1702,23 +1723,23 @@ export default function Dashboard() {
             ROW 4 — TASK SCHEDULE
         ================================================= */}
 
-        <section className="overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
+        <section className="overflow-hidden rounded-2xl border border-[#cfd7df] bg-white shadow-[0_2px_10px_rgba(24,39,54,0.05)]">
 
-          <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+          <div className="flex flex-col gap-4 border-b border-[#e5e9ed] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
 
             <div className="flex items-center gap-3">
 
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f5eff9] text-[#895a9d]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f5eff9] text-[#895a9d]">
                 <CalendarDays size={19} />
               </div>
 
               <div>
 
-                <h2 className="text-[20px] font-bold text-[#172633]">
+                <h2 className="text-[19px] font-extrabold text-[#172633]">
                   Task Schedule
                 </h2>
 
-                <p className="mt-1 text-[12px] text-[#8b96a3]">
+                <p className="mt-1 text-[13px] font-medium text-[#596775]">
                   Upcoming deadlines and scheduled tasks
                 </p>
 
@@ -1732,14 +1753,14 @@ export default function Dashboard() {
                 onClick={() =>
                   changeScheduleDate(-1)
                 }
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e1e6eb] bg-white text-[#697783] transition hover:bg-[#f5f7f9]"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d6dde4] bg-white text-[#53616d] transition hover:bg-[#f4f7fa]"
               >
                 <ChevronLeft size={16} />
               </button>
 
-              <div className="min-w-[150px] rounded-lg bg-[#f5f7f9] px-4 py-2.5 text-center">
+              <div className="min-w-[150px] rounded-lg border border-[#dfe5ea] bg-[#f7f9fb] px-4 py-2.5 text-center">
 
-                <span className="text-[11px] font-bold text-[#44515c]">
+                <span className="text-[12px] font-bold text-[#3d4b58]">
                   {formattedScheduleDate}
                 </span>
 
@@ -1749,7 +1770,7 @@ export default function Dashboard() {
                 onClick={() =>
                   changeScheduleDate(1)
                 }
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e1e6eb] bg-white text-[#697783] transition hover:bg-[#f5f7f9]"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d6dde4] bg-white text-[#53616d] transition hover:bg-[#f4f7fa]"
               >
                 <ChevronRight size={16} />
               </button>
@@ -1766,20 +1787,20 @@ export default function Dashboard() {
 
                 <div className="text-center">
 
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f5f7f9]">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-[#f3f5f7]">
 
                     <CalendarDays
                       size={25}
-                      className="text-[#b7c0c8]"
+                      className="text-[#8996a1]"
                     />
 
                   </div>
 
-                  <p className="mt-4 text-[13px] font-semibold text-[#697783]">
+                  <p className="mt-4 text-[14px] font-bold text-[#53616d]">
                     No scheduled tasks
                   </p>
 
-                  <p className="mt-1.5 text-[11px] text-[#a0a9b2]">
+                  <p className="mt-1.5 text-[12px] font-medium text-[#7b8791]">
                     {isMember
                       ? "Your tasks with due dates will appear here."
                       : "Tasks with due dates will appear here."}
@@ -1793,7 +1814,7 @@ export default function Dashboard() {
 
               <div className="relative py-5">
 
-                <div className="absolute bottom-0 left-[72px] top-0 w-px bg-[#e7ebef]" />
+                <div className="absolute bottom-0 left-[72px] top-0 w-px bg-[#e1e6eb]" />
 
                 {scheduleTasks.map(
                   (task, index) => (
@@ -1817,13 +1838,13 @@ export default function Dashboard() {
 
           </div>
 
-          <div className="border-t border-[#edf0f3] p-5 sm:p-6">
+          <div className="border-t border-[#e5e9ed] bg-[#fafbfd] p-5 sm:p-6">
 
             <button
               onClick={() =>
                 router.push("/Schedule")
               }
-              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#172b3a] py-3.5 text-[12px] font-bold text-white transition hover:bg-[#223d50]"
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#172b3a] py-3.5 text-[12px] font-bold text-white transition hover:bg-[#263f50]"
             >
               <CalendarDays size={15} />
               View Full Schedule
@@ -1899,7 +1920,7 @@ export default function Dashboard() {
 
           return (
             <div
-              className="fixed inset-0 z-[100] flex items-center justify-center bg-[#172b3a]/55 px-4 backdrop-blur-sm"
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-[#172b3a]/60 px-4 backdrop-blur-sm"
               onClick={() =>
                 setSelectedOverviewProject(
                   null
@@ -1908,17 +1929,19 @@ export default function Dashboard() {
             >
 
               <div
-                className="w-full max-w-[580px] overflow-hidden rounded-2xl bg-white shadow-2xl"
+                className="w-full max-w-[580px] overflow-hidden rounded-2xl border border-[#dce2e8] bg-white shadow-2xl"
                 onClick={(event) =>
                   event.stopPropagation()
                 }
               >
 
+                {/* MODAL HEADER */}
+
                 <div className="relative overflow-hidden bg-[#172b3a] px-6 py-6">
 
-                  <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#557bd2]/20" />
+                  <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#315da5]/25" />
 
-                  <div className="absolute -bottom-16 left-20 h-28 w-28 rounded-full bg-[#438d5d]/10" />
+                  <div className="absolute -bottom-16 left-20 h-28 w-28 rounded-full bg-[#2f8a4f]/10" />
 
                   <div className="relative flex items-start justify-between">
 
@@ -1930,11 +1953,11 @@ export default function Dashboard() {
 
                       <div className="min-w-0">
 
-                        <h2 className="truncate text-[20px] font-bold text-white">
+                        <h2 className="truncate text-[20px] font-extrabold text-white">
                           {project.name}
                         </h2>
 
-                        <p className="mt-1 text-[12px] text-white/60">
+                        <p className="mt-1 text-[12px] font-medium text-white/70">
                           Project Progress Details
                         </p>
 
@@ -1958,19 +1981,23 @@ export default function Dashboard() {
 
                 </div>
 
+                {/* MODAL BODY */}
+
                 <div className="max-h-[68vh] overflow-y-auto p-6">
 
-                  <div className="rounded-2xl border border-[#e8edf2] bg-[#fafbfd] p-6">
+                  {/* PROGRESS */}
+
+                  <div className="rounded-xl border border-[#dfe5ea] bg-[#fafbfd] p-6">
 
                     <div className="flex items-end justify-between">
 
                       <div>
 
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#687581]">
                           Task Completion
                         </p>
 
-                        <p className="mt-1 text-[32px] font-bold text-[#172633]">
+                        <p className="mt-1 text-[34px] font-extrabold text-[#172633]">
                           {progress}%
                         </p>
 
@@ -1978,11 +2005,11 @@ export default function Dashboard() {
 
                       <div className="text-right">
 
-                        <p className="text-[11px] text-[#98a2ac]">
+                        <p className="text-[11px] font-semibold text-[#687581]">
                           Completed
                         </p>
 
-                        <p className="text-[16px] font-bold text-[#438d5d]">
+                        <p className="text-[17px] font-extrabold text-[#2f8a4f]">
                           {completedTasks} /{" "}
                           {totalTasks}
                         </p>
@@ -1991,10 +2018,10 @@ export default function Dashboard() {
 
                     </div>
 
-                    <div className="mt-5 h-3 overflow-hidden rounded-full bg-[#e9edf1]">
+                    <div className="mt-5 h-3 overflow-hidden rounded-full bg-[#e5e9ed]">
 
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#557bd2] to-[#7c9bea] transition-all duration-500"
+                        className="h-full rounded-full bg-gradient-to-r from-[#315da5] to-[#6f91d8] transition-all duration-500"
                         style={{
                           width: `${progress}%`,
                         }}
@@ -2004,17 +2031,17 @@ export default function Dashboard() {
 
                   </div>
 
+                  {/* STATS */}
+
                   <div className="mt-5 grid grid-cols-3 gap-3">
 
                     <ModalStat
                       icon={
-                        <Circle
-                          size={14}
-                        />
+                        <Circle size={14} />
                       }
                       label="Total Tasks"
                       value={totalTasks}
-                      iconClass="text-[#557bd2]"
+                      iconClass="text-[#315da5]"
                     />
 
                     <ModalStat
@@ -2025,7 +2052,7 @@ export default function Dashboard() {
                       }
                       label="Completed"
                       value={completedTasks}
-                      iconClass="text-[#438d5d]"
+                      iconClass="text-[#2f8a4f]"
                     />
 
                     <ModalStat
@@ -2036,10 +2063,12 @@ export default function Dashboard() {
                       }
                       label="In Progress"
                       value={inProgressTasks}
-                      iconClass="text-[#be8944]"
+                      iconClass="text-[#b7791f]"
                     />
 
                   </div>
+
+                  {/* PROJECT INFORMATION */}
 
                   <div className="mt-5 grid grid-cols-2 gap-3">
 
@@ -2101,13 +2130,13 @@ export default function Dashboard() {
 
                   {(project.about_description ||
                     project.about_title) && (
-                    <div className="mt-5 rounded-xl border border-[#edf0f3] bg-[#fafbfd] p-5">
+                    <div className="mt-5 rounded-xl border border-[#e1e6eb] bg-[#fafbfd] p-5">
 
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                      <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#687581]">
                         Description
                       </p>
 
-                      <p className="mt-2 whitespace-pre-wrap text-[13px] leading-6 text-[#5f6b75]">
+                      <p className="mt-2 whitespace-pre-wrap text-[13px] font-medium leading-6 text-[#4d5b67]">
                         {project.about_description ||
                           project.about_title}
                       </p>
@@ -2117,7 +2146,9 @@ export default function Dashboard() {
 
                 </div>
 
-                <div className="border-t border-[#edf0f3] bg-[#fafbfd] p-5">
+                {/* MODAL FOOTER */}
+
+                <div className="border-t border-[#e5e9ed] bg-[#fafbfd] p-5">
 
                   <button
                     type="button"
@@ -2130,7 +2161,7 @@ export default function Dashboard() {
                         `/projects?projectId=${project.id}`
                       );
                     }}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#557bd2] py-3.5 text-[12px] font-bold text-white shadow-sm transition hover:bg-[#456bc2]"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#315da5] py-3.5 text-[12px] font-extrabold text-white transition hover:bg-[#244b8e]"
                   >
                     <Eye size={15} />
                     Open Project
@@ -2168,21 +2199,25 @@ function DashboardStat({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-white/70 p-5 ${className}`}
+      className={`rounded-xl border border-[#dce3e9] p-5 ${className}`}
     >
+
       <div className="flex items-center gap-2.5">
+
         <span className={iconClass}>
           {icon}
         </span>
 
-        <span className="text-[11px] font-bold uppercase tracking-wide text-[#697783]">
+        <span className="text-[11px] font-extrabold uppercase tracking-wide text-[#53616d]">
           {label}
         </span>
+
       </div>
 
-      <p className="mt-3 text-[28px] font-bold text-[#172633]">
+      <p className="mt-3 text-[28px] font-extrabold text-[#172633]">
         {value}
       </p>
+
     </div>
   );
 }
@@ -2203,7 +2238,7 @@ function ModalStat({
   iconClass: string;
 }) {
   return (
-    <div className="rounded-xl border border-[#edf0f3] bg-[#fafbfd] p-4">
+    <div className="rounded-xl border border-[#e1e6eb] bg-[#fafbfd] p-4">
 
       <div className="flex items-center gap-2">
 
@@ -2211,13 +2246,15 @@ function ModalStat({
           {icon}
         </span>
 
-        <span className="text-[10px] font-semibold text-[#7b8794]">
+        <span className="text-[10px] font-bold text-[#687581]">
           {label}
         </span>
 
       </div>
 
-      <p className={`mt-2 text-[24px] font-bold ${iconClass}`}>
+      <p
+        className={`mt-2 text-[24px] font-extrabold ${iconClass}`}
+      >
         {value}
       </p>
 
@@ -2260,37 +2297,37 @@ function ProjectCard({
 
   return (
     <>
-      <div className="group overflow-hidden rounded-2xl border border-[#dfe5ea] bg-white shadow-[0_4px_18px_rgba(24,39,54,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(24,39,54,0.12)]">
+      <div className="group overflow-hidden rounded-2xl border border-[#cfd7df] bg-white shadow-[0_2px_10px_rgba(24,39,54,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(24,39,54,0.10)]">
+
+        {/* CARD HEADER */}
 
         <div className="relative overflow-hidden bg-[#172b3a] px-6 pb-6 pt-6">
 
-          <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-[#557bd2]/20" />
+          <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-[#315da5]/20" />
 
-          <div className="absolute -bottom-16 right-20 h-32 w-32 rounded-full bg-[#438d5d]/10" />
-
-          <div className="absolute right-5 top-10 h-12 w-12 rotate-12 rounded-xl border border-white/10 bg-white/5" />
+          <div className="absolute -bottom-16 right-20 h-32 w-32 rounded-full bg-[#2f8a4f]/10" />
 
           <div className="relative flex items-start justify-between">
 
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-white backdrop-blur-sm">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-white">
               <FolderKanban size={19} />
             </div>
 
             <span
-              className={`rounded-full px-3 py-1.5 text-[10px] font-bold ${statusClass}`}
+              className={`rounded-lg px-3 py-1.5 text-[10px] font-extrabold ${statusClass}`}
             >
               {status}
             </span>
 
           </div>
 
-          <div className="relative mt-8">
+          <div className="relative mt-7">
 
-            <h3 className="truncate text-[19px] font-bold text-white">
+            <h3 className="truncate text-[19px] font-extrabold text-white">
               {project.name}
             </h3>
 
-            <p className="mt-2 line-clamp-2 min-h-[40px] text-[12px] leading-5 text-white/65">
+            <p className="mt-2 line-clamp-2 min-h-[40px] text-[12px] font-medium leading-5 text-white/70">
               {description}
             </p>
 
@@ -2298,26 +2335,28 @@ function ProjectCard({
 
         </div>
 
+        {/* CARD BODY */}
+
         <div className="p-6">
 
           <div className="grid grid-cols-2 gap-3">
 
-            <div className="rounded-xl bg-[#f7f9fb] p-4">
+            <div className="rounded-xl border border-[#e5e9ed] bg-[#f8fafc] p-4">
 
               <div className="flex items-center gap-2">
 
                 <CalendarDays
                   size={13}
-                  className="text-[#557bd2]"
+                  className="text-[#315da5]"
                 />
 
-                <p className="text-[10px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#687581]">
                   Deadline
                 </p>
 
               </div>
 
-              <p className="mt-2 text-[12px] font-bold text-[#44515c]">
+              <p className="mt-2 text-[12px] font-extrabold text-[#3d4c59]">
                 {project.deadline
                   ? formatDate(
                       project.deadline
@@ -2327,7 +2366,7 @@ function ProjectCard({
 
             </div>
 
-            <div className="rounded-xl bg-[#f7f9fb] p-4">
+            <div className="rounded-xl border border-[#e5e9ed] bg-[#f8fafc] p-4">
 
               <div className="flex items-center gap-2">
 
@@ -2336,13 +2375,13 @@ function ProjectCard({
                   className="text-[#895a9d]"
                 />
 
-                <p className="text-[10px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#687581]">
                   Domain
                 </p>
 
               </div>
 
-              <p className="mt-2 truncate text-[12px] font-bold text-[#44515c]">
+              <p className="mt-2 truncate text-[12px] font-extrabold text-[#3d4c59]">
                 {project.domain ||
                   "General"}
               </p>
@@ -2351,24 +2390,26 @@ function ProjectCard({
 
           </div>
 
+          {/* PROGRESS */}
+
           <div className="mt-6">
 
             <div className="mb-2.5 flex items-center justify-between">
 
-              <p className="text-[10px] font-bold uppercase tracking-wide text-[#98a2ac]">
+              <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#687581]">
                 Project Progress
               </p>
 
-              <span className="text-[14px] font-bold text-[#172b3a]">
+              <span className="text-[14px] font-extrabold text-[#172b3a]">
                 {progress}%
               </span>
 
             </div>
 
-            <div className="h-2.5 overflow-hidden rounded-full bg-[#e9edf1]">
+            <div className="h-2.5 overflow-hidden rounded-full bg-[#e5e9ed]">
 
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#557bd2] via-[#6689dd] to-[#8ca7ec] transition-all duration-500"
+                className="h-full rounded-full bg-gradient-to-r from-[#315da5] to-[#7694d5] transition-all duration-500"
                 style={{
                   width: `${progress}%`,
                 }}
@@ -2378,11 +2419,13 @@ function ProjectCard({
 
           </div>
 
-          <div className="mt-6 flex items-center justify-between border-t border-[#edf0f3] pt-5">
+          {/* MANAGER */}
+
+          <div className="mt-6 flex items-center justify-between border-t border-[#e5e9ed] pt-5">
 
             <div className="flex min-w-0 items-center gap-3">
 
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#557bd2] to-[#314f9c] text-[10px] font-bold text-white">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#315da5] to-[#244b8e] text-[10px] font-extrabold text-white">
 
                 {getInitials(
                   project.manager_name ||
@@ -2393,11 +2436,11 @@ function ProjectCard({
 
               <div className="min-w-0">
 
-                <p className="text-[9px] font-bold uppercase tracking-wide text-[#a0a9b2]">
+                <p className="text-[9px] font-extrabold uppercase tracking-wide text-[#8996a1]">
                   Project Manager
                 </p>
 
-                <p className="truncate text-[11px] font-bold text-[#44515c]">
+                <p className="truncate text-[11px] font-extrabold text-[#3d4c59]">
                   {project.manager_name ||
                     "Not assigned"}
                 </p>
@@ -2406,18 +2449,20 @@ function ProjectCard({
 
             </div>
 
-            <span className="rounded-lg bg-[#f0f4ff] px-2.5 py-1.5 text-[10px] font-bold text-[#557bd2]">
+            <span className="rounded-lg bg-[#edf3ff] px-2.5 py-1.5 text-[10px] font-extrabold text-[#315da5]">
               {project.priority ||
                 "Normal"}
             </span>
 
           </div>
 
+          {/* BUTTONS */}
+
           <div className="mt-6 grid grid-cols-2 gap-2.5">
 
             <button
               onClick={onView}
-              className="flex items-center justify-center gap-2 rounded-xl bg-[#557bd2] py-3.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#456bc2] active:scale-[0.98]"
+              className="flex items-center justify-center gap-2 rounded-xl bg-[#315da5] py-3.5 text-[11px] font-extrabold text-white transition hover:bg-[#244b8e] active:scale-[0.98]"
             >
               <Eye size={14} />
               View Project
@@ -2427,7 +2472,7 @@ function ProjectCard({
               onClick={() =>
                 setDetailsOpen(true)
               }
-              className="flex items-center justify-center gap-2 rounded-xl bg-[#172b3a] py-3.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#223d50] active:scale-[0.98]"
+              className="flex items-center justify-center gap-2 rounded-xl bg-[#172b3a] py-3.5 text-[11px] font-extrabold text-white transition hover:bg-[#263f50] active:scale-[0.98]"
             >
               <Eye size={14} />
               Details
@@ -2439,16 +2484,18 @@ function ProjectCard({
 
       </div>
 
+      {/* PROJECT DETAILS MODAL */}
+
       {detailsOpen && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#172b3a]/55 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#172b3a]/60 px-4 backdrop-blur-sm"
           onClick={() =>
             setDetailsOpen(false)
           }
         >
 
           <div
-            className="w-full max-w-[580px] overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="w-full max-w-[580px] overflow-hidden rounded-2xl border border-[#dce2e8] bg-white shadow-2xl"
             onClick={(event) =>
               event.stopPropagation()
             }
@@ -2456,7 +2503,7 @@ function ProjectCard({
 
             <div className="relative overflow-hidden bg-[#172b3a] px-6 py-6">
 
-              <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#557bd2]/20" />
+              <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#315da5]/25" />
 
               <div className="relative flex items-center justify-between">
 
@@ -2468,11 +2515,11 @@ function ProjectCard({
 
                   <div className="min-w-0">
 
-                    <h2 className="truncate text-[20px] font-bold text-white">
+                    <h2 className="truncate text-[20px] font-extrabold text-white">
                       {project.name}
                     </h2>
 
-                    <p className="mt-1 text-[12px] text-white/60">
+                    <p className="mt-1 text-[12px] font-medium text-white/70">
                       Project Details
                     </p>
 
@@ -2509,13 +2556,13 @@ function ProjectCard({
 
               </div>
 
-              <div className="mt-5 rounded-xl border border-[#edf0f3] bg-[#fafbfd] p-5">
+              <div className="mt-5 rounded-xl border border-[#e1e6eb] bg-[#fafbfd] p-5">
 
-                <p className="text-[11px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#687581]">
                   Description
                 </p>
 
-                <p className="mt-2 whitespace-pre-wrap text-[13px] leading-6 text-[#5f6b75]">
+                <p className="mt-2 whitespace-pre-wrap text-[13px] font-medium leading-6 text-[#4d5b67]">
                   {description}
                 </p>
 
@@ -2580,18 +2627,18 @@ function ProjectCard({
               </div>
 
               {project.creator_name && (
-                <div className="mt-4 rounded-xl border border-[#edf0f3] bg-[#fafbfd] p-4">
+                <div className="mt-4 rounded-xl border border-[#e1e6eb] bg-[#fafbfd] p-4">
 
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                  <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#687581]">
                     Created By
                   </p>
 
-                  <p className="mt-1.5 text-[13px] font-bold text-[#44515c]">
+                  <p className="mt-1.5 text-[13px] font-extrabold text-[#3d4c59]">
                     {project.creator_name}
                   </p>
 
                   {project.creator_role && (
-                    <p className="mt-1 text-[11px] text-[#9aa4ae]">
+                    <p className="mt-1 text-[11px] font-medium text-[#7b8791]">
                       {project.creator_role}
                     </p>
                   )}
@@ -2601,11 +2648,11 @@ function ProjectCard({
 
             </div>
 
-            <div className="border-t border-[#edf0f3] bg-[#fafbfd] p-5">
+            <div className="border-t border-[#e5e9ed] bg-[#fafbfd] p-5">
 
               <button
                 onClick={onView}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#557bd2] py-3.5 text-[12px] font-bold text-white transition hover:bg-[#456bc2]"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#315da5] py-3.5 text-[12px] font-extrabold text-white transition hover:bg-[#244b8e]"
               >
                 <Eye size={15} />
                 Open Project
@@ -2633,13 +2680,13 @@ function ProjectDetailItem({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+    <div className="rounded-xl border border-[#e1e6eb] bg-[#f8fafc] p-4">
 
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+      <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#687581]">
         {label}
       </p>
 
-      <p className="mt-1.5 truncate text-[12px] font-bold text-gray-700">
+      <p className="mt-1.5 truncate text-[12px] font-extrabold text-[#3d4c59]">
         {value}
       </p>
 
@@ -2669,13 +2716,13 @@ function TeamItemNew({
           className={`h-2.5 w-2.5 rounded-full ${color}`}
         />
 
-        <span className="text-[11px] font-medium text-[#697783]">
+        <span className="text-[12px] font-semibold text-[#53616d]">
           {label}
         </span>
 
       </div>
 
-      <span className="text-[12px] font-bold text-[#34424d]">
+      <span className="text-[13px] font-extrabold text-[#34424d]">
         {value}
       </span>
 
@@ -2731,30 +2778,30 @@ function ScheduleItem({
     task.status || "Pending";
 
   return (
-    <div className="relative flex min-h-[58px] items-center">
+    <div className="relative flex min-h-[60px] items-center">
 
-      <div className="w-[56px] shrink-0 text-[11px] font-medium text-gray-400">
+      <div className="w-[56px] shrink-0 text-[11px] font-bold text-[#687581]">
         {time}
       </div>
 
-      <div className="relative z-10 mx-[7px] flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full border border-white bg-gray-300 shadow-sm" />
+      <div className="relative z-10 mx-[7px] flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full border border-white bg-[#aeb8c1] shadow-sm" />
 
       <div className="ml-3 flex min-w-0 flex-1 items-center justify-between gap-3">
 
         <div className="flex min-w-0 items-center gap-3">
 
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-300 to-gray-600 text-[9px] font-bold text-white">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#9aa5ae] to-[#596570] text-[9px] font-extrabold text-white">
             {initials}
           </div>
 
           <div className="min-w-0">
 
-            <span className="block truncate text-[12px] font-semibold text-[#34424d]">
+            <span className="block truncate text-[12px] font-bold text-[#34424d]">
               {taskName}
             </span>
 
             {project && (
-              <span className="mt-0.5 block truncate text-[10px] text-gray-400">
+              <span className="mt-0.5 block truncate text-[10px] font-medium text-[#7b8791]">
                 {project.name}
               </span>
             )}
@@ -2790,18 +2837,18 @@ function TaskBadge({
     normalized.includes("review")
   ) {
     className =
-      "bg-[#f8f0e4] text-[#ad8144]";
+      "bg-[#fff6e8] text-[#a66d21]";
   } else if (
     normalized.includes("progress")
   ) {
     className =
-      "bg-[#edf2ff] text-[#5577c2]";
+      "bg-[#edf3ff] text-[#315da5]";
   } else if (
     normalized.includes("done") ||
     normalized.includes("complete")
   ) {
     className =
-      "bg-[#eaf5ed] text-[#438759]";
+      "bg-[#ecf8ef] text-[#2f8a4f]";
   } else if (
     normalized.includes("todo") ||
     normalized.includes("to do") ||
@@ -2814,7 +2861,7 @@ function TaskBadge({
 
   return (
     <span
-      className={`shrink-0 rounded-full px-2.5 py-1.5 text-[10px] font-semibold ${className}`}
+      className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold ${className}`}
     >
       {type}
     </span>
@@ -2833,18 +2880,20 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-6 py-12 text-center">
+    <div className="w-full rounded-xl border border-dashed border-[#cfd7df] bg-[#f8fafc] px-6 py-12 text-center">
 
-      <Users
-        size={28}
-        className="mx-auto text-gray-300"
-      />
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white">
+        <Users
+          size={25}
+          className="text-[#9aa6b1]"
+        />
+      </div>
 
-      <p className="mt-3 text-[14px] font-bold text-gray-600">
+      <p className="mt-4 text-[14px] font-extrabold text-[#53616d]">
         {title}
       </p>
 
-      <p className="mt-1.5 text-[12px] text-gray-400">
+      <p className="mt-1.5 text-[12px] font-medium text-[#7b8791]">
         {description}
       </p>
 
@@ -2887,20 +2936,20 @@ function getProjectStatusClass(
       "progress"
     )
   ) {
-    return "bg-[#edf2ff] text-[#5577c2]";
+    return "bg-[#edf3ff] text-[#315da5]";
   }
 
   if (
     normalized.includes("done") ||
     normalized.includes("complete")
   ) {
-    return "bg-[#eaf5ed] text-[#438759]";
+    return "bg-[#ecf8ef] text-[#2f8a4f]";
   }
 
   if (
     normalized.includes("pause")
   ) {
-    return "bg-[#f8f0e4] text-[#ad8144]";
+    return "bg-[#fff6e8] text-[#a66d21]";
   }
 
   if (
@@ -2911,7 +2960,7 @@ function getProjectStatusClass(
     return "bg-[#f3eafa] text-[#85579a]";
   }
 
-  return "bg-gray-100 text-gray-600";
+  return "bg-[#f1f4f7] text-[#53616d]";
 }
 
 /* =========================================================
