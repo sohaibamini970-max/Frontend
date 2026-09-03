@@ -2131,64 +2131,59 @@ export default function Projects() {
                                       {/* MANAGEMENT OPTIONS */}
 
                                       {canManageProjects && (
-                                        <>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              openEditProject(
-                                                project
-                                              )
-                                            }
-                                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                          >
-                                            <Edit3
-                                              size={
-                                                16
-                                              }
-                                              className="text-gray-500"
-                                            />
-                                            Update Project
-                                          </button>
+  <>
+    <button
+      type="button"
+      onClick={() =>
+        openEditProject(project)
+      }
+      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+    >
+      <Edit3
+        size={16}
+        className="text-gray-500"
+      />
+      Update Project
+    </button>
 
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              openDeadlineModal(
-                                                project
-                                              )
-                                            }
-                                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                          >
-                                            <Calendar
-                                              size={
-                                                16
-                                              }
-                                              className="text-gray-500"
-                                            />
-                                            Update Deadline
-                                          </button>
+    <button
+      type="button"
+      onClick={() =>
+        openDeadlineModal(project)
+      }
+      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+    >
+      <Calendar
+        size={16}
+        className="text-gray-500"
+      />
+      Update Deadline
+    </button>
+  </>
+)}
 
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              openStatusModal(
-                                                project
-                                              )
-                                            }
-                                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                          >
-                                            <CheckCircle2
-                                              size={
-                                                16
-                                              }
-                                              className="text-gray-500"
-                                            />
-                                            Change Status
-                                          </button>
+{/* PROJECT MANAGER STATUS OPTION */}
 
-                                          <div className="my-1 border-t border-gray-100" />
-                                        </>
-                                      )}
+{isProjectManager && (
+  <>
+    <button
+      type="button"
+      onClick={() => {
+        openStatusModal(project);
+        setOpenProjectMenu(null);
+      }}
+      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+    >
+      <CheckCircle2
+        size={16}
+        className="text-gray-500"
+      />
+      Change Status
+    </button>
+
+    <div className="my-1 border-t border-gray-100" />
+  </>
+)}
 
                                       {/* EVERY ROLE CAN VIEW */}
 
