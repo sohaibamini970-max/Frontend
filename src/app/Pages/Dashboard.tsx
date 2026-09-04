@@ -1186,7 +1186,7 @@ export default function Dashboard() {
         {/* =====================================================
             PROJECT BARS
         ===================================================== */}
-        <div className="relative grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+        <div className="relative grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
 
           {projectOverview.map(
             (
@@ -1260,8 +1260,12 @@ export default function Dashboard() {
                   ================================================= */}
                   <div className="mt-3 min-h-[40px] w-full text-center">
 
+                    <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8a98a8]">
+                            Project {index + 1}
+                    </p>
+
                     <p className="line-clamp-2 text-[11px] font-bold uppercase leading-5 text-[#172633] transition group-hover:text-[#557bd2]">
-                      {project.name}
+                            {project.name}
                     </p>
 
                   </div>
