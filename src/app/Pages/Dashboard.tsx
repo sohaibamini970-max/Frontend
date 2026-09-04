@@ -1186,7 +1186,7 @@ export default function Dashboard() {
         {/* =====================================================
             PROJECT BARS
         ===================================================== */}
-        <div className="relative flex flex-wrap justify-center gap-x-6 gap-y-8">
+        <div className="relative flex flex-wrap justify-start gap-x-8 gap-y-8">
 
           {projectOverview.map(
             (
@@ -1264,7 +1264,7 @@ export default function Dashboard() {
                             Project {index + 1}
                     </p>
 
-                    <p className="line-clamp-2 text-[13px] font-bold uppercase leading-5 text-[#172633] transition group-hover:text-[#557bd2]">
+                    <p className="line-clamp-2 text-[12px] font-bold uppercase leading-5 text-[#172633] transition group-hover:text-[#557bd2]">
                             {project.name}
                     </p>
 
