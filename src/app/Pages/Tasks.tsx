@@ -20,8 +20,6 @@ import {
   Download,
   File,
   FileText,
-  Eye,
-  CheckCircle2,
 } from "lucide-react";
 
 type ProjectStatus =
@@ -54,7 +52,6 @@ type Project = {
   start_date?: string;
   deadline?: string;
   priority?: ProjectPriority;
-  project_manager_id?: string;
 };
 
 type Task = {
@@ -194,13 +191,6 @@ function normalizeProject(project: any): Project {
       project.dueDate ||
       "",
     priority: project.priority || "Medium",
-    project_manager_id: String(
-      project.project_manager_id ??
-      project.projectManagerId ??
-      project.manager_id ??
-      project.managerId ??
-      ""
-    ),
   };
 }
 
@@ -426,7 +416,6 @@ useEffect(() => {
   );
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedTaskDetails, setSelectedTaskDetails] = useState<Task | null>(null);
 
   const [selectedProjectId, setSelectedProjectId] = useState<
     string | null
@@ -481,13 +470,22 @@ const [loadingAttachments, setLoadingAttachments] = useState(false);
 const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
 const [previewLoading, setPreviewLoading] = useState(false);
 
+  const isSystemAdministrator =
+    currentUser?.role === "System Administrator";
+
+  const isExecutiveManager =
+    currentUser?.role === "Executive Manager";
+
+  const isProjectManager =
+    currentUser?.role === "Project Manager";
+
   const isManagementRole =
-  currentUser?.role === "System Administrator" ||
-  currentUser?.role === "Executive Manager" ||
-  currentUser?.role === "Project Manager";
+    isSystemAdministrator ||
+    isExecutiveManager ||
+    isProjectManager;
 
   const isMember =
-  currentUser?.role === "Member";
+    currentUser?.role === "Member";
 
   const canWriteChallenge = (task: Task) => {
   return (
@@ -497,25 +495,26 @@ const [previewLoading, setPreviewLoading] = useState(false);
   );
 };
 
-const canReadChallenge = (task: Task) => {
-  return (
-    isManagementRole ||
-    (
-      isMember &&
-      String(task.assignee_id || "") ===
-        String(currentUser?.id || "")
-    )
-  );
+const canReadChallenge = (_task: Task) => {
+  // Anyone who can access the task can read its challenges.
+  // Only the assigned Member can create a new challenge.
+  return Boolean(currentUser?.id);
 };
 
 // ====================================
 // FILE ATTACHMENT HELPERS
 // ====================================
-const canReadAttachments = (task: Task): boolean => {
-  return (
-    isManagementRole ||
-    (String(task.assignee_id || "") === String(currentUser?.id || ""))
-  );
+const canReadAttachments = (_task: Task): boolean => {
+  // Task files are readable by every authenticated role that can see the task.
+  return Boolean(currentUser?.id);
+};
+
+const canUploadAttachments = (_task: Task): boolean => {
+  return isProjectManager;
+};
+
+const canManageAttachments = (_task: Task): boolean => {
+  return isSystemAdministrator || isExecutiveManager || isProjectManager;
 };
 
 const getFileIcon = (fileType: string) => {
@@ -540,242 +539,313 @@ const getFileIcon = (fileType: string) => {
   const fetchProjectsAndTasks = async () => {
     try {
       setLoading(true);
-      setError("");
 
-      const user = getCurrentUser();
+      const currentUser = getCurrentUser();
 
-      if (!user?.id) {
+      if (!currentUser?.id) {
         throw new Error("User information not found. Please login again.");
       }
 
-      const role = user.role || "";
-      const canSeeEverything =
-        role === "System Administrator" || role === "Executive Manager";
-      const isProjectManager = role === "Project Manager";
-      const isMemberRole = role === "Member";
+      const userRole = currentUser.role;
+
+      const managementRoles = [
+        "System Administrator",
+        "Executive Manager",
+        "Project Manager",
+      ];
+
+      const isManagementUser = managementRoles.includes(userRole);
 
       /*
-       * SYSTEM ADMINISTRATOR / EXECUTIVE MANAGER
-       * ---------------------------------------
-       * These roles can see every project and every task.
+       * ============================================================
+       * MANAGEMENT
+       * ============================================================
+       *
+       * Admin / Executive Manager / Project Manager:
+       * See all projects and all tasks.
        */
-      if (canSeeEverything) {
-        const projectResponse = await fetch(`${API_BASE}/projects`, {
-          headers: authHeaders(),
-        });
+      if (isManagementUser) {
+        const projectResponse = await fetch(
+          `${API_BASE}/projects`,
+          {
+            headers: authHeaders(),
+          }
+        );
 
         if (!projectResponse.ok) {
           throw new Error("Failed to fetch projects");
         }
 
         const projectData = await projectResponse.json();
+
         const rawProjects =
           projectData.projects ||
           projectData.data ||
-          (Array.isArray(projectData) ? projectData : []);
+          (Array.isArray(projectData)
+            ? projectData
+            : []);
 
-        const visibleProjects = rawProjects.map(normalizeProject);
-        setProjects(visibleProjects);
+        const normalizedProjects =
+          rawProjects.map(normalizeProject);
+
+        setProjects(normalizedProjects);
 
         const taskResponses = await Promise.all(
-          visibleProjects.map(async (project: Project) => {
+          normalizedProjects.map(async (project: Project) => {
             try {
               const response = await fetch(
                 `${API_BASE}/tasks/project/${project.id}`,
-                { headers: authHeaders() }
+                {
+                  headers: authHeaders(),
+                }
               );
 
-              if (!response.ok) return [];
+              if (!response.ok) {
+                return [];
+              }
 
               const data = await response.json();
+
               const rawTasks =
                 data.tasks ||
                 data.data ||
-                (Array.isArray(data) ? data : []);
+                (Array.isArray(data)
+                  ? data
+                  : []);
 
               return rawTasks.map((task: any) =>
                 normalizeTask({
                   ...task,
                   project_id:
-                    task.project_id || task.projectId || project.id,
+                    task.project_id ||
+                    task.projectId ||
+                    project.id,
                 })
               );
-            } catch (taskError) {
-              console.error(`Failed to load tasks for project ${project.id}`, taskError);
+            } catch (error) {
+              console.error(
+                `Failed to load tasks for project ${project.id}`,
+                error
+              );
+
               return [];
             }
           })
         );
 
         const allTasks = taskResponses.flat();
+
         setTasks(allTasks);
-        setExpandedProjects(
-          visibleProjects
+
+        const projectsWithTasks =
+          normalizedProjects
             .filter((project: Project) =>
               allTasks.some(
-                (task) => String(task.project_id) === String(project.id)
+                (task) =>
+                  String(task.project_id) ===
+                  String(project.id)
               )
             )
-            .map((project: Project) => project.id)
-        );
+            .map((project: Project) => project.id);
+
+        setExpandedProjects(projectsWithTasks);
+
         return;
       }
 
       /*
-       * PROJECT MANAGER
-       * ---------------
-       * A Project Manager only sees projects assigned to them.
-       * A project is considered assigned when the current user is the
-       * project manager OR appears in the project's members list.
-       * All tasks belonging to those assigned projects are then shown.
-       */
-      if (isProjectManager) {
-        const projectResponse = await fetch(`${API_BASE}/projects`, {
-          headers: authHeaders(),
-        });
-
-        if (!projectResponse.ok) {
-          throw new Error("Failed to fetch assigned projects");
-        }
-
-        const projectData = await projectResponse.json();
-        const rawProjects =
-          projectData.projects ||
-          projectData.data ||
-          (Array.isArray(projectData) ? projectData : []);
-
-        const allProjects = rawProjects.map(normalizeProject);
-        const myUserId = String(user.id);
-
-        const assignedProjects = allProjects.filter((project: Project) => {
-          const isManager =
-            String(project.project_manager_id || "") === myUserId;
-          const isMember = (project.members || []).some(
-            (member) => String(member.user_id) === myUserId
-          );
-          return isManager || isMember;
-        });
-
-        const taskResponses = await Promise.all(
-          assignedProjects.map(async (project: Project) => {
-            try {
-              const response = await fetch(
-                `${API_BASE}/tasks/project/${project.id}`,
-                { headers: authHeaders() }
-              );
-
-              if (!response.ok) return [];
-
-              const data = await response.json();
-              const rawTasks =
-                data.tasks ||
-                data.data ||
-                (Array.isArray(data) ? data : []);
-
-              return rawTasks.map((task: any) =>
-                normalizeTask({
-                  ...task,
-                  project_id:
-                    task.project_id || task.projectId || project.id,
-                })
-              );
-            } catch (taskError) {
-              console.error(`Failed to load tasks for project ${project.id}`, taskError);
-              return [];
-            }
-          })
-        );
-
-        const managerTasks = taskResponses.flat();
-        setProjects(assignedProjects);
-        setTasks(managerTasks);
-        setExpandedProjects(assignedProjects.map((project: Project) => project.id));
-        return;
-      }
-
-      /*
+       * ============================================================
        * MEMBER
-       * ------
-       * Members only see tasks assigned to their own account and the
-       * projects those tasks belong to. This also protects the UI if the
-       * backend accidentally returns another member's task.
+       * ============================================================
+       *
+       * Member should NEVER load all projects.
+       *
+       * Only:
+       *
+       *     logged-in member
+       *             ↓
+       *       assigned tasks
+       *             ↓
+       *       related projects
+       *
+       * Example:
+       *
+       * Member Ahmed
+       *   ├── Project A
+       *   │     ├── Task 1
+       *   │     └── Task 2
+       *   └── Project B
+       *         └── Task 3
+       *
+       * Tasks assigned to other users are removed.
        */
-      if (isMemberRole) {
-        const myTasksResponse = await fetch(`${API_BASE}/tasks/my/tasks`, {
+      const myTasksResponse = await fetch(
+        `${API_BASE}/tasks/my/tasks`,
+        {
           headers: authHeaders(),
-        });
-
-        if (!myTasksResponse.ok) {
-          const errorData = await myTasksResponse.json().catch(() => ({}));
-          throw new Error(
-            errorData.message ||
-              errorData.error ||
-              "Failed to fetch your tasks"
-          );
         }
+      );
 
-        const myTasksData = await myTasksResponse.json();
-        const rawMyTasks =
-          myTasksData.tasks ||
-          myTasksData.data ||
-          (Array.isArray(myTasksData) ? myTasksData : []);
+      if (!myTasksResponse.ok) {
+        const errorData =
+          await myTasksResponse
+            .json()
+            .catch(() => ({}));
 
-        const myUserId = String(user.id);
-        const onlyMyTasks = rawMyTasks
-          .map((task: any) => normalizeTask(task))
+        throw new Error(
+          errorData.message ||
+          errorData.error ||
+          "Failed to fetch your tasks"
+        );
+      }
+
+      const myTasksData =
+        await myTasksResponse.json();
+
+      const rawMyTasks =
+        myTasksData.tasks ||
+        myTasksData.data ||
+        (Array.isArray(myTasksData)
+          ? myTasksData
+          : []);
+
+      /*
+       * Normalize tasks first.
+       */
+      const normalizedMyTasks: Task[] =
+        rawMyTasks
+          .map((task: any) =>
+            normalizeTask(task)
+          )
           .filter(
             (task: Task) =>
               task.id &&
-              task.project_id &&
-              String(task.assignee_id || "") === myUserId
+              task.project_id
           );
 
-        const projectIds = [
-          ...new Set(onlyMyTasks.map((task: Task) => String(task.project_id))),
-        ];
+      /*
+       * IMPORTANT:
+       *
+       * Even if backend accidentally returns extra tasks,
+       * filter them here using the logged-in user's ID.
+       */
+      const myUserId = String(currentUser.id);
 
-        if (projectIds.length === 0) {
-          setTasks([]);
-          setProjects([]);
-          setExpandedProjects([]);
-          return;
-        }
-
-        const projectResponse = await fetch(`${API_BASE}/projects`, {
-          headers: authHeaders(),
+      const onlyMyTasks =
+        normalizedMyTasks.filter((task) => {
+          return (
+            String(task.assignee_id || "") ===
+            myUserId
+          );
         });
 
-        if (!projectResponse.ok) {
-          throw new Error("Failed to fetch assigned projects");
-        }
+      console.log(
+        "Logged-in member:",
+        currentUser
+      );
 
-        const projectData = await projectResponse.json();
-        const rawProjects =
-          projectData.projects ||
-          projectData.data ||
-          (Array.isArray(projectData) ? projectData : []);
+      console.log(
+        "Tasks returned by backend:",
+        normalizedMyTasks
+      );
 
-        const myProjects = rawProjects
-          .map(normalizeProject)
-          .filter((project: Project) => projectIds.includes(String(project.id)));
+      console.log(
+        "Tasks assigned to current member:",
+        onlyMyTasks
+      );
 
-        setTasks(onlyMyTasks);
-        setProjects(myProjects);
-        setExpandedProjects(myProjects.map((project: Project) => project.id));
+      setTasks(onlyMyTasks);
+
+      /*
+       * ============================================================
+       * GET ONLY PROJECTS BELONGING TO MEMBER'S TASKS
+       * ============================================================
+       */
+
+      const projectIds = [
+        ...new Set(
+          onlyMyTasks.map((task) =>
+            String(task.project_id)
+          )
+        ),
+      ];
+
+      if (projectIds.length === 0) {
+        setProjects([]);
+        setExpandedProjects([]);
         return;
       }
 
-      // Unknown roles get no task data rather than accidentally seeing all data.
-      setProjects([]);
-      setTasks([]);
-      setExpandedProjects([]);
+      /*
+       * Get projects visible to the member.
+       *
+       * We can use /projects because we only keep projects
+       * whose IDs occur in the member's assigned tasks.
+       */
+      const projectResponse = await fetch(
+        `${API_BASE}/projects`,
+        {
+          headers: authHeaders(),
+        }
+      );
+
+      if (!projectResponse.ok) {
+        throw new Error(
+          "Failed to fetch projects"
+        );
+      }
+
+      const projectData =
+        await projectResponse.json();
+
+      const rawProjects =
+        projectData.projects ||
+        projectData.data ||
+        (Array.isArray(projectData)
+          ? projectData
+          : []);
+
+      const allProjects =
+        rawProjects.map(normalizeProject);
+
+      /*
+       * Keep ONLY projects for which the member
+       * has at least one assigned task.
+       */
+      const myProjects =
+        allProjects.filter((project: Project, projectIndex: number) =>
+          projectIds.includes(
+            String(project.id)
+          )
+        );
+
+      setProjects(myProjects);
+
+      /*
+       * Automatically expand projects that contain
+       * the member's tasks.
+       */
+      setExpandedProjects(
+        myProjects.map(
+          (project:Project) => project.id
+        )
+      );
     } catch (error) {
-      console.error("Loading projects/tasks error:", error);
-      setError(error instanceof Error ? error.message : "Failed to load tasks");
+      console.error(
+        "Loading projects/tasks error:",
+        error
+      );
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load tasks"
+      );
     } finally {
       setLoading(false);
     }
   };
+
 
   const fetchUsers = async () => {
     try {
@@ -1022,15 +1092,64 @@ const handlePreviewAttachment = async (attachment: Attachment) => {
   };
 
   const openAttachmentModal = async (task: Task) => {
+    if (!canReadAttachments(task)) {
+      alert("You are not authorized to view files for this task.");
+      return;
+    }
+
     setSelectedTaskForAttachment(task);
+    setSelectedFile(null);
     setAttachmentModalOpen(true);
+    setOpenTaskMenu(null);
     await fetchTaskAttachments(task.id);
+  };
+
+  const handleAttachmentFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file || !selectedTaskForAttachment) return;
+
+    if (!canUploadAttachments(selectedTaskForAttachment)) {
+      alert("Only Project Managers can add task files.");
+      return;
+    }
+
+    try {
+      setSelectedFile(file);
+      await handleUploadAttachment(selectedTaskForAttachment.id, file);
+      await fetchTaskAttachments(selectedTaskForAttachment.id);
+      setSelectedFile(null);
+      alert("File uploaded successfully.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to upload file");
+    }
   };
 
   const closeAttachmentModal = () => {
     setAttachmentModalOpen(false);
     setSelectedTaskForAttachment(null);
     setSelectedFile(null);
+  };
+
+  const openTaskDetails = (task: Task) => {
+    setSelectedTaskForDetails(task);
+    setDetailsModalOpen(true);
+    setOpenTaskMenu(null);
+  };
+
+  const closeTaskDetails = () => {
+    setDetailsModalOpen(false);
+    setSelectedTaskForDetails(null);
+  };
+
+  const getProjectForTask = (task: Task | null) => {
+    if (!task) return undefined;
+    return projects.find(
+      (project) => String(project.id) === String(task.project_id)
+    );
   };
 
   const filteredProjects = useMemo(() => {
@@ -1253,11 +1372,13 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
         : [...previous, selectedProjectId]
     );
 
+    // Preserve the selected file before closeModal clears form state.
+    const fileToUpload = selectedFile;
     closeModal();
 
-    if (selectedFile) {
+    if (fileToUpload) {
   try {
-    await handleUploadAttachment(createdTask.id, selectedFile);
+    await handleUploadAttachment(createdTask.id, fileToUpload);
   } catch (uploadError) {
     console.error("Task created but file upload failed:", uploadError);
     alert(
@@ -1527,15 +1648,6 @@ const fetchTaskChallenges = async (task: Task) => {
   }
 };
 
-  const openTaskDetails = (task: Task) => {
-    setOpenTaskMenu(null);
-    setSelectedTaskDetails(task);
-  };
-
-  const closeTaskDetails = () => {
-    setSelectedTaskDetails(null);
-  };
-
   const handleTaskStatusChange = async (
     taskId: string,
     status: TaskStatus
@@ -1649,54 +1761,57 @@ const fetchTaskChallenges = async (task: Task) => {
             </button>
           </div>
 
-          {error && (
-            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-              {error}
-            </div>
-          )}
-
           <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-[0_4px_16px_rgba(37,99,235,0.06)]">
+            <div className="rounded-xl border border-gray-400 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">Visible projects</p>
-                  <p className="mt-1 text-3xl font-bold tracking-tight text-blue-950">{projects.length}</p>
-                  <p className="mt-1 text-[10px] font-semibold text-blue-700/70">
-                    {currentUser?.role === "System Administrator" || currentUser?.role === "Executive Manager"
-                      ? "All projects"
-                      : "Projects assigned to you"}
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600">
+                    Projects
+                  </p>
+
+                  <p className="mt-1 text-2xl font-bold text-gray-950">
+                    {projects.length}
                   </p>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-blue-700 shadow-sm ring-1 ring-blue-100">
-                  <FolderKanban size={19} />
+
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-800">
+                  <FolderKanban size={18} />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
+            <div className="rounded-xl border border-gray-400 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700">Visible tasks</p>
-                  <p className="mt-1 text-3xl font-bold tracking-tight text-violet-950">{totalTasks}</p>
-                  <p className="mt-1 text-[10px] font-semibold text-violet-700/70">Tasks available in your view</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600">
+                    Total Tasks
+                  </p>
+
+                  <p className="mt-1 text-2xl font-bold text-gray-950">
+                    {totalTasks}
+                  </p>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-violet-700 shadow-sm ring-1 ring-violet-100">
-                  <ListTodo size={19} />
+
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-800">
+                  <ListTodo size={18} />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-[0_4px_16px_rgba(16,185,129,0.06)]">
+            <div className="rounded-xl border border-gray-400 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">Completed</p>
-                  <p className="mt-1 text-3xl font-bold tracking-tight text-emerald-950">{completedTasks}</p>
-                  <p className="mt-1 text-[10px] font-semibold text-emerald-700/70">
-                    {totalTasks ? `${Math.round((completedTasks / totalTasks) * 100)}% of visible tasks` : "No tasks completed yet"}
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600">
+                    Completed
+                  </p>
+
+                  <p className="mt-1 text-2xl font-bold text-gray-950">
+                    {completedTasks}
                   </p>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100">
-                  <CheckCircle2 size={19} />
+
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
+                  <Check size={18} />
                 </div>
               </div>
             </div>
@@ -1709,7 +1824,7 @@ const fetchTaskChallenges = async (task: Task) => {
               </h2>
 
               <p className="mt-1 text-xs font-medium text-gray-600">
-                Projects are shown according to your role. Click any task to view complete details.
+                Select a project to view and manage its tasks.
               </p>
             </div>
 
@@ -1785,309 +1900,604 @@ const fetchTaskChallenges = async (task: Task) => {
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
-            {filteredProjects.map((project, projectIndex) => {
-              const projectTasks = tasks.filter(
-                (task) => String(task.project_id) === String(project.id)
-              );
+          <div className="mt-5 space-y-5">
+            {filteredProjects.map(
+              (project, projectIndex) => {
+                const projectTasks = tasks.filter(
+                  (task) =>
+                    String(task.project_id) ===
+                    String(project.id)
+                );
 
-              const completedProjectTasks = projectTasks.filter(
-                (task) => task.status === "Done"
-              ).length;
-              const inProgressProjectTasks = projectTasks.filter(
-                (task) => task.status === "In Progress"
-              ).length;
-              const todoProjectTasks = projectTasks.filter(
-                (task) => task.status === "To Do"
-              ).length;
-              const taskProgress = projectTasks.length
-                ? Math.round((completedProjectTasks / projectTasks.length) * 100)
-                : 0;
+                const isExpanded =
+                  expandedProjects.includes(
+                    project.id
+                  );
 
-              const projectStatus =
-                projectTasks.length > 0 && completedProjectTasks === projectTasks.length
-                  ? "Completed"
-                  : inProgressProjectTasks > 0
-                    ? "In Progress"
-                    : "To Do";
+                const completedProjectTasks =
+                  projectTasks.filter(
+                    (task) =>
+                      task.status === "Done"
+                  ).length;
 
-              return (
-                <article
-                  key={project.id}
-                  className="group overflow-visible rounded-2xl border border-[#dce2e8] bg-white shadow-[0_5px_22px_rgba(20,34,50,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(20,34,50,0.10)]"
-                >
-                  {/* Project header */}
-                  <div className="rounded-t-2xl bg-[#07111f] px-5 py-4 text-white sm:px-6">
-                    <div className="flex items-center gap-3">
-                      <ProjectLogo index={projectIndex} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                          Project
-                        </p>
-                        <h3 className="mt-0.5 truncate text-base font-bold tracking-[-0.2px] sm:text-lg">
-                          {project.name}
-                        </h3>
-                        {project.domain && (
-                          <p className="mt-0.5 truncate text-xs font-medium text-slate-300">
-                            {project.domain}
-                          </p>
-                        )}
+                const inProgressProjectTasks =
+                  projectTasks.filter(
+                    (task) =>
+                      task.status === "In Progress"
+                  ).length;
+
+                const todoProjectTasks =
+                  projectTasks.filter(
+                    (task) =>
+                      task.status === "To Do"
+                  ).length;
+
+                const taskProgress =
+                  projectTasks.length === 0
+                    ? 0
+                    : Math.round(
+                      (completedProjectTasks /
+                        projectTasks.length) *
+                      100
+                    );
+
+                return (
+                  <div
+                    key={project.id}
+                    className="overflow-visible rounded-xl border-2 border-gray-400 bg-white shadow-md"
+                  >
+                    <div className="p-5 sm:p-6">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <ProjectLogo
+                            index={projectIndex}
+                          />
+
+                          <div className="min-w-0">
+                            <button
+                              onClick={() =>
+                                toggleProject(
+                                  project.id
+                                )
+                              }
+                              className="text-left"
+                            >
+                              <h3 className="truncate text-sm font-bold text-gray-950 hover:text-gray-700 sm:text-base">
+                                {project.name}
+                              </h3>
+                            </button>
+
+                            {project.domain && (
+                              <p className="mt-0.5 truncate text-xs font-semibold text-gray-600">
+                                {project.domain}
+                              </p>
+                            )}
+
+                            {project.about_description && (
+                              <p className="mt-2 max-w-2xl text-xs font-medium leading-relaxed text-gray-700">
+                                {project.about_description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="hidden items-center gap-2 pr-2 sm:flex">
+                            <div className="h-2 w-24 overflow-hidden rounded-full border border-gray-300 bg-gray-200">
+                              <div
+                                className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+                                style={{
+                                  width: `${taskProgress}%`,
+                                }}
+                              />
+                            </div>
+
+                            <span className="text-[10px] font-bold text-gray-700">
+                              {taskProgress}%
+                            </span>
+                          </div>
+
+                          <div className="relative">
+                            <button
+                              onClick={() =>
+                                setTaskMenuOpen(
+                                  taskMenuOpen ===
+                                    project.id
+                                    ? null
+                                    : project.id
+                                )
+                              }
+                              disabled={!isAdmin}
+                              title={!isAdmin ? "Only managers can create tasks" : ""}
+              className={`inline-flex h-11 items-center justify-center gap-2 self-start rounded-lg px-5 text-sm font-semibold shadow-md transition ${!isAdmin
+                  ? "cursor-not-allowed border border-gray-300 bg-gray-100 text-gray-400"
+                  : "bg-[#07111f] text-white hover:bg-[#111c2c] active:scale-[0.98]"
+                }`}
+      
+                            >
+                              <Plus size={14} />
+                              Add task
+                              <ChevronDown size={13} />
+                            </button>
+
+                            {taskMenuOpen ===
+                              project.id && (
+                                <div className="absolute right-0 top-11 z-40 w-48 overflow-hidden rounded-xl border-2 border-gray-400 bg-white p-1.5 shadow-2xl">
+                                  <button
+                                    onClick={() =>
+                                      openAddTask(
+                                        project.id
+                                      )
+                                    }
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-gray-900 hover:bg-gray-100"
+                                  >
+                                    <Plus size={14} />
+                                    New task
+                                  </button>
+                                </div>
+                              )}
+                          </div>
+
+                          <button
+                            onClick={() =>
+                              toggleProject(
+                                project.id
+                              )
+                            }
+                            className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                            title={
+                              isExpanded
+                                ? "Collapse"
+                                : "View tasks"
+                            }
+                          >
+                            <ChevronDown
+                              size={16}
+                              className={
+                                isExpanded
+                                  ? "rotate-180 transition"
+                                  : "transition"
+                              }
+                            />
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="shrink-0 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-right">
-                        <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                          Tasks
-                        </p>
-                        <p className="text-sm font-bold text-white">
-                          {completedProjectTasks}/{projectTasks.length}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t-2 border-gray-300 pt-4">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+                          <ListTodo size={12} />
+                          {projectTasks.length}
+                          {projectTasks.length === 1
+                            ? " Task"
+                            : " Tasks"}
+                        </div>
 
-                  <div className="p-5 sm:p-6">
-                    {/* Brief project info */}
-                    <div className="rounded-xl border border-[#e5e9ee] bg-[#f8fafb] p-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[10px] font-bold ${
-                            projectStatus === "Completed"
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : projectStatus === "In Progress"
-                                ? "border-blue-200 bg-blue-50 text-blue-700"
-                                : "border-slate-200 bg-white text-slate-700"
-                          }`}
-                        >
-                          {projectStatus === "Completed" ? (
-                            <Check size={11} />
-                          ) : projectStatus === "In Progress" ? (
-                            <Clock3 size={11} />
-                          ) : (
-                            <Circle size={11} />
-                          )}
-                          {projectStatus}
-                        </span>
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+                          <Check
+                            size={12}
+                            className="text-emerald-700"
+                          />
+                          {completedProjectTasks}{" "}
+                          Completed
+                        </div>
 
-                        <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-bold text-amber-700">
-                          <Flag size={11} />
-                          {project.priority || "Medium"} priority
-                        </span>
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-blue-800">
+                          <Clock3 size={12} />
+                          {inProgressProjectTasks}{" "}
+                          In Progress
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+                          <Circle size={12} />
+                          {todoProjectTasks} To Do
+                        </div>
 
                         {project.deadline && (
-                          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-600">
-                            <Calendar size={11} />
-                            Due {formatDate(project.deadline)}
-                          </span>
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+                            <Calendar size={12} />
+                            Due{" "}
+                            {formatDate(
+                              project.deadline
+                            )}
+                          </div>
+                        )}
+
+                        {project.priority && (
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+                            <Flag size={12} />
+                            {project.priority} priority
+                          </div>
                         )}
                       </div>
 
-                      {project.about_description && (
-                        <p className="mt-3 line-clamp-2 text-xs font-medium leading-relaxed text-slate-600">
-                          {project.about_description}
-                        </p>
-                      )}
-
-                      <div className="mt-4 flex items-center gap-3">
-                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
-                          <div
-                            className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-                            style={{ width: `${taskProgress}%` }}
+                      {projectTasks.length > 0 && (
+                        <div className="mt-4">
+                          <StatusSummary
+                            tasks={projectTasks}
                           />
                         </div>
-                        <span className="min-w-[38px] text-right text-[10px] font-bold text-slate-700">
-                          {taskProgress}%
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Tasks */}
-                    <div className="mt-5">
-                      <div className="mb-3 flex items-center justify-between">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-950">Tasks</h4>
-                          <p className="mt-0.5 text-[10px] font-medium text-slate-500">
-                            Click a task to view its complete details.
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">
-                          {projectTasks.length} {projectTasks.length === 1 ? "task" : "tasks"}
-                        </span>
-                      </div>
-
-                      {projectTasks.length > 0 ? (
-                        <div className="space-y-2.5">
-                          {projectTasks.map((task) => (
-                            <div
-                              key={task.id}
-                              onClick={() => openTaskDetails(task)}
-                              role="button"
-                              tabIndex={0}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
-                                  openTaskDetails(task);
-                                }
-                              }}
-                              className="group/task cursor-pointer rounded-xl border border-[#e1e6eb] bg-white p-3.5 transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm"
-                            >
-                              <div className="flex items-start gap-3">
-                                <div
-                                  className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                                    task.status === "Done"
-                                      ? "bg-emerald-50 text-emerald-600"
-                                      : task.status === "In Progress"
-                                        ? "bg-blue-50 text-blue-600"
-                                        : "bg-slate-100 text-slate-600"
-                                  }`}
-                                >
-                                  {task.status === "Done" ? (
-                                    <Check size={15} />
-                                  ) : task.status === "In Progress" ? (
-                                    <Clock3 size={15} />
-                                  ) : (
-                                    <Circle size={15} />
-                                  )}
-                                </div>
-
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm font-bold text-slate-950">
-                                        {task.name}
-                                      </p>
-                                      <p className="mt-1 line-clamp-1 text-[11px] font-medium text-slate-500">
-                                        {task.description || "No description provided."}
-                                      </p>
-                                    </div>
-
-                                    <div className="relative shrink-0" onClick={(event) => event.stopPropagation()}>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setOpenTaskMenu(
-                                            openTaskMenu === task.id ? null : task.id
-                                          )
-                                        }
-                                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-400 hover:border-slate-200 hover:bg-white hover:text-slate-900"
-                                        title="Change task status"
-                                      >
-                                        <MoreVertical size={16} />
-                                      </button>
-
-                                      {openTaskMenu === task.id && (
-                                        <div className="absolute right-0 top-9 z-50 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_35px_rgba(15,23,42,0.16)]">
-                                          <p className="px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-400">
-                                            Change status
-                                          </p>
-                                          {["To Do", "In Progress", "Done"].map((status) => (
-                                            <button
-                                              key={status}
-                                              type="button"
-                                              onClick={() =>
-                                                handleTaskStatusChange(task.id, status as TaskStatus)
-                                              }
-                                              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold ${
-                                                task.status === status
-                                                  ? "bg-slate-100 text-slate-950"
-                                                  : "text-slate-600 hover:bg-slate-50"
-                                              }`}
-                                            >
-                                              {status === "To Do" ? (
-                                                <Circle size={12} />
-                                              ) : status === "In Progress" ? (
-                                                <Clock3 size={12} />
-                                              ) : (
-                                                <Check size={12} />
-                                              )}
-                                              {status}
-                                              {task.status === status && (
-                                                <Check size={12} className="ml-auto" />
-                                              )}
-                                            </button>
-                                          ))}
-
-                                          {isAdmin && (
-                                            <>
-                                              <div className="my-1 border-t border-slate-100" />
-                                              <button
-                                                type="button"
-                                                onClick={() => handleDeleteTask(task.id)}
-                                                disabled={deletingTask === task.id}
-                                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
-                                              >
-                                                <Trash2 size={12} />
-                                                {deletingTask === task.id ? "Deleting..." : "Delete task"}
-                                              </button>
-                                            </>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                                    <TaskStatusBadge status={task.status} />
-                                    <PriorityBadge priority={task.priority} />
-
-                                    {task.assignee_name && (
-                                      <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600">
-                                        <Users size={11} />
-                                        {task.assignee_name}
-                                      </span>
-                                    )}
-
-                                    {task.due_date && (
-                                      <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600">
-                                        <Calendar size={11} />
-                                        {formatDate(task.due_date)}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <div className="mt-3 border-t border-slate-100 pt-2.5">
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        openTaskDetails(task);
-                                      }}
-                                      className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#07111f] px-4 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#111c2c]"
-                                    >
-                                      <Eye size={13} />
-                                      View task details
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
-                          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
-                            <ListTodo size={17} />
-                          </div>
-                          <p className="mt-3 text-sm font-bold text-slate-900">No tasks yet</p>
-                          <p className="mt-1 text-xs font-medium text-slate-500">
-                            Add a task to start tracking work for this project.
-                          </p>
-                          {isAdmin && (
-                            <button
-                              type="button"
-                              onClick={() => openAddTask(project.id)}
-                              className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#07111f] px-3.5 text-xs font-bold text-white hover:bg-[#111c2c]"
-                            >
-                              <Plus size={13} />
-                              Add task
-                            </button>
-                          )}
-                        </div>
                       )}
                     </div>
+
+                    {isExpanded && (
+                      <div className="border-t-2 border-gray-400 bg-[#e9edf1] p-4 sm:p-5">
+                        {projectTasks.length > 0 ? (
+                          <div className="space-y-3">
+                            {projectTasks.map(
+                              (task) => (
+                                <div
+                                  key={task.id}
+                                  className={`rounded-xl border-2 bg-white p-4 shadow-sm transition ${task.status ===
+                                    "Done"
+                                    ? "border-emerald-400 bg-emerald-50/30"
+                                    : task.status ===
+                                      "In Progress"
+                                      ? "border-blue-400"
+                                      : "border-gray-400"
+                                    }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <button
+                                      onClick={() =>
+                                        toggleTaskComplete(
+                                          task.id,
+                                          task.status
+                                        )
+                                      }
+                                      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition ${task.status ===
+                                        "Done"
+                                        ? "border-emerald-600 bg-emerald-600 text-white"
+                                        : task.status ===
+                                          "In Progress"
+                                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                                          : "border-gray-500 bg-gray-100 text-gray-600 hover:border-gray-800 hover:text-gray-900"
+                                        }`}
+                                      title={
+                                        task.status ===
+                                          "Done"
+                                          ? "Mark as To Do"
+                                          : "Mark task as Done"
+                                      }
+                                    >
+                                      {task.status ===
+                                        "Done" && (
+                                          <Check
+                                            size={15}
+                                          />
+                                        )}
+
+                                      {task.status ===
+                                        "In Progress" && (
+                                          <Clock3
+                                            size={14}
+                                          />
+                                        )}
+
+                                      {task.status ===
+                                        "To Do" && (
+                                          <Circle
+                                            size={14}
+                                          />
+                                        )}
+                                    </button>
+
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                        <div className="min-w-0">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <p
+                                              className={`text-sm font-bold ${task.status ===
+                                                "Done"
+                                                ? "text-gray-500 line-through"
+                                                : "text-gray-950"
+                                                }`}
+                                            >
+                                              {task.name}
+                                            </p>
+
+                                            <TaskStatusBadge
+                                              status={
+                                                task.status
+                                              }
+                                            />
+                                          </div>
+
+                                          {task.description ? (
+                                            <p
+                                              className={`mt-2 max-w-3xl text-xs font-medium leading-relaxed ${task.status ===
+                                                "Done"
+                                                ? "text-gray-500"
+                                                : "text-gray-700"
+                                                }`}
+                                            >
+                                              {
+                                                task.description
+                                              }
+                                            </p>
+                                          ) : (
+                                            <p className="mt-2 text-xs italic text-gray-400">
+                                              No description
+                                              provided.
+                                            </p>
+                                          )}
+                                        </div>
+
+                                        <div className="relative flex flex-wrap items-center justify-end gap-2 sm:max-w-[420px]">
+
+                                          {/* VIEW DETAILS */}
+                                          <button
+                                            onClick={() => openTaskDetails(task)}
+                                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-gray-400 bg-gray-50 px-2.5 text-[10px] font-bold text-gray-800 hover:bg-gray-100"
+                                            title="View task details"
+                                          >
+                                            <FileText size={13} />
+                                            Details
+                                          </button>
+
+                                          {/* CHALLENGES */}
+                                          {canReadChallenge(task) && (
+                                            <button
+                                              onClick={() => openChallenges(task)}
+                                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-2.5 text-[10px] font-bold text-violet-800 hover:bg-violet-100"
+                                              title="View task challenges"
+                                            >
+                                              <Flag size={13} />
+                                              Challenges
+                                              {challengeCounts[task.id] !== undefined && (
+                                                <span className="rounded-full bg-violet-200 px-1.5 py-0.5 text-[9px] font-bold text-violet-900">
+                                                  {challengeCounts[task.id]}
+                                                </span>
+                                              )}
+                                            </button>
+                                          )}
+
+                                          {/* FILES */}
+                                          {canReadAttachments(task) && (
+                                            <button
+                                              onClick={() => openAttachmentModal(task)}
+                                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 text-[10px] font-bold text-amber-800 hover:bg-amber-100"
+                                              title="View task files"
+                                            >
+                                              <File size={13} />
+                                              Files
+                                              {(attachments[task.id]?.length || 0) > 0 && (
+                                                <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-900">
+                                                  {attachments[task.id]?.length || 0}
+                                                </span>
+                                              )}
+                                            </button>
+                                          )}
+
+                                          <button
+                                            onClick={() =>
+                                              setOpenTaskMenu(
+                                                openTaskMenu === task.id ? null : task.id
+                                              )
+                                            }
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-950"
+                                            title="Task options"
+                                          >
+                                            <MoreVertical
+                                              size={16}
+                                            />
+                                          </button>
+
+                                          {openTaskMenu ===
+                                            task.id && (
+                                              <div className="absolute right-0 top-9 z-50 w-52 overflow-hidden rounded-xl border-2 border-gray-400 bg-white shadow-2xl">
+                                                <div className="border-b border-gray-300 bg-gray-50 px-3 py-2.5">
+                                                  <p className="text-[10px] font-bold uppercase tracking-wide text-gray-700">
+                                                    Task Options
+                                                  </p>
+                                                </div>
+
+                                                <div className="p-1.5">
+                                                  {[
+                                                    "To Do",
+                                                    "In Progress",
+                                                    "Done",
+                                                  ].map(
+                                                    (
+                                                      status
+                                                    ) => (
+                                                      <button
+                                                        key={
+                                                          status
+                                                        }
+                                                        onClick={() =>
+                                                          handleTaskStatusChange(
+                                                            task.id,
+                                                            status as TaskStatus
+                                                          )
+                                                        }
+                                                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-semibold ${task.status ===
+                                                          status
+                                                          ? status ===
+                                                            "To Do"
+                                                            ? "bg-gray-200 text-gray-950"
+                                                            : status ===
+                                                              "In Progress"
+                                                              ? "bg-blue-100 text-blue-900"
+                                                              : "bg-emerald-100 text-emerald-900"
+                                                          : "text-gray-700 hover:bg-gray-100"
+                                                          }`}
+                                                      >
+                                                        {status ===
+                                                          "To Do" && (
+                                                            <Circle
+                                                              size={
+                                                                13
+                                                              }
+                                                            />
+                                                          )}
+
+                                                        {status ===
+                                                          "In Progress" && (
+                                                            <Clock3
+                                                              size={
+                                                                13
+                                                              }
+                                                            />
+                                                          )}
+
+                                                        {status ===
+                                                          "Done" && (
+                                                            <Check
+                                                              size={
+                                                                13
+                                                              }
+                                                            />
+                                                          )}
+
+                                                        {status}
+
+                                                        {task.status ===
+                                                          status && (
+                                                            <Check
+                                                              size={
+                                                                13
+                                                              }
+                                                              className="ml-auto"
+                                                            />
+                                                          )}
+                                                      </button>
+                                                    )
+                                                  )}
+
+                                                  <div className="my-1 border-t border-gray-200" />
+
+                                                  <button
+                                                    onClick={() =>
+                                                      handleDeleteTask(
+                                                        task.id
+                                                      )
+                                                    }
+                                                    disabled={
+                                                      deletingTask ===
+                                                      task.id
+                                                    }
+                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                  >
+                                                    {deletingTask ===
+                                                      task.id ? (
+                                                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-red-300 border-t-red-700" />
+                                                    ) : (
+                                                      <Trash2
+                                                        size={
+                                                          13
+                                                        }
+                                                      />
+                                                    )}
+
+                                                    {deletingTask ===
+                                                      task.id
+                                                      ? "Deleting..."
+                                                      : "Delete task"}
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            )}
+                                        </div>
+                                      </div>
+
+                                      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t-2 border-gray-200 pt-3">
+                                        <PriorityBadge
+                                          priority={
+                                            task.priority
+                                          }
+                                        />
+
+                                        {task.assignee_name ? (
+                                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+                                            <Users
+                                              size={
+                                                11
+                                              }
+                                            />
+                                            {
+                                              task.assignee_name
+                                            }
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400">
+                                            <Users
+                                              size={
+                                                11
+                                              }
+                                            />
+                                            Unassigned
+                                          </div>
+                                        )}
+
+                                        {task.start_date && (
+                                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+                                            <Clock3
+                                              size={
+                                                11
+                                              }
+                                            />
+                                            Start{" "}
+                                            {formatDate(
+                                              task.start_date
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {task.due_date && (
+                                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+                                            <Calendar
+                                              size={
+                                                11
+                                              }
+                                            />
+                                            Due{" "}
+                                            {formatDate(
+                                              task.due_date
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex min-h-[190px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-400 bg-white px-5 text-center">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-200 text-gray-600">
+                              <ListTodo size={19} />
+                            </div>
+
+                            <p className="mt-3 text-sm font-bold text-gray-950">
+                              No tasks yet
+                            </p>
+
+                            <p className="mt-1 max-w-sm text-xs font-medium leading-relaxed text-gray-600">
+                              Start breaking this project
+                              into smaller, manageable
+                              tasks.
+                            </p>
+
+                            <button
+                              onClick={() =>
+                                openAddTask(
+                                  project.id
+                                )
+                              }
+                              className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg border-2 border-gray-400 bg-white px-3.5 text-xs font-bold text-gray-900 hover:bg-gray-100"
+                            >
+                              <Plus size={14} />
+                              Add first task
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </article>
-              );
-            })}
+                );
+              }
+            )}
           </div>
 
           {filteredProjects.length === 0 && (
@@ -2112,175 +2522,6 @@ const fetchTaskChallenges = async (task: Task) => {
       </main>
 
       {/* Your existing modals (create task, challenges) remain unchanged */}
-      {/* TASK + PROJECT DETAILS MODAL */}
-      {selectedTaskDetails && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/65 px-4 py-6 backdrop-blur-[3px]"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closeTaskDetails();
-          }}
-        >
-          {(() => {
-            const task = selectedTaskDetails;
-            const project = projects.find(
-              (item) => String(item.id) === String(task.project_id)
-            );
-
-            if (!project) return null;
-
-            return (
-              <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_25px_70px_rgba(0,0,0,0.25)]">
-                <div className="shrink-0 bg-[#07111f] px-5 py-5 text-white sm:px-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                        Task details
-                      </p>
-                      <h2 className="mt-1 break-words text-xl font-bold tracking-tight sm:text-2xl">
-                        {task.name}
-                      </h2>
-                      <div className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-300">
-                        <FolderKanban size={13} />
-                        <span className="truncate">{project.name}</span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={closeTaskDetails}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-slate-300 hover:bg-white/15 hover:text-white"
-                      aria-label="Close task details"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="overflow-y-auto bg-[#f4f6f8] p-5 sm:p-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Status</p>
-                      <div className="mt-2"><TaskStatusBadge status={task.status} /></div>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Priority</p>
-                      <div className="mt-2"><PriorityBadge priority={task.priority} /></div>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Assignee</p>
-                      <p className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
-                        <Users size={14} className="text-slate-500" />
-                        {task.assignee_name || "Unassigned"}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Deadline</p>
-                      <p className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
-                        <Calendar size={14} className="text-slate-500" />
-                        {task.due_date ? formatDate(task.due_date) : "No deadline"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                        <ListTodo size={15} />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-950">Task description</h3>
-                        <p className="text-[10px] font-medium text-slate-500">What needs to be completed</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3.5">
-                      <p className="whitespace-pre-wrap text-sm font-medium leading-6 text-slate-700">
-                        {task.description || "No description provided for this task."}
-                      </p>
-                    </div>
-                  </section>
-
-                  <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                        <FolderKanban size={15} />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-950">Project information</h3>
-                        <p className="text-[10px] font-medium text-slate-500">Project this task belongs to</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project</p>
-                        <p className="mt-1 text-sm font-bold text-slate-900">{project.name}</p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project deadline</p>
-                        <p className="mt-1 text-sm font-bold text-slate-900">
-                          {project.deadline ? formatDate(project.deadline) : "No deadline"}
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project priority</p>
-                        <p className="mt-1 text-sm font-bold text-slate-900">{project.priority || "Medium"}</p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project progress</p>
-                        <p className="mt-1 text-sm font-bold text-slate-900">{project.progress ?? 0}%</p>
-                      </div>
-                    </div>
-
-                    {project.about_description && (
-                      <div className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">About project</p>
-                        <p className="mt-1.5 text-xs font-medium leading-5 text-slate-600">
-                          {project.about_description}
-                        </p>
-                      </div>
-                    )}
-                  </section>
-
-                  <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
-                    <h3 className="text-sm font-bold text-slate-950">Task timeline</h3>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
-                        <Calendar size={15} className="text-slate-500" />
-                        <div>
-                          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Start date</p>
-                          <p className="mt-0.5 text-xs font-bold text-slate-800">
-                            {task.start_date ? formatDate(task.start_date) : "Not set"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
-                        <Calendar size={15} className="text-slate-500" />
-                        <div>
-                          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Due date</p>
-                          <p className="mt-0.5 text-xs font-bold text-slate-800">
-                            {task.due_date ? formatDate(task.due_date) : "Not set"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-                </div>
-
-                <div className="flex justify-end border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
-                  <button
-                    type="button"
-                    onClick={closeTaskDetails}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#111c2c]"
-                  >
-                    <Eye size={15} />
-                    Close details
-                  </button>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
@@ -2669,7 +2910,144 @@ const fetchTaskChallenges = async (task: Task) => {
         </div>
       )}
 
-      {/* Challenges Modal - Unchanged */}
+      {/* TASK DETAILS MODAL */}
+      {detailsModalOpen && selectedTaskForDetails && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeTaskDetails();
+          }}
+        >
+          {(() => {
+            const detailTask = selectedTaskForDetails;
+            const detailProject = getProjectForTask(detailTask);
+            return (
+              <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border-2 border-gray-500 bg-white shadow-2xl">
+                <div className="shrink-0 border-b border-gray-200 bg-white px-5 py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                          <ListTodo size={17} />
+                        </div>
+                        <div className="min-w-0">
+                          <h2 className="text-lg font-bold text-gray-950">Task Details</h2>
+                          <p className="truncate text-xs font-medium text-gray-500">{detailTask.name}</p>
+                        </div>
+                        <TaskStatusBadge status={detailTask.status} />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeTaskDetails}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                      aria-label="Close task details"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-y-auto bg-[#eef1f4] p-5 sm:p-6">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="rounded-xl border-2 border-gray-300 bg-white p-4 sm:col-span-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Task description</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm font-medium leading-relaxed text-gray-800">
+                        {detailTask.description || "No description provided."}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border-2 border-gray-300 bg-white p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Priority</p>
+                      <div className="mt-2"><PriorityBadge priority={detailTask.priority} /></div>
+                    </div>
+
+                    <div className="rounded-xl border-2 border-gray-300 bg-white p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Assigned to</p>
+                      <div className="mt-2 flex items-center gap-2 text-sm font-bold text-gray-900">
+                        <Users size={15} className="text-gray-600" />
+                        {detailTask.assignee_name || "Unassigned"}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border-2 border-gray-300 bg-white p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Start date</p>
+                      <div className="mt-2 flex items-center gap-2 text-sm font-bold text-gray-900">
+                        <Clock3 size={15} className="text-gray-600" />
+                        {detailTask.start_date ? formatDate(detailTask.start_date) : "Not set"}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border-2 border-gray-300 bg-white p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Deadline</p>
+                      <div className="mt-2 flex items-center gap-2 text-sm font-bold text-gray-900">
+                        <Calendar size={15} className="text-gray-600" />
+                        {detailTask.due_date ? formatDate(detailTask.due_date) : "Not set"}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border-2 border-blue-300 bg-blue-50 p-4 sm:col-span-2">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
+                          <FolderKanban size={16} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">Project</p>
+                          <h3 className="mt-1 text-base font-bold text-gray-950">
+                            {detailProject?.name || "Project not found"}
+                          </h3>
+                          {detailProject?.domain && (
+                            <p className="mt-1 text-xs font-semibold text-gray-600">{detailProject.domain}</p>
+                          )}
+                          {detailProject?.about_description && (
+                            <p className="mt-2 text-xs font-medium leading-relaxed text-gray-700">{detailProject.about_description}</p>
+                          )}
+                          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[10px] font-bold text-gray-700">
+                            {detailProject?.start_date && (
+                              <span className="inline-flex items-center gap-1.5"><Clock3 size={11} />Project start {formatDate(detailProject.start_date)}</span>
+                            )}
+                            {detailProject?.deadline && (
+                              <span className="inline-flex items-center gap-1.5"><Calendar size={11} />Project deadline {formatDate(detailProject.deadline)}</span>
+                            )}
+                            {detailProject?.priority && (
+                              <span className="inline-flex items-center gap-1.5"><Flag size={11} />{detailProject.priority} priority</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap justify-end gap-2 border-t-2 border-gray-300 bg-[#f5f6f8] px-5 py-4">
+                  <button
+                    onClick={() => openChallenges(detailTask)}
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border-2 border-violet-300 bg-violet-50 px-4 text-sm font-bold text-violet-800 hover:bg-violet-100"
+                  >
+                    <Flag size={15} />
+                    Challenges
+                  </button>
+                  <button
+                    onClick={() => openAttachmentModal(detailTask)}
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border-2 border-amber-300 bg-amber-50 px-4 text-sm font-bold text-amber-800 hover:bg-amber-100"
+                  >
+                    <File size={15} />
+                    Files
+                  </button>
+                  <button
+                    onClick={closeTaskDetails}
+                    className="h-10 rounded-lg border-2 border-gray-400 bg-white px-5 text-sm font-semibold text-gray-900 hover:bg-gray-100"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Challenges Modal */}
       {challengeModalOpen && selectedChallengeTask && (
   <div
     className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
@@ -2945,6 +3323,51 @@ const fetchTaskChallenges = async (task: Task) => {
 
             {/* Content */}
             <div className="overflow-y-auto bg-[#eef1f4] px-6 py-6">
+              {/* Project Manager Upload Area */}
+              {canUploadAttachments(selectedTaskForAttachment) && (
+                <div className="mb-6 rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-amber-700 shadow-sm">
+                        <Plus size={16} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-950">Add task file</h3>
+                        <p className="mt-1 text-[11px] font-medium leading-relaxed text-gray-700">
+                          Project Managers can attach instructions, requirements, reference documents, or other task files.
+                        </p>
+                      </div>
+                    </div>
+
+                    <label className={`inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#07111f] px-4 text-xs font-bold text-white shadow-sm hover:bg-[#111c2c] ${uploadingAttachment ? "pointer-events-none opacity-50" : ""}`}>
+                      {uploadingAttachment ? (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={14} />
+                          Choose file
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        className="hidden"
+                        disabled={uploadingAttachment}
+                        onChange={handleAttachmentFileChange}
+                      />
+                    </label>
+                  </div>
+
+                  {selectedFile && (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800">
+                      Selected: {selectedFile.name}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Files List */}
               <div>
                 <div className="flex items-center justify-between">
