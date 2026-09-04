@@ -1186,7 +1186,7 @@ export default function Dashboard() {
         {/* =====================================================
             PROJECT BARS
         ===================================================== */}
-        <div className="relative grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+        <div className="relative flex flex-wrap justify-center gap-x-6 gap-y-8">
 
           {projectOverview.map(
             (
@@ -1211,7 +1211,7 @@ export default function Dashboard() {
                   onClick={() =>
                     setSelectedOverviewProject(project)
                   }
-                  className="group flex min-w-0 flex-col items-center rounded-xl px-2 pt-1 transition hover:bg-[#fafbfd]"
+                  className="group flex w-[90px] flex-col items-center rounded-xl px-1 pt-1 transition hover:bg-[#fafbfd]"
                 >
 
                   {/* =================================================
