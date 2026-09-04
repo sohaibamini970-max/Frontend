@@ -910,7 +910,7 @@ export default function Header() {
                     <div className="flex items-start justify-between">
 
                       <span
-                        className={`text-[30px] font-medium leading-none tracking-tight ${cardColors.number}`}
+                        className={`text-[30px] font-medium leading-none tracking-tight ${cardColors.icon}`}
                       >
                         {stat.value}
                       </span>
