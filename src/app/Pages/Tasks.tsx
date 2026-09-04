@@ -2056,6 +2056,20 @@ const fetchTaskChallenges = async (task: Task) => {
                                       <Eye size={13} />
                                       View task details
                                     </button>
+
+                                    {/* CHALLENGES Member can add challenges only to their assigned task. Management / permitted roles can read challenges. */}
+                                    {canReadChallenge(task) &&
+                                    ( <button type="button" onClick={() => openChallenges(task)}
+                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-2.5 text-[10px] font-bold text-violet-800 shadow-sm transition hover:border-violet-400 hover:bg-violet-100"
+                                        title={ canWriteChallenge(task) ? "View or add challenges" : "View task challenges" } 
+                                        > <Flag size={13} /> 
+                                      <span>Challenges</span> 
+                                      {challengeCounts[task.id] !== undefined && 
+                                      ( <span className="flex min-w-[18px] items-center justify-center rounded-full bg-violet-200 px-1.5 py-0.5 text-[9px] font-bold text-violet-900">
+                                    {challengeCounts[task.id]} </span> )}
+                                      
+                                    </button> )}
+                                    
                                   </div>
                                 </div>
                               </div>
