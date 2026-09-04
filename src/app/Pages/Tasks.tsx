@@ -2580,14 +2580,18 @@ const fetchTaskChallenges = async (task: Task) => {
                       Select team member
                     </option>
 
-                    {users.map((user) => (
-                      <option
-                        key={user.id}
-                        value={user.id}
-                      >
-                        {user.full_name}
-                      </option>
-                    ))}
+                  
+                {/* ✅ FILTER TO SHOW ONLY MEMBERS */}
+                {users
+                  .filter((user) => user.role === "Member")
+                  .map((user) => (
+                    <option
+                      key={user.id}
+                      value={user.id}
+                    >
+                      {user.full_name}
+                    </option>
+                  ))}
                   </select>
                   
                 </div>
