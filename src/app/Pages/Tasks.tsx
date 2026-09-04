@@ -2059,7 +2059,9 @@ const fetchTaskChallenges = async (task: Task) => {
 
                                     {/* CHALLENGES Member can add challenges only to their assigned task. Management / permitted roles can read challenges. */}
                                     {canReadChallenge(task) &&
-                                    ( <button type="button" onClick={() => openChallenges(task)}
+                                    ( <button 
+                                      type="button" 
+                                      onClick={() => openChallenges(task)}
                                       className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-2.5 text-[10px] font-bold text-violet-800 shadow-sm transition hover:border-violet-400 hover:bg-violet-100"
                                         title={ canWriteChallenge(task) ? "View or add challenges" : "View task challenges" } 
                                         > <Flag size={13} /> 
@@ -2068,6 +2070,16 @@ const fetchTaskChallenges = async (task: Task) => {
                                       ( <span className="flex min-w-[18px] items-center justify-center rounded-full bg-violet-200 px-1.5 py-0.5 text-[9px] font-bold text-violet-900">
                                     {challengeCounts[task.id]} </span> )}
                                       
+                                    </button> )}
+
+                                    {canReadAttachments(task) && (
+                                    <button type="button"
+                                    onClick={() => openAttachmentModal(task)}
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 text-[10px] font-bold text-amber-800 shadow-sm transition hover:border-amber-400 hover:bg-amber-100"
+                                      title={ currentUser?.role === "Project Manager" ? "View or add task files" : "View task files" } > 
+                                      <File size={13} /> <span>Files</span> {(attachments[task.id]?.length || 0) > 0 && 
+                                      ( <span className="flex min-w-[18px] items-center justify-center rounded-full bg-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-900"> 
+                                      {attachments[task.id]?.length || 0} </span> )}
                                     </button> )}
                                     
                                   </div>
