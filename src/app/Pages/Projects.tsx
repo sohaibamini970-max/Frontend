@@ -486,141 +486,143 @@ export default function Projects() {
      FETCH PROJECTS + TASKS
   ========================================================= */
 
-  const fetchProjects = async () => {
-    try {
-      setLoading(true);
-      setError("");
+ const fetchProjects = async () => {
+  try {
+    setLoading(true);
+    setError("");
 
-      const response = await fetch(`${API_BASE}/api/projects`, {
-        method: "GET",
-        headers: getAuthHeaders(),
-      });
+    const response = await fetch(`${API_BASE}/api/projects`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
 
-      const contentType = response.headers.get("content-type");
-      const isJson =
-        contentType && contentType.includes("application/json");
+    const contentType = response.headers.get("content-type");
+    const isJson =
+      contentType && contentType.includes("application/json");
 
-      if (!response.ok) {
-        throw new Error(
-          isJson
-            ? (await response.json()).message ||
-                `Error ${response.status}`
-            : `Server error ${response.status}`
-        );
-      }
-
-      if (!isJson) {
-        throw new Error(
-          "Expected JSON response from projects API."
-        );
-      }
-
-      const data = await response.json();
-
-      const rawProjects = data.projects || [];
-
-      const formattedProjects: Project[] = await Promise.all(
-        rawProjects.map(async (project: any) => {
-          const projectId = String(project.id);
-
-          const tasks = await fetchProjectTasks(projectId);
-
-          const completedTasks = tasks.filter(
-            (task) =>
-              String(task.status).toLowerCase() === "done"
-          ).length;
-
-          const totalTasks = tasks.length;
-
-          const calculatedProgress =
-            totalTasks > 0
-              ? Math.round((completedTasks / totalTasks) * 100)
-              : 0;
-
-          return {
-            id: projectId,
-
-            name:
-              project.name ||
-              "Untitled Project",
-
-            domain:
-              project.domain ||
-              "No domain",
-
-            status:
-              project.status ||
-              "Unassigned",
-
-            aboutTitle:
-              project.about_title ||
-              "Project",
-
-            aboutDescription:
-              project.about_description ||
-              "",
-
-            progress: calculatedProgress,
-
-            members: [],
-
-            startDate:
-              project.start_date ||
-              "",
-
-            deadline:
-              project.deadline ||
-              "",
-
-            priority:
-              project.priority ||
-              "Medium",
-
-            managerId:
-              project.manager_id
-                ? String(project.manager_id)
-                : null,
-
-            managerName:
-              project.manager_name ||
-              null,
-
-            managerEmail:
-              project.manager_email ||
-              null,
-
-            creatorId:
-              project.creator_id
-                ? String(project.creator_id)
-                : undefined,
-
-            creatorName:
-              project.creator_name ||
-              undefined,
-
-            creatorRole:
-              project.creator_role ||
-              undefined,
-
-            tasks,
-
-            completedTasks,
-
-            totalTasks,
-          };
-        })
+    if (!response.ok) {
+      throw new Error(
+        isJson
+          ? (await response.json()).message ||
+              `Error ${response.status}`
+          : `Server error ${response.status}`
       );
-
-      setProjects(formattedProjects);
-    } catch (error: any) {
-      setError(
-        error.message ||
-          "Unable to load projects."
-      );
-    } finally {
-      setLoading(false);
     }
-  };
+
+    if (!isJson) {
+      throw new Error(
+        "Expected JSON response from projects API."
+      );
+    }
+
+    const data = await response.json();
+    const rawProjects = data.projects || [];
+
+    const formattedProjects: Project[] = await Promise.all(
+      rawProjects.map(async (project: any) => {
+        const projectId = String(project.id);
+        const tasks = await fetchProjectTasks(projectId);
+
+        const completedTasks = tasks.filter(
+          (task) =>
+            String(task.status).toLowerCase() === "done"
+        ).length;
+
+        const totalTasks = tasks.length;
+
+        const calculatedProgress =
+          totalTasks > 0
+            ? Math.round((completedTasks / totalTasks) * 100)
+            : 0;
+
+        return {
+          id: projectId,
+          name: project.name || "Untitled Project",
+          domain: project.domain || "No domain",
+          status: project.status || "Unassigned",
+          aboutTitle: project.about_title || "Project",
+          aboutDescription:
+            project.about_description || "",
+          progress: calculatedProgress,
+          members: [],
+          startDate: project.start_date || "",
+          deadline: project.deadline || "",
+          priority: project.priority || "Medium",
+          managerId: project.manager_id
+            ? String(project.manager_id)
+            : null,
+          managerName: project.manager_name || null,
+          managerEmail: project.manager_email || null,
+          creatorId: project.creator_id
+            ? String(project.creator_id)
+            : undefined,
+          creatorName: project.creator_name || undefined,
+          creatorRole: project.creator_role || undefined,
+          tasks,
+          completedTasks,
+          totalTasks,
+        };
+      })
+    );
+
+    setProjects(formattedProjects);
+
+    // ✅ SYNC STATUS AFTER FETCHING
+    await syncProjectStatuses(formattedProjects);
+  } catch (error: any) {
+    setError(
+      error.message || "Unable to load projects."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
+  /* =========================================================
+   SYNC PROJECT STATUS WITH TASK COMPLETION
+========================================================= */
+
+const syncProjectStatuses = async (projects: Project[]) => {
+  try {
+    const projectsNeedingUpdate = projects.filter(
+      (project) =>
+        project.status === "Done" &&
+        project.completedTasks !== project.totalTasks
+    );
+
+    if (projectsNeedingUpdate.length === 0) {
+      return;
+    }
+
+    // Update each project that needs status correction
+    await Promise.all(
+      projectsNeedingUpdate.map((project) =>
+        fetch(
+          `${API_BASE}/api/projects/${project.id}/status`,
+          {
+            method: "PATCH",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              status: "Backlog",
+            }),
+          }
+        )
+          .then((res) => res.json())
+          .catch((err) =>
+            console.error(
+              `Failed to sync project ${project.id}:`,
+              err
+            )
+          )
+      )
+    );
+
+    // Refresh projects after sync
+    await fetchProjects();
+  } catch (error) {
+    console.error("Status sync error:", error);
+  }
+};
 
   /* =========================================================
      FETCH PROJECT MANAGERS
