@@ -854,7 +854,7 @@ export default function Reports() {
                         <div className="mb-4 flex items-center justify-between">
                             <div>
                                 <h2 className="text-lg font-bold text-black">
-                                    Create Reports
+                                    Projects Pending Reports
                                 </h2>
                                 <p className="mt-1 text-xs text-gray-600">
                                     Projects without reports
@@ -1048,7 +1048,7 @@ export default function Reports() {
                         <div className="mb-4 flex items-center justify-between">
                             <div>
                                 <h2 className="text-lg font-bold text-black">
-                                    Created Reports
+                                    Available Project Reports
                                 </h2>
                                 <p className="mt-1 text-xs text-gray-600">
                                     Submitted reports
