@@ -417,6 +417,13 @@ useEffect(() => {
 
   const [modalOpen, setModalOpen] = useState(false);
 
+  // ====================================
+  // TASK DETAILS MODAL STATE
+  // ====================================
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [selectedTaskForDetails, setSelectedTaskForDetails] =
+    useState<Task | null>(null);
+
   const [selectedProjectId, setSelectedProjectId] = useState<
     string | null
   >(null);
