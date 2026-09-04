@@ -1566,57 +1566,58 @@ const openStatusModal = (project: Project) => {
      CHANGE PROJECT STATUS
   ========================================================= */
 
-const handleChangeProjectStatus =
-  async () => {
-    if (
-      !selectedProject ||
-      (!isProjectManager && !canManageProjects)  // ✅ ALLOW PROJECT MANAGERS
-    ) {
+const handleChangeProjectStatus = async () => {
+  if (
+    !selectedProject ||
+    (!isProjectManager && !canManageProjects)
+  ) {
+    return;
+  }
+
+  setStatusError("");
+
+  // ✅ ADD THIS VALIDATION
+  if (selectedNewStatus === "Done") {
+    if (selectedProject.completedTasks !== selectedProject.totalTasks) {
+      setStatusError(
+        "The project cannot be marked Done until every task is completed."
+      );
       return;
     }
-    
-    setStatusError("");
-    
-    // Rest of your code stays the same...
-    if (selectedNewStatus === "Done") {
-      // validation logic...
-    }
-    
-    try {
-      setSavingStatus(true);
-      const response = await fetch(
-        `${API_BASE}/api/projects/${selectedProject.id}/status`,
-        {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            status: selectedNewStatus,
-          }),
-        }
-      );
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-            "Unable to update project status."
-        );
-      }
-      
-      setStatusModalOpen(false);
-      setSelectedProject(null);
-      await fetchProjects();
-    } catch (error: any) {
-      setStatusError(
-        error.message ||
-          "Unable to update project status."
-      );
-    } finally {
-      setSavingStatus(false);
-    }
-  };
+  }
 
+  try {
+    setSavingStatus(true);
+    const response = await fetch(
+      `${API_BASE}/api/projects/${selectedProject.id}/status`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          status: selectedNewStatus,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Unable to update project status."
+      );
+    }
+
+    setStatusModalOpen(false);
+    setSelectedProject(null);
+    await fetchProjects();
+  } catch (error: any) {
+    setStatusError(
+      error.message || "Unable to update project status."
+    );
+  } finally {
+    setSavingStatus(false);
+  }
+};
   /* =========================================================
      ROLE LABEL
   ========================================================= */
@@ -4016,8 +4017,11 @@ const handleChangeProjectStatus =
                   onClick={
                     handleChangeProjectStatus
                   }
-                  disabled={
-                    savingStatus
+                    disabled={
+                    savingStatus ||
+                    (selectedNewStatus === "Done" &&
+                    selectedProject.completedTasks !==
+                    selectedProject.totalTasks)
                   }
                   className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white disabled:opacity-40"
                 >
