@@ -93,6 +93,14 @@ type CurrentUser = {
   email?: string;
 };
 
+type TeamRoleStats = {
+  developers: number;
+  designers: number;
+  managers: number;
+  qa: number;
+  other: number;
+  total: number;
+};
 /* =========================================================
    API
 ========================================================= */
@@ -165,6 +173,16 @@ export default function Dashboard() {
     selectedOverviewProject,
     setSelectedOverviewProject,
   ] = useState<Project | null>(null);
+
+  const [teamRoleStats, setTeamRoleStats] =
+  useState<TeamRoleStats>({
+    developers: 0,
+    designers: 0,
+    managers: 0,
+    qa: 0,
+    other: 0,
+    total: 0,
+  });
 
   /* =======================================================
      CURRENT USER / ROLE
@@ -296,6 +314,71 @@ export default function Dashboard() {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       };
+
+      /* =====================================================
+               DASHBOARD TEAM OVERVIEW
+         ===================================================== */
+
+        try {
+          const teamOverviewResponse = await fetch(
+            `${API_BASE}/dashboard/team-overview`,
+            {
+              headers,
+            }
+          );
+        
+          if (teamOverviewResponse.ok) {
+            const teamOverviewData =
+              await teamOverviewResponse.json();
+        
+            setTeamRoleStats({
+              developers:
+                Number(
+                  teamOverviewData?.developers
+                ) || 0,
+        
+              designers:
+                Number(
+                  teamOverviewData?.designers
+                ) || 0,
+        
+              managers:
+                Number(
+                  teamOverviewData?.managers
+                ) || 0,
+        
+              qa:
+                Number(
+                  teamOverviewData?.qa
+                ) || 0,
+        
+              other:
+                Number(
+                  teamOverviewData?.other
+                ) || 0,
+        
+              total:
+                Number(
+                  teamOverviewData?.total
+                ) || 0,
+            });
+          }
+        } catch (teamError) {
+          console.error(
+            "Failed to load team overview:",
+            teamError
+          );
+        
+          setTeamRoleStats({
+            developers: 0,
+            designers: 0,
+            managers: 0,
+            qa: 0,
+            other: 0,
+            total: 0,
+          });
+        }
+      
       /* =====================================================
          PROJECTS
       ===================================================== */
@@ -797,79 +880,79 @@ export default function Dashboard() {
      TEAM ROLE OVERVIEW
   ======================================================= */
 
-  const teamRoleStats = useMemo(() => {
-    const developers =
-      teamMembers.filter(
-        (member) => {
-          const role =
-            member.role?.toLowerCase();
+  // const teamRoleStats = useMemo(() => {
+  //   const developers =
+  //     teamMembers.filter(
+  //       (member) => {
+  //         const role =
+  //           member.role?.toLowerCase();
 
-          return (
-            role.includes("developer") ||
-            role.includes("software") ||
-            role.includes("engineer")
-          );
-        }
-      ).length;
+  //         return (
+  //           role.includes("developer") ||
+  //           role.includes("software") ||
+  //           role.includes("engineer")
+  //         );
+  //       }
+  //     ).length;
 
-    const designers =
-      teamMembers.filter(
-        (member) => {
-          const role =
-            member.role?.toLowerCase();
+  //   const designers =
+  //     teamMembers.filter(
+  //       (member) => {
+  //         const role =
+  //           member.role?.toLowerCase();
 
-          return (
-            role.includes("designer") ||
-            role.includes("ui") ||
-            role.includes("ux")
-          );
-        }
-      ).length;
+  //         return (
+  //           role.includes("designer") ||
+  //           role.includes("ui") ||
+  //           role.includes("ux")
+  //         );
+  //       }
+  //     ).length;
 
-    const managers =
-      teamMembers.filter(
-        (member) => {
-          const role =
-            member.role?.toLowerCase();
+  //   const managers =
+  //     teamMembers.filter(
+  //       (member) => {
+  //         const role =
+  //           member.role?.toLowerCase();
 
-          return role.includes("manager");
-        }
-      ).length;
+  //         return role.includes("manager");
+  //       }
+  //     ).length;
 
-    const qa =
-      teamMembers.filter(
-        (member) => {
-          const role =
-            member.role?.toLowerCase();
+  //   const qa =
+  //     teamMembers.filter(
+  //       (member) => {
+  //         const role =
+  //           member.role?.toLowerCase();
 
-          return (
-            role.includes("qa") ||
-            role.includes("quality") ||
-            role.includes("tester")
-          );
-        }
-      ).length;
+  //         return (
+  //           role.includes("qa") ||
+  //           role.includes("quality") ||
+  //           role.includes("tester")
+  //         );
+  //       }
+  //     ).length;
 
-    const known =
-      developers +
-      designers +
-      managers +
-      qa;
+  //   const known =
+  //     developers +
+  //     designers +
+  //     managers +
+  //     qa;
 
-    const other = Math.max(
-      teamMembers.length - known,
-      0
-    );
+  //   const other = Math.max(
+  //     teamMembers.length - known,
+  //     0
+  //   );
 
-    return {
-      developers,
-      designers,
-      managers,
-      qa,
-      other,
-      total: teamMembers.length,
-    };
-  }, [teamMembers]);
+  //   return {
+  //     developers,
+  //     designers,
+  //     managers,
+  //     qa,
+  //     other,
+  //     total: teamMembers.length,
+  //   };
+  // }, [teamMembers]);
 
   /* =======================================================
      DOMAIN OVERVIEW
