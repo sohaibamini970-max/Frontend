@@ -1190,7 +1190,7 @@ export default function Dashboard() {
     <div>
       <div className="flex items-center gap-3">
 
-        <h2 className="text-[15px] font-bold text-[#172633]">
+        <h2 className="text-[25px] font-bold text-[#172633]">
           Projects Overview
         </h2>
 
@@ -1485,11 +1485,11 @@ export default function Dashboard() {
 
               <div>
 
-                <h2 className="text-[18px] font-bold text-[#172633]">
+                <h2 className="text-[25px] font-bold text-[#172633]">
                   Team Overview
                 </h2>
 
-                <p className="mt-1 text-[11px] text-[#8b96a3]">
+                <p className="mt-1 text-[14px] text-[#8b96a3]">
                   Team members, roles and project domains
                 </p>
 
@@ -1501,7 +1501,7 @@ export default function Dashboard() {
               onClick={() =>
                 router.push("/teams")
               }
-              className="flex items-center gap-2 rounded-lg bg-[#172b3a] px-4 py-2.5 text-[11px] font-semibold text-white transition hover:bg-[#223d50]"
+              className="flex items-center gap-2 rounded-lg bg-[#172b3a] px-4 py-2.5 text-[15px] font-semibold text-white transition hover:bg-[#223d50]"
             >
               View teams
               <ChevronRight size={13} />
@@ -1517,7 +1517,7 @@ export default function Dashboard() {
 
               <div className="mb-6">
 
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9aa4ae]">
+                <p className="text-[14px] font-bold uppercase tracking-wider text-[#9aa4ae]">
                   Team Distribution
                 </p>
 
@@ -1547,7 +1547,7 @@ export default function Dashboard() {
                       {teamRoleStats.total}
                     </span>
 
-                    <span className="mt-1 text-[9px] font-bold text-[#9aa4ae]">
+                    <span className="mt-1 text-[12px] font-bold text-[#9aa4ae]">
                       MEMBERS
                     </span>
 
