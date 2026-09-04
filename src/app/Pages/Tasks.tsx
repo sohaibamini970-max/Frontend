@@ -611,12 +611,12 @@ const getFileIcon = (fileType: string) => {
         setTasks(allTasks);
         setExpandedProjects(
           visibleProjects
-            .filter((project) =>
+            .filter((project: Project) =>
               allTasks.some(
                 (task) => String(task.project_id) === String(project.id)
               )
             )
-            .map((project) => project.id)
+            .map((project: Project) => project.id)
         );
         return;
       }
@@ -689,7 +689,7 @@ const getFileIcon = (fileType: string) => {
         const managerTasks = taskResponses.flat();
         setProjects(assignedProjects);
         setTasks(managerTasks);
-        setExpandedProjects(assignedProjects.map((project) => project.id));
+        setExpandedProjects(assignedProjects.map((project: Project) => project.id));
         return;
       }
 
@@ -731,7 +731,7 @@ const getFileIcon = (fileType: string) => {
           );
 
         const projectIds = [
-          ...new Set(onlyMyTasks.map((task) => String(task.project_id))),
+          ...new Set(onlyMyTasks.map((task: Task) => String(task.project_id))),
         ];
 
         if (projectIds.length === 0) {
@@ -761,7 +761,7 @@ const getFileIcon = (fileType: string) => {
 
         setTasks(onlyMyTasks);
         setProjects(myProjects);
-        setExpandedProjects(myProjects.map((project) => project.id));
+        setExpandedProjects(myProjects.map((project: Project) => project.id));
         return;
       }
 
