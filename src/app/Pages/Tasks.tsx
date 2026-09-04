@@ -2044,45 +2044,78 @@ const fetchTaskChallenges = async (task: Task) => {
                                     )}
                                   </div>
 
-                                  <div className="mt-3 border-t border-slate-100 pt-2.5">
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        openTaskDetails(task);
-                                      }}
-                                      className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#07111f] px-4 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#111c2c]"
-                                    >
-                                      <Eye size={13} />
-                                      View task details
-                                    </button>
+                                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-2.5">
+  {/* View Task Details */}
+  <button
+    type="button"
+    onClick={(event) => {
+      event.stopPropagation();
+      openTaskDetails(task);
+    }}
+    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#07111f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#172235]"
+  >
+    <Eye size={13} />
+    <span>Details</span>
+  </button>
 
-                                    {/* CHALLENGES Member can add challenges only to their assigned task. Management / permitted roles can read challenges. */}
-                                    {canReadChallenge(task) &&
-                                    ( <button 
-                                      type="button" 
-                                      onClick={() => openChallenges(task)}
-                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-2.5 text-[10px] font-bold text-violet-800 shadow-sm transition hover:border-violet-400 hover:bg-violet-100"
-                                        title={ canWriteChallenge(task) ? "View or add challenges" : "View task challenges" } 
-                                        > <Flag size={13} /> 
-                                      <span>Challenges</span> 
-                                      {challengeCounts[task.id] !== undefined && 
-                                      ( <span className="flex min-w-[18px] items-center justify-center rounded-full bg-violet-200 px-1.5 py-0.5 text-[9px] font-bold text-violet-900">
-                                    {challengeCounts[task.id]} </span> )}
-                                      
-                                    </button> )}
+  {/* Challenges */}
+  {canReadChallenge(task) ? (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        openChallenges(task);
+      }}
+      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#31204f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#432968]"
+      title={
+        canWriteChallenge(task)
+          ? "View or add challenges"
+          : "View task challenges"
+      }
+    >
+      <Flag size={13} />
 
-                                    {canReadAttachments(task) && (
-                                    <button type="button"
-                                    onClick={() => openAttachmentModal(task)}
-                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 text-[10px] font-bold text-amber-800 shadow-sm transition hover:border-amber-400 hover:bg-amber-100"
-                                      title={ currentUser?.role === "Project Manager" ? "View or add task files" : "View task files" } > 
-                                      <File size={13} /> <span>Files</span> {(attachments[task.id]?.length || 0) > 0 && 
-                                      ( <span className="flex min-w-[18px] items-center justify-center rounded-full bg-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-900"> 
-                                      {attachments[task.id]?.length || 0} </span> )}
-                                    </button> )}
-                                    
-                                  </div>
+      <span>Challenges</span>
+
+      {challengeCounts[task.id] !== undefined && (
+        <span className="flex min-w-[17px] items-center justify-center rounded-full bg-violet-300 px-1.5 py-0.5 text-[9px] font-bold text-violet-950">
+          {challengeCounts[task.id]}
+        </span>
+      )}
+    </button>
+  ) : (
+    <div />
+  )}
+
+  {/* Files */}
+  {canReadAttachments(task) ? (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        openAttachmentModal(task);
+      }}
+      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#49351b] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#60451f]"
+      title={
+        currentUser?.role === "Project Manager"
+          ? "View or add task files"
+          : "View task files"
+      }
+    >
+      <File size={13} />
+
+      <span>Files</span>
+
+      {(attachments[task.id]?.length || 0) > 0 && (
+        <span className="flex min-w-[17px] items-center justify-center rounded-full bg-amber-300 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">
+          {attachments[task.id]?.length || 0}
+        </span>
+      )}
+    </button>
+  ) : (
+    <div />
+  )}
+</div>
                                 </div>
                               </div>
                             </div>
