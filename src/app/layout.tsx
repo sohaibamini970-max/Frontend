@@ -1,7 +1,6 @@
 // app/layout.tsx
 import "./globals.css";
 import LayoutWrapper from "./Components/LayoutWrapper";
-import { ChatbotButton } from "./Components";
 
 export default function RootLayout({
   children,
@@ -11,11 +10,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-white">
-        <LayoutWrapper>
-          {children}
-          {/* Chatbot Button - Always visible */}
-          <ChatbotButton />
-        </LayoutWrapper>
+        <LayoutWrapper>{children}</LayoutWrapper>
       </body>
     </html>
   );
