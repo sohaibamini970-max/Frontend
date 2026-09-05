@@ -1777,7 +1777,7 @@ const handleChangeProjectStatus = async () => {
                     activeView ===
                     "assignment"
                       ? "text-gray-900"
-                      : "text-gray-500 hover:text-gray-800"
+                     : "text-gray-500 hover:text-gray-800"
                   }`}
                 >
                   Assignment Board
@@ -1896,7 +1896,7 @@ const handleChangeProjectStatus = async () => {
               <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
 
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900">
+                  <h2 className="text-xl font-semibold text-gray-900">
                     {isMember
                       ? "My Project Tasks"
                       : isProjectManager
@@ -1904,7 +1904,7 @@ const handleChangeProjectStatus = async () => {
                       : "All Projects"}
                   </h2>
 
-                  <p className="mt-1 text-[11px] text-gray-400">
+                  <p className="mt-1 text-[14px] text-gray-400">
                     {filteredProjects.length}{" "}
                     project
                     {filteredProjects.length !==
