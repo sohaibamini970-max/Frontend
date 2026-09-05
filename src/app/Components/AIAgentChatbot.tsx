@@ -1,7 +1,7 @@
-// components/AIAgentChatbot.jsx
+// components/AIAgentChatbot.tsx
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Send,
   X,
@@ -21,20 +21,60 @@ import {
   FileText,
 } from "lucide-react";
 
-const API_BASE = "https://backend-five-swart-88.vercel.app/api";
+// ============================================================
+// TYPES
+// ============================================================
 
-const AIAgentChatbot = ({ isOpen, onClose }) => {
-  const [messages, setMessages] = useState([
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+  data?: any;
+  functionCalled?: string | null;
+  requiresAction?: boolean;
+  isError?: boolean;
+}
+
+interface ConversationHistory {
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface AIAgentChatbotProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+interface ChatResponse {
+  success: boolean;
+  message?: string;
+  data?: any;
+  function_called?: string | null;
+  requires_action?: boolean;
+  error?: string;
+}
+
+// ============================================================
+// COMPONENT
+// ============================================================
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://backend-five-swart-88.vercel.app/api";
+
+const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
+  const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
-      content: "👋 Hello! I'm your AI Project Management Assistant.\n\nI can help you with:\n• Creating and managing projects\n• Creating and assigning tasks\n• Submitting work\n• Finding information about projects, tasks, and users\n\nJust tell me what you'd like to do!",
+      content:
+        "👋 Hello! I'm your AI Project Management Assistant.\n\nI can help you with:\n• Creating and managing projects\n• Creating and assigning tasks\n• Submitting work\n• Finding information about projects, tasks, and users\n\nJust tell me what you'd like to do!",
       timestamp: new Date(),
     },
   ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState([
+
+  const [input, setInput] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [suggestions, setSuggestions] = useState<string[]>([
     "Create a new project called 'AI Platform' with high priority",
     "Show me all my projects",
     "Create a task for project 5b7896e6 called 'Design Login Page'",
@@ -42,10 +82,11 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
     "Assign project abc-123 to manager John Doe",
     "Submit work for task xyz-789: https://github.com/...",
   ]);
-  const [showSuggestions, setShowSuggestions] = useState(true);
-  const [conversationHistory, setConversationHistory] = useState([]);
-  const chatEndRef = useRef(null);
-  const inputRef = useRef(null);
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(true);
+  const [conversationHistory, setConversationHistory] = useState<ConversationHistory[]>([]);
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -59,15 +100,17 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  const getAuthHeaders = () => ({
+  // Get auth headers
+  const getAuthHeaders = (): HeadersInit => ({
     "Content-Type": "application/json",
     Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
   });
 
-  const sendMessage = async (messageText) => {
+  // Send message
+  const sendMessage = async (messageText: string): Promise<void> => {
     if (!messageText.trim()) return;
 
-    const userMessage = {
+    const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: messageText,
@@ -80,7 +123,7 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
     setLoading(true);
 
     // Add to conversation history
-    const newHistory = [
+    const newHistory: ConversationHistory[] = [
       ...conversationHistory,
       { role: "user", content: messageText },
     ];
@@ -92,18 +135,18 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
         headers: getAuthHeaders(),
         body: JSON.stringify({
           message: messageText,
-          conversationHistory: newHistory.slice(-10), // Keep last 10 messages
+          conversationHistory: newHistory.slice(-10),
         }),
       });
 
-      const data = await response.json();
+      const data: ChatResponse = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to process request");
       }
 
       // Add assistant message
-      const assistantMessage = {
+      const assistantMessage: Message = {
         id: Date.now().toString() + "-assistant",
         role: "assistant",
         content: data.message || "Task completed successfully!",
@@ -123,10 +166,10 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
 
       // Show suggestions again after a delay
       setTimeout(() => setShowSuggestions(true), 5000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat error:", error);
 
-      const errorMessage = {
+      const errorMessage: Message = {
         id: Date.now().toString() + "-error",
         role: "assistant",
         content: `❌ ${error.message || "Something went wrong. Please try again."}`,
@@ -140,7 +183,8 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleKeyPress = (e) => {
+  // Handle key press
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage(input);
@@ -148,16 +192,15 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
   };
 
   // Format timestamp
-  const formatTime = (date) => {
+  const formatTime = (date: Date): string => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  // Parse message content for links and code
-  const formatContent = (content) => {
-    // Convert URLs to clickable links
+  // Format content with links
+  const formatContent = (content: string): React.ReactNode => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = content.split(urlRegex);
-    
+
     return parts.map((part, index) => {
       if (part.match(urlRegex)) {
         return (
@@ -195,6 +238,7 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 hover:bg-white/10"
+            aria-label="Close chatbot"
           >
             <X size={18} />
           </button>
@@ -287,6 +331,7 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
               <button
                 onClick={() => setShowSuggestions(false)}
                 className="text-gray-400 hover:text-gray-600"
+                aria-label="Hide suggestions"
               >
                 <ChevronUp size={14} />
               </button>
@@ -312,8 +357,8 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
               ref={inputRef}
               type="text"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+              onKeyDown={handleKeyPress}
               placeholder="Ask me anything..."
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500 focus:ring-2 focus:ring-gray-100"
               disabled={loading}
@@ -322,6 +367,7 @@ const AIAgentChatbot = ({ isOpen, onClose }) => {
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || loading}
               className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#07111f] text-white hover:bg-[#111c2c] disabled:opacity-40 disabled:cursor-not-allowed transition"
+              aria-label="Send message"
             >
               {loading ? (
                 <Loader2 size={18} className="animate-spin" />
