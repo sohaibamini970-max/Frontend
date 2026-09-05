@@ -1,7 +1,9 @@
+// app/Components/LayoutWrapper.tsx
 "use client";
 
 import { usePathname } from "next/navigation";
 import Header from "./Header";
+import ChatbotButton from "./ChatbotButton";
 
 export default function LayoutWrapper({
   children,
@@ -18,6 +20,9 @@ export default function LayoutWrapper({
       {!isLoginPage && <Header />}
 
       <main>{children}</main>
+
+      {/* Show chatbot on all pages EXCEPT login */}
+      {!isLoginPage && <ChatbotButton />}
     </>
   );
 }
