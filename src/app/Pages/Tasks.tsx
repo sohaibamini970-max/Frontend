@@ -104,6 +104,8 @@ type Attachment = {
   created_at: string;
 };
 
+
+
 const API_BASE = "https://backend-five-swart-88.vercel.app/api";
 
 function getToken() {
@@ -480,6 +482,17 @@ const [deletingAttachment, setDeletingAttachment] = useState<string | null>(null
 const [loadingAttachments, setLoadingAttachments] = useState(false);
 const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
 const [previewLoading, setPreviewLoading] = useState(false);
+// SUBMISSION STATE
+// ====================================
+const [submissions, setSubmissions] = useState<Record<string, TaskSubmission[]>>({});
+const [submissionModalOpen, setSubmissionModalOpen] = useState(false);
+const [selectedTaskForSubmission, setSelectedTaskForSubmission] = useState<Task | null>(null);
+const [submissionLink, setSubmissionLink] = useState("");
+const [submissionDescription, setSubmissionDescription] = useState("");
+const [savingSubmission, setSavingSubmission] = useState(false);
+const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+const [deletingSubmission, setDeletingSubmission] = useState<string | null>(null);
+
 
   const isManagementRole =
   currentUser?.role === "System Administrator" ||
@@ -488,6 +501,177 @@ const [previewLoading, setPreviewLoading] = useState(false);
 
   const isMember =
   currentUser?.role === "Member";
+
+  // Task Work Submission
+  // ====================================
+// ====================================
+// SUBMISSION HELPERS
+// ====================================
+const canSubmitWork = (task: Task): boolean => {
+    return (
+        isMember &&
+        String(task.assignee_id || "") === String(currentUser?.id || "") &&
+        task.status !== "Done"
+    );
+};
+
+const canViewSubmissions = (task: Task): boolean => {
+    return (
+        isManagementRole ||
+        String(task.assignee_id || "") === String(currentUser?.id || "")
+    );
+};
+
+const canDeleteSubmission = (submission: TaskSubmission): boolean => {
+    return (
+        isManagementRole ||
+        String(submission.user_id) === String(currentUser?.id)
+    );
+};
+
+const hasSubmissions = (taskId: string): boolean => {
+    return (submissions[taskId]?.length || 0) > 0;
+};
+
+// ====================================
+// SUBMISSION API FUNCTIONS
+// ====================================
+
+const fetchTaskSubmissions = async (taskId: string) => {
+    try {
+        setLoadingSubmissions(true);
+        const response = await fetch(
+            `${API_BASE}/tasks/${taskId}/submissions`,
+            { headers: authHeaders() }
+        );
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to load submissions");
+        }
+        
+        setSubmissions(prev => ({
+            ...prev,
+            [taskId]: data.submissions || []
+        }));
+    } catch (error) {
+        console.error("Fetch submissions error:", error);
+        setSubmissions(prev => ({
+            ...prev,
+            [taskId]: []
+        }));
+    } finally {
+        setLoadingSubmissions(false);
+    }
+};
+
+const handleAddSubmission = async (taskId: string) => {
+    if (!submissionLink.trim()) {
+        alert("Please provide a work link.");
+        return;
+    }
+
+    try {
+        setSavingSubmission(true);
+        
+        const response = await fetch(
+            `${API_BASE}/tasks/${taskId}/submissions`,
+            {
+                method: "POST",
+                headers: {
+                    ...authHeaders(),
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    link: submissionLink.trim(),
+                    description: submissionDescription.trim() || null
+                }),
+            }
+        );
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to submit work");
+        }
+        
+        // Refresh submissions
+        await fetchTaskSubmissions(taskId);
+        
+        // Refresh tasks to update status
+        await fetchProjectsAndTasks();
+        
+        setSubmissionLink("");
+        setSubmissionDescription("");
+        
+        alert("Work submitted successfully!");
+        
+    } catch (error) {
+        console.error("Submit work error:", error);
+        alert(error instanceof Error ? error.message : "Failed to submit work");
+    } finally {
+        setSavingSubmission(false);
+    }
+};
+
+const handleDeleteSubmission = async (submissionId: string) => {
+    const confirmed = window.confirm(
+        "Are you sure you want to delete this submission?"
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        setDeletingSubmission(submissionId);
+        
+        const response = await fetch(
+            `${API_BASE}/submissions/${submissionId}`,
+            {
+                method: "DELETE",
+                headers: authHeaders(),
+            }
+        );
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to delete submission");
+        }
+        
+        // Refresh submissions for the current task
+        if (selectedTaskForSubmission) {
+            await fetchTaskSubmissions(selectedTaskForSubmission.id);
+        }
+        
+        alert("Submission deleted successfully");
+    } catch (error) {
+        console.error("Delete submission error:", error);
+        alert(error instanceof Error ? error.message : "Failed to delete submission");
+    } finally {
+        setDeletingSubmission(null);
+    }
+};
+
+const openSubmissionModal = async (task: Task) => {
+    if (!canViewSubmissions(task)) {
+        alert("You are not authorized to view submissions for this task.");
+        return;
+    }
+    
+    setSelectedTaskForSubmission(task);
+    setSubmissionModalOpen(true);
+    setSubmissionLink("");
+    setSubmissionDescription("");
+    await fetchTaskSubmissions(task.id);
+};
+
+const closeSubmissionModal = () => {
+    setSubmissionModalOpen(false);
+    setSelectedTaskForSubmission(null);
+    setSubmissionLink("");
+    setSubmissionDescription("");
+};
 
   const canWriteChallenge = (task: Task) => {
   return (
@@ -1536,58 +1720,78 @@ const fetchTaskChallenges = async (task: Task) => {
     setSelectedTaskDetails(null);
   };
 
-  const handleTaskStatusChange = async (
-    taskId: string,
-    status: TaskStatus
-  ) => {
+const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
     try {
-      const response = await fetch(
-        `${API_BASE}/tasks/${taskId}/status`,
-        {
-          method: "PATCH",
-          headers: {
-            ...authHeaders(),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            status,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-          data.message ||
-          "Failed to update status"
-        );
-      }
-
-      const updatedTask = normalizeTask(data);
-
-      setTasks((previous) =>
-        previous.map((task) =>
-          task.id === taskId
-            ? {
-              ...task,
-              ...updatedTask,
+        // If trying to mark as Done, check for submissions
+        if (status === "Done") {
+            const task = tasks.find(t => t.id === taskId);
+            const submissionsForTask = submissions[taskId] || [];
+            
+            if (submissionsForTask.length === 0) {
+                alert(
+                    "Task cannot be marked as Done until the assignee has submitted at least one work link. Please ask the assignee to submit their work first."
+                );
+                return;
             }
-            : task
-        )
-      );
-
-      setOpenTaskMenu(null);
+            
+            // Use the special endpoint that checks for submissions
+            const response = await fetch(
+                `${API_BASE}/tasks/${taskId}/mark-done`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        ...authHeaders(),
+                        "Content-Type": "application/json",
+                    }
+                }
+            );
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to mark task as Done");
+            }
+            
+            // Update task in UI
+            await fetchProjectsAndTasks();
+            setOpenTaskMenu(null);
+            return;
+        }
+        
+        // For other status changes, use the existing method
+        const response = await fetch(
+            `${API_BASE}/tasks/${taskId}/status`,
+            {
+                method: "PATCH",
+                headers: {
+                    ...authHeaders(),
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ status }),
+            }
+        );
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to update status");
+        }
+        
+        const updatedTask = normalizeTask(data);
+        setTasks(previous =>
+            previous.map(task =>
+                task.id === taskId
+                    ? { ...task, ...updatedTask }
+                    : task
+            )
+        );
+        setOpenTaskMenu(null);
+        
     } catch (error: any) {
-      console.error(error);
-
-      alert(
-        error.message ||
-        "Failed to update task status"
-      );
+        console.error(error);
+        alert(error.message || "Failed to update task status");
     }
-  };
+};
 
   const toggleTaskComplete = (
     taskId: string,
@@ -2044,77 +2248,90 @@ const fetchTaskChallenges = async (task: Task) => {
                                     )}
                                   </div>
 
-                                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-2.5">
-  {/* View Task Details */}
-  <button
-    type="button"
-    onClick={(event) => {
-      event.stopPropagation();
-      openTaskDetails(task);
-    }}
-    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#07111f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#172235]"
-  >
-    <Eye size={13} />
-    <span>Details</span>
-  </button>
-
-  {/* Challenges */}
-  {canReadChallenge(task) ? (
+                            <div className="mt-3 grid grid-cols-4 gap-2 border-t border-slate-100 pt-2.5">
+    {/* View Task Details */}
     <button
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        openChallenges(task);
-      }}
-      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#31204f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#432968]"
-      title={
-        canWriteChallenge(task)
-          ? "View or add challenges"
-          : "View task challenges"
-      }
+        type="button"
+        onClick={(event) => {
+            event.stopPropagation();
+            openTaskDetails(task);
+        }}
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#07111f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#172235]"
     >
-      <Flag size={13} />
-
-      <span>Challenges</span>
-
-      {challengeCounts[task.id] !== undefined && (
-        <span className="flex min-w-[17px] items-center justify-center rounded-full bg-violet-300 px-1.5 py-0.5 text-[9px] font-bold text-violet-950">
-          {challengeCounts[task.id]}
-        </span>
-      )}
+        <Eye size={13} />
+        <span>Details</span>
     </button>
-  ) : (
-    <div />
-  )}
 
-  {/* Files */}
-  {canReadAttachments(task) ? (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        openAttachmentModal(task);
-      }}
-      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#49351b] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#60451f]"
-      title={
-        currentUser?.role === "Project Manager"
-          ? "View or add task files"
-          : "View task files"
-      }
-    >
-      <File size={13} />
+    {/* Work Submissions */}
+    {canViewSubmissions(task) ? (
+        <button
+            type="button"
+            onClick={(event) => {
+                event.stopPropagation();
+                openSubmissionModal(task);
+            }}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#1a4a3a] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#23634b]"
+            title={
+                canSubmitWork(task)
+                    ? "Submit your work or view submissions"
+                    : "View work submissions"
+            }
+        >
+            <CheckCircle2 size={13} />
+            <span>Work</span>
+            {(submissions[task.id]?.length || 0) > 0 && (
+                <span className="flex min-w-[17px] items-center justify-center rounded-full bg-emerald-300 px-1.5 py-0.5 text-[9px] font-bold text-emerald-950">
+                    {submissions[task.id]?.length || 0}
+                </span>
+            )}
+        </button>
+    ) : (
+        <div />
+    )}
 
-      <span>Files</span>
+    {/* Challenges */}
+    {canReadChallenge(task) ? (
+        <button
+            type="button"
+            onClick={(event) => {
+                event.stopPropagation();
+                openChallenges(task);
+            }}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#31204f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#432968]"
+        >
+            <Flag size={13} />
+            <span>Challenges</span>
+            {challengeCounts[task.id] !== undefined && (
+                <span className="flex min-w-[17px] items-center justify-center rounded-full bg-violet-300 px-1.5 py-0.5 text-[9px] font-bold text-violet-950">
+                    {challengeCounts[task.id]}
+                </span>
+            )}
+        </button>
+    ) : (
+        <div />
+    )}
 
-      {(attachments[task.id]?.length || 0) > 0 && (
-        <span className="flex min-w-[17px] items-center justify-center rounded-full bg-amber-300 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">
-          {attachments[task.id]?.length || 0}
-        </span>
-      )}
-    </button>
-  ) : (
-    <div />
-  )}
+    {/* Files */}
+    {canReadAttachments(task) ? (
+        <button
+            type="button"
+            onClick={(event) => {
+                event.stopPropagation();
+                openAttachmentModal(task);
+            }}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#49351b] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#60451f]"
+        >
+            <File size={13} />
+            <span>Files</span>
+            {(attachments[task.id]?.length || 0) > 0 && (
+                <span className="flex min-w-[17px] items-center justify-center rounded-full bg-amber-300 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">
+                    {attachments[task.id]?.length || 0}
+                </span>
+            )}
+        </button>
+    ) : (
+        <div />
+    )}
 </div>
                                 </div>
                               </div>
@@ -3126,6 +3343,234 @@ const fetchTaskChallenges = async (task: Task) => {
           </div>
         </div>
       )}
+
+      {/* Task Submission Modal*/}
+      {/* WORK SUBMISSION MODAL */}
+{submissionModalOpen && selectedTaskForSubmission && (
+    <div
+        className="fixed inset-0 z-[65] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
+        onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !savingSubmission) {
+                closeSubmissionModal();
+            }
+        }}
+    >
+        <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border-2 border-gray-500 bg-white shadow-2xl">
+            {/* Header */}
+            <div className="shrink-0 border-b border-gray-200 bg-white px-5 py-3">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
+                                <CheckCircle2 size={16} className="text-emerald-700" />
+                            </div>
+                            <div className="min-w-0">
+                                <h2 className="truncate text-base font-bold text-gray-950">
+                                    Work Submissions
+                                </h2>
+                                <p className="truncate text-[11px] text-gray-500">
+                                    {selectedTaskForSubmission?.name}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={closeSubmissionModal}
+                        disabled={savingSubmission}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Close"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="overflow-y-auto bg-[#eef1f4] px-6 py-6">
+                {/* Submissions List */}
+                <div>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-sm font-bold text-gray-950">
+                                Submitted Work
+                            </h3>
+                            <p className="mt-1 text-xs font-medium text-gray-600">
+                                Links to work submitted for this task.
+                            </p>
+                        </div>
+                        <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">
+                            {submissions[selectedTaskForSubmission.id]?.length || 0} Submission{(submissions[selectedTaskForSubmission.id]?.length || 0) !== 1 ? "s" : ""}
+                        </span>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                        {loadingSubmissions ? (
+                            <div className="flex min-h-[130px] items-center justify-center rounded-xl border-2 border-gray-300 bg-white">
+                                <div className="text-center">
+                                    <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+                                    <p className="mt-2 text-xs font-semibold text-gray-600">
+                                        Loading submissions...
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (submissions[selectedTaskForSubmission.id]?.length || 0) === 0 ? (
+                            <div className="rounded-xl border-2 border-dashed border-gray-400 bg-white px-5 py-10 text-center">
+                                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-600">
+                                    <CheckCircle2 size={18} />
+                                </div>
+                                <p className="mt-3 text-sm font-bold text-gray-950">
+                                    No submissions yet
+                                </p>
+                                <p className="mt-1 text-xs font-medium text-gray-600">
+                                    {canSubmitWork(selectedTaskForSubmission)
+                                        ? "Submit your work using the form below."
+                                        : "The assignee has not submitted any work yet."}
+                                </p>
+                            </div>
+                        ) : (
+                            (submissions[selectedTaskForSubmission.id] || []).map((submission, index) => (
+                                <div
+                                    key={submission.id}
+                                    className="rounded-xl border-2 border-gray-300 bg-white p-4 shadow-sm"
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold text-emerald-800">
+                                            #{index + 1}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <a
+                                                        href={submission.link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline break-all"
+                                                    >
+                                                        {submission.link}
+                                                    </a>
+                                                    {submission.description && (
+                                                        <p className="mt-1.5 text-xs font-medium text-gray-700">
+                                                            {submission.description}
+                                                        </p>
+                                                    )}
+                                                    <p className="mt-1.5 text-[10px] font-medium text-gray-500">
+                                                        Submitted by {submission.submitter_name || "User"} • Version {submission.version} • {formatDate(submission.created_at)}
+                                                    </p>
+                                                </div>
+                                                
+                                                {canDeleteSubmission(submission) && (
+                                                    <button
+                                                        onClick={() => handleDeleteSubmission(submission.id)}
+                                                        disabled={deletingSubmission === submission.id}
+                                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                                                        title="Delete submission"
+                                                    >
+                                                        {deletingSubmission === submission.id ? (
+                                                            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-red-600" />
+                                                        ) : (
+                                                            <Trash2 size={14} />
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* Submit Work Form - Only for assignee who is a Member */}
+                {canSubmitWork(selectedTaskForSubmission) && (
+                    <div className="mt-6 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-sm">
+                                <CheckCircle2 size={16} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-sm font-bold text-gray-950">
+                                    Submit Your Work
+                                </h3>
+                                <p className="mt-1 text-xs font-medium leading-relaxed text-gray-700">
+                                    Provide a link to your completed work (Google Drive, GitHub, Figma, etc.).
+                                    You can submit multiple versions if needed.
+                                </p>
+                                <div className="mt-4 space-y-3">
+                                    <input
+                                        type="url"
+                                        value={submissionLink}
+                                        onChange={(event) => setSubmissionLink(event.target.value)}
+                                        placeholder="https://drive.google.com/..."
+                                        className="h-11 w-full rounded-lg border-2 border-gray-400 bg-white px-3.5 text-sm font-semibold text-gray-950 outline-none placeholder:text-gray-500 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                                    />
+                                    <textarea
+                                        value={submissionDescription}
+                                        onChange={(event) => setSubmissionDescription(event.target.value)}
+                                        placeholder="Optional: Describe what was completed or provide additional context..."
+                                        rows={2}
+                                        className="w-full resize-none rounded-lg border-2 border-gray-400 bg-white px-3.5 py-3 text-sm font-medium text-gray-950 outline-none placeholder:text-gray-500 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                                    />
+                                    <div className="flex justify-end">
+                                        <button
+                                            onClick={() => handleAddSubmission(selectedTaskForSubmission.id)}
+                                            disabled={savingSubmission || !submissionLink.trim()}
+                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            {savingSubmission ? (
+                                                <>
+                                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                                    Submitting...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Plus size={15} />
+                                                    Submit Work
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Management Info */}
+                {isManagementRole && selectedTaskForSubmission && (
+                    <div className="mt-3 rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
+                        <div className="flex gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700">
+                                <Users size={15} />
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-gray-950">
+                                    Management View
+                                </p>
+                                <p className="mt-1 text-[11px] font-medium leading-relaxed text-gray-700">
+                                    {selectedTaskForSubmission.assignee_name || "The assignee"} has submitted {(submissions[selectedTaskForSubmission.id]?.length || 0)} work item{(submissions[selectedTaskForSubmission.id]?.length || 0) !== 1 ? "s" : ""}. 
+                                    You can mark this task as Done once the work meets your requirements.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end border-t-2 border-gray-300 bg-[#f5f6f8] px-6 py-4">
+                <button
+                    onClick={closeSubmissionModal}
+                    disabled={savingSubmission}
+                    className="h-10 rounded-lg border-2 border-gray-400 bg-white px-5 text-sm font-semibold text-gray-900 hover:bg-gray-100 disabled:opacity-50"
+                >
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+)}
 
       {/* FILE PREVIEW MODAL */}
       {previewModalOpen && selectedAttachmentForPreview && (
