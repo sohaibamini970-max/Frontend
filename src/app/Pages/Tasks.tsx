@@ -104,6 +104,20 @@ type Attachment = {
   created_at: string;
 };
 
+// Add to your existing type definitions
+type TaskSubmission = {
+    id: string;
+    task_id: string;
+    user_id: string;
+    link: string;
+    description?: string;
+    version: number;
+    created_at: string;
+    updated_at: string;
+    submitter_name?: string;
+    submitter_email?: string;
+};
+
 
 
 const API_BASE = "https://backend-five-swart-88.vercel.app/api";
