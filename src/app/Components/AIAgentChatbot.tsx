@@ -59,7 +59,7 @@ interface ChatResponse {
 // COMPONENT
 // ============================================================
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://backend-five-swart-88.vercel.app/api/ai";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://backend-five-swart-88.vercel.app/api";
 
 const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
   const [messages, setMessages] = useState<Message[]>([
