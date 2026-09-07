@@ -17,12 +17,13 @@ import {
   RefreshCw,
   AlertTriangle,
   TrendingUp,
-  TrendingDown,
-  BarChart3,
   GanttChart,
-  Sparkles,
   Timer,
   Flag,
+  Sparkles,
+  Target,
+  Layers,
+  BarChart3,
 } from "lucide-react";
 
 /* =========================================================
@@ -148,28 +149,47 @@ function getProgressPercentage(startDate?: string | null, endDate?: string | nul
 }
 
 /* =========================================================
+   PROJECT COLORS
+========================================================= */
+
+const PROJECT_COLORS = [
+  { bg: "bg-gradient-to-r from-blue-600 to-blue-700", light: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", accent: "from-blue-500 to-blue-600" },
+  { bg: "bg-gradient-to-r from-purple-600 to-purple-700", light: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", accent: "from-purple-500 to-purple-600" },
+  { bg: "bg-gradient-to-r from-emerald-600 to-emerald-700", light: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", accent: "from-emerald-500 to-emerald-600" },
+  { bg: "bg-gradient-to-r from-rose-600 to-rose-700", light: "bg-rose-50", border: "border-rose-200", text: "text-rose-700", accent: "from-rose-500 to-rose-600" },
+  { bg: "bg-gradient-to-r from-amber-600 to-amber-700", light: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", accent: "from-amber-500 to-amber-600" },
+  { bg: "bg-gradient-to-r from-cyan-600 to-cyan-700", light: "bg-cyan-50", border: "border-cyan-200", text: "text-cyan-700", accent: "from-cyan-500 to-cyan-600" },
+  { bg: "bg-gradient-to-r from-indigo-600 to-indigo-700", light: "bg-indigo-50", border: "border-indigo-200", text: "text-indigo-700", accent: "from-indigo-500 to-indigo-600" },
+  { bg: "bg-gradient-to-r from-teal-600 to-teal-700", light: "bg-teal-50", border: "border-teal-200", text: "text-teal-700", accent: "from-teal-500 to-teal-600" },
+];
+
+function getProjectColor(index: number) {
+  return PROJECT_COLORS[index % PROJECT_COLORS.length];
+}
+
+/* =========================================================
    BADGES
 ========================================================= */
 
 function StatusBadge({ status }: { status?: string }) {
   if (status === "Done") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-bold text-emerald-700">
-        <CheckCircle2 size={12} />
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
+        <CheckCircle2 size={11} />
         Done
       </span>
     );
   }
   if (status === "In Progress") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-[10px] font-bold text-blue-700">
-        <Clock3 size={12} />
+      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-700">
+        <Clock3 size={11} />
         In Progress
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-[10px] font-bold text-gray-600">
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-bold text-gray-600">
       <Circle size={10} />
       To Do
     </span>
@@ -180,7 +200,7 @@ function PriorityBadge({ priority }: { priority?: Priority }) {
   const value = priority || "Medium";
   if (value === "High") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[9px] font-bold text-red-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[9px] font-bold text-red-600">
         <Flag size={10} />
         High
       </span>
@@ -188,14 +208,14 @@ function PriorityBadge({ priority }: { priority?: Priority }) {
   }
   if (value === "Medium") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-bold text-amber-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[9px] font-bold text-amber-700">
         <Flag size={10} />
         Medium
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-[9px] font-bold text-gray-500">
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-[9px] font-bold text-gray-500">
       <Flag size={10} />
       Low
     </span>
@@ -209,7 +229,7 @@ function DueBadge({ date }: { date?: string | null }) {
   }
   if (days < 0) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[9px] font-bold text-red-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[9px] font-bold text-red-600 animate-pulse">
         <AlertTriangle size={11} />
         {Math.abs(days)}d overdue
       </span>
@@ -217,7 +237,7 @@ function DueBadge({ date }: { date?: string | null }) {
   }
   if (days === 0) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-bold text-amber-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-[9px] font-bold text-orange-700">
         <Timer size={11} />
         Due today
       </span>
@@ -225,14 +245,25 @@ function DueBadge({ date }: { date?: string | null }) {
   }
   if (days <= 3) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[9px] font-bold text-amber-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-[9px] font-bold text-orange-700">
+        <Timer size={11} />
+        {days}d left
+      </span>
+    );
+  }
+  if (days <= 7) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[9px] font-bold text-amber-700">
         <Timer size={11} />
         {days}d left
       </span>
     );
   }
   return (
-    <span className="text-[9px] font-medium text-gray-500">{days} days left</span>
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold text-emerald-700">
+      <Timer size={11} />
+      {days}d left
+    </span>
   );
 }
 
@@ -249,18 +280,10 @@ export default function SchedulePage() {
   const [search, setSearch] = useState("");
   const [expandedProjects, setExpandedProjects] = useState<string[]>([]);
 
-  /* =========================================================
-     LOAD USER
-  ========================================================= */
-
   useEffect(() => {
     const storedUser = getStoredUser();
     setUser(storedUser);
   }, []);
-
-  /* =========================================================
-     API HEADERS
-  ========================================================= */
 
   const getHeaders = () => {
     const token = getToken();
@@ -269,10 +292,6 @@ export default function SchedulePage() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   };
-
-  /* =========================================================
-     LOAD PROJECTS + TASKS
-  ========================================================= */
 
   const loadData = async () => {
     try {
@@ -441,7 +460,7 @@ export default function SchedulePage() {
             HEADER
         ================================================= */}
 
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#1a1a2e] via-[#16213e] to-[#0f3460] px-6 py-8 sm:px-8 sm:py-10">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0a0a1a] via-[#1a1a2e] to-[#16213e] px-6 py-8 sm:px-8 sm:py-10">
           <div className="absolute right-0 top-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl"></div>
           <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl"></div>
           
@@ -502,62 +521,64 @@ export default function SchedulePage() {
         ================================================= */}
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4">
-          <div className="group rounded-2xl border-l-4 border-l-blue-500 bg-white p-4 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center justify-between">
+          <div className="group relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
+            <div className="absolute right-0 top-0 h-20 w-20 -translate-y-8 translate-x-8 rounded-full bg-blue-500/10 blur-2xl group-hover:bg-blue-500/20 transition"></div>
+            <div className="relative flex items-center justify-between">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 {isManagerView ? "Projects" : "Tasks"}
               </p>
-              <FolderKanban size={16} className="text-blue-500" />
+              <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
+                <FolderKanban size={16} />
+              </div>
             </div>
-            <p className="mt-2 text-2xl font-bold text-slate-900">
+            <p className="relative mt-2 text-2xl font-bold text-slate-900">
               {isManagerView ? projects.length : totalTasks}
             </p>
-            <p className="mt-0.5 text-[9px] text-slate-400">
+            <p className="relative text-[9px] text-slate-400">
               {isManagerView ? "Active projects" : "Assigned to you"}
             </p>
           </div>
 
-          <div className="group rounded-2xl border-l-4 border-l-emerald-500 bg-white p-4 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Completed
-              </p>
-              <CheckCircle2 size={16} className="text-emerald-500" />
+          <div className="group relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
+            <div className="absolute right-0 top-0 h-20 w-20 -translate-y-8 translate-x-8 rounded-full bg-emerald-500/10 blur-2xl group-hover:bg-emerald-500/20 transition"></div>
+            <div className="relative flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Completed</p>
+              <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
+                <CheckCircle2 size={16} />
+              </div>
             </div>
-            <p className="mt-2 text-2xl font-bold text-slate-900">
-              {completedTasks}
-            </p>
-            <p className="mt-0.5 text-[9px] text-slate-400">
+            <p className="relative mt-2 text-2xl font-bold text-slate-900">{completedTasks}</p>
+            <p className="relative text-[9px] text-slate-400">
               {totalTasks > 0 ? `${Math.round((completedTasks / totalTasks) * 100)}% done` : "No tasks"}
             </p>
           </div>
 
-          <div className="group rounded-2xl border-l-4 border-l-red-500 bg-white p-4 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Overdue
-              </p>
-              <AlertTriangle size={16} className="text-red-500" />
+          <div className="group relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
+            <div className="absolute right-0 top-0 h-20 w-20 -translate-y-8 translate-x-8 rounded-full bg-red-500/10 blur-2xl group-hover:bg-red-500/20 transition"></div>
+            <div className="relative flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Overdue</p>
+              <div className="rounded-lg bg-red-50 p-2 text-red-600">
+                <AlertTriangle size={16} />
+              </div>
             </div>
-            <p className="mt-2 text-2xl font-bold text-red-600">{overdueTasks}</p>
-            <p className="mt-0.5 text-[9px] text-slate-400">Tasks past due date</p>
+            <p className="relative mt-2 text-2xl font-bold text-red-600">{overdueTasks}</p>
+            <p className="relative text-[9px] text-slate-400">Tasks past due date</p>
           </div>
 
-          <div className="group rounded-2xl border-l-4 border-l-amber-500 bg-white p-4 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center justify-between">
+          <div className="group relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
+            <div className="absolute right-0 top-0 h-20 w-20 -translate-y-8 translate-x-8 rounded-full bg-amber-500/10 blur-2xl group-hover:bg-amber-500/20 transition"></div>
+            <div className="relative flex items-center justify-between">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 {isManagerView ? "Upcoming" : "Progress"}
               </p>
-              {isManagerView ? (
-                <Calendar size={16} className="text-amber-500" />
-              ) : (
-                <TrendingUp size={16} className="text-amber-500" />
-              )}
+              <div className="rounded-lg bg-amber-50 p-2 text-amber-600">
+                {isManagerView ? <Calendar size={16} /> : <TrendingUp size={16} />}
+              </div>
             </div>
-            <p className="mt-2 text-2xl font-bold text-amber-600">
+            <p className="relative mt-2 text-2xl font-bold text-amber-600">
               {isManagerView ? upcomingDeadlines : totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%
             </p>
-            <p className="mt-0.5 text-[9px] text-slate-400">
+            <p className="relative text-[9px] text-slate-400">
               {isManagerView ? "Deadlines in 7 days" : "Task completion rate"}
             </p>
           </div>
@@ -573,7 +594,7 @@ export default function SchedulePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={isManagerView ? "Search projects or tasks..." : "Search your tasks..."}
-            className="h-11 w-full rounded-xl border-0 bg-white px-10 text-sm text-slate-800 outline-none ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-[#1a1a2e]"
+            className="h-11 w-full rounded-xl border-0 bg-white px-10 text-sm text-slate-800 outline-none ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-[#1a1a2e] transition"
           />
         </div>
 
@@ -591,67 +612,68 @@ export default function SchedulePage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredProjects.map((project) => {
+                {filteredProjects.map((project, index) => {
                   const projectTasks = getProjectTasks(project.id);
                   const expanded = expandedProjects.includes(project.id);
                   const completedProjectTasks = projectTasks.filter(t => t.status === "Done").length;
                   const progress = projectTasks.length > 0 ? Math.round((completedProjectTasks / projectTasks.length) * 100) : 0;
                   const daysUntilDeadline = getDaysUntil(project.deadline);
                   const isOverdue = daysUntilDeadline !== null && daysUntilDeadline < 0;
+                  const color = getProjectColor(index);
 
                   return (
                     <div
                       key={project.id}
-                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
+                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md"
                     >
-                      {/* Project Header */}
-                      <div className="bg-gradient-to-r from-slate-50 to-white px-5 py-4">
+                      {/* Project Header - Darker and more prominent */}
+                      <div className={`bg-gradient-to-r ${color.accent} px-5 py-4 text-white`}>
                         <div className="flex flex-wrap items-start gap-3">
                           <button
                             type="button"
                             onClick={() => toggleProject(project.id)}
-                            className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+                            className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20 text-white transition hover:bg-white/30"
                           >
                             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                           </button>
 
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-base font-bold text-slate-900">{project.name}</h3>
+                              <h3 className="text-base font-bold text-white">{project.name}</h3>
                               <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold ${
-                                project.status === "Done" ? "bg-emerald-100 text-emerald-700" :
-                                project.status === "In Progress" ? "bg-blue-100 text-blue-700" :
-                                "bg-slate-100 text-slate-600"
+                                project.status === "Done" ? "bg-emerald-500/30 text-emerald-100" :
+                                project.status === "In Progress" ? "bg-blue-500/30 text-blue-100" :
+                                "bg-white/20 text-white"
                               }`}>
                                 {project.status || "Active"}
                               </span>
                               <PriorityBadge priority={project.priority} />
                             </div>
-                            <p className="mt-0.5 text-xs text-slate-500">
+                            <p className="mt-0.5 text-xs text-white/70">
                               {project.domain || "No domain"}
                               {project.manager_name && ` · Managed by ${project.manager_name}`}
                             </p>
                           </div>
 
-                          <div className="flex shrink-0 items-center gap-2">
+                          <div className="flex shrink-0 items-center gap-3">
                             <div className="text-right">
-                              <p className="text-[9px] font-medium text-slate-400">Progress</p>
-                              <p className="text-sm font-bold text-slate-900">{progress}%</p>
+                              <p className="text-[8px] font-bold uppercase text-white/60">Progress</p>
+                              <p className="text-sm font-bold text-white">{progress}%</p>
                             </div>
-                            <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center text-white text-xs font-bold">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 font-bold text-white">
                               {projectTasks.length}
                             </div>
                           </div>
                         </div>
 
-                        {/* Progress Bar */}
+                        {/* Progress Bar - White version */}
                         <div className="mt-3">
-                          <div className="relative h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/20">
                             <div
                               className={`h-full rounded-full transition-all duration-700 ${
-                                progress === 100 ? "bg-emerald-500" :
-                                progress >= 60 ? "bg-blue-500" :
-                                progress >= 30 ? "bg-amber-500" :
+                                progress === 100 ? "bg-emerald-400" :
+                                progress >= 60 ? "bg-blue-400" :
+                                progress >= 30 ? "bg-amber-400" :
                                 "bg-red-400"
                               }`}
                               style={{ width: `${progress}%` }}
@@ -659,36 +681,36 @@ export default function SchedulePage() {
                           </div>
                         </div>
 
-                        {/* Timeline */}
+                        {/* Timeline - White version */}
                         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                          <div className="rounded-lg bg-slate-50 px-3 py-2">
-                            <p className="text-[8px] font-bold uppercase text-slate-400">Start</p>
-                            <p className="text-xs font-semibold text-slate-700">{formatDate(project.start_date)}</p>
+                          <div className="rounded-lg bg-white/10 px-3 py-2 backdrop-blur-sm">
+                            <p className="text-[8px] font-bold uppercase text-white/50">Start</p>
+                            <p className="text-xs font-semibold text-white">{formatDate(project.start_date)}</p>
                           </div>
-                          <div className={`rounded-lg px-3 py-2 ${isOverdue ? "bg-red-50" : "bg-slate-50"}`}>
-                            <p className={`text-[8px] font-bold uppercase ${isOverdue ? "text-red-400" : "text-slate-400"}`}>
+                          <div className={`rounded-lg px-3 py-2 backdrop-blur-sm ${isOverdue ? "bg-red-500/20" : "bg-white/10"}`}>
+                            <p className={`text-[8px] font-bold uppercase ${isOverdue ? "text-red-300" : "text-white/50"}`}>
                               Deadline
                             </p>
-                            <p className={`text-xs font-semibold ${isOverdue ? "text-red-600" : "text-slate-700"}`}>
+                            <p className={`text-xs font-semibold ${isOverdue ? "text-red-200" : "text-white"}`}>
                               {formatDate(project.deadline)}
                             </p>
                           </div>
-                          <div className="rounded-lg bg-slate-50 px-3 py-2">
-                            <p className="text-[8px] font-bold uppercase text-slate-400">Tasks</p>
-                            <p className="text-xs font-semibold text-slate-700">
+                          <div className="rounded-lg bg-white/10 px-3 py-2 backdrop-blur-sm">
+                            <p className="text-[8px] font-bold uppercase text-white/50">Tasks</p>
+                            <p className="text-xs font-semibold text-white">
                               {completedProjectTasks}/{projectTasks.length} done
                             </p>
                           </div>
-                          <div className="rounded-lg bg-slate-50 px-3 py-2">
-                            <p className="text-[8px] font-bold uppercase text-slate-400">Time Left</p>
+                          <div className="rounded-lg bg-white/10 px-3 py-2 backdrop-blur-sm">
+                            <p className="text-[8px] font-bold uppercase text-white/50">Time Left</p>
                             <DueBadge date={project.deadline} />
                           </div>
                         </div>
                       </div>
 
-                      {/* Tasks */}
+                      {/* Tasks Section */}
                       {expanded && (
-                        <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-4">
+                        <div className={`border-t ${color.border} ${color.light} px-5 py-4`}>
                           {projectTasks.length === 0 ? (
                             <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-8 text-center">
                               <ClipboardList size={22} className="mx-auto text-slate-300" />
@@ -697,13 +719,34 @@ export default function SchedulePage() {
                           ) : (
                             <div className="space-y-2.5">
                               {projectTasks.map((task) => {
+                                const daysUntilDue = getDaysUntil(task.due_date);
+                                const isTaskOverdue = daysUntilDue !== null && daysUntilDue < 0 && task.status !== "Done";
                                 const taskProgress = getProgressPercentage(task.start_date, task.due_date);
+                                
+                                let dueColor = "text-slate-700";
+                                let dueBg = "bg-slate-50";
+                                let dueBorder = "border-slate-200";
+                                if (isTaskOverdue) {
+                                  dueColor = "text-red-600";
+                                  dueBg = "bg-red-50";
+                                  dueBorder = "border-red-200";
+                                } else if (daysUntilDue !== null && daysUntilDue <= 3 && task.status !== "Done") {
+                                  dueColor = "text-orange-600";
+                                  dueBg = "bg-orange-50";
+                                  dueBorder = "border-orange-200";
+                                } else if (daysUntilDue !== null && daysUntilDue <= 7 && task.status !== "Done") {
+                                  dueColor = "text-amber-600";
+                                  dueBg = "bg-amber-50";
+                                  dueBorder = "border-amber-200";
+                                }
+
                                 return (
                                   <div
                                     key={task.id}
-                                    className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300"
+                                    className={`rounded-xl border ${dueBorder} bg-white p-4 transition hover:shadow-sm`}
                                   >
                                     <div className="flex flex-wrap items-start gap-3">
+                                      {/* Task Status Icon */}
                                       <div className="mt-0.5">
                                         {task.status === "Done" ? (
                                           <CheckCircle2 size={16} className="text-emerald-500" />
@@ -714,6 +757,7 @@ export default function SchedulePage() {
                                         )}
                                       </div>
 
+                                      {/* Task Name and Details */}
                                       <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
                                           <p className="text-sm font-bold text-slate-800">{task.name}</p>
@@ -723,28 +767,42 @@ export default function SchedulePage() {
                                             <span className="text-xs text-slate-500">· {task.assignee_name}</span>
                                           )}
                                         </div>
+
                                         {task.description && (
                                           <p className="mt-1 text-xs text-slate-500 line-clamp-1">{task.description}</p>
                                         )}
+
+                                        {/* Task Timeline - Start Date, Deadline, Days Left in same row */}
                                         <div className="mt-2 flex flex-wrap items-center gap-3">
-                                          <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                                            <Calendar size={11} />
-                                            Start: {formatDate(task.start_date)}
-                                          </span>
-                                          <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                                            <Calendar size={11} />
-                                            Due: {formatDate(task.due_date)}
-                                          </span>
-                                          <DueBadge date={task.due_date} />
+                                          <div className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5">
+                                            <Calendar size={12} className="text-slate-400" />
+                                            <span className="text-[10px] font-medium text-slate-600">
+                                              Start: {formatDate(task.start_date)}
+                                            </span>
+                                          </div>
+                                          <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${dueBg}`}>
+                                            <Calendar size={12} className={isTaskOverdue ? "text-red-400" : "text-slate-400"} />
+                                            <span className={`text-[10px] font-medium ${dueColor}`}>
+                                              Due: {formatDate(task.due_date)}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-1.5">
+                                            <DueBadge date={task.due_date} />
+                                          </div>
                                           {task.status !== "Done" && task.start_date && task.due_date && (
-                                            <div className="flex items-center gap-1.5">
-                                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                                            <div className="flex items-center gap-2 ml-auto">
+                                              <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
                                                 <div
-                                                  className="h-full rounded-full bg-blue-500"
+                                                  className={`h-full rounded-full transition-all duration-500 ${
+                                                    taskProgress >= 75 ? "bg-emerald-500" :
+                                                    taskProgress >= 50 ? "bg-blue-500" :
+                                                    taskProgress >= 25 ? "bg-amber-500" :
+                                                    "bg-red-400"
+                                                  }`}
                                                   style={{ width: `${Math.min(taskProgress, 100)}%` }}
                                                 />
                                               </div>
-                                              <span className="text-[9px] text-slate-400">{Math.min(taskProgress, 100)}%</span>
+                                              <span className="text-[9px] font-medium text-slate-500">{Math.min(taskProgress, 100)}%</span>
                                             </div>
                                           )}
                                         </div>
@@ -786,19 +844,24 @@ export default function SchedulePage() {
                   <div className="space-y-3">
                     {filteredTasks.map((task) => {
                       const project = projects.find((p) => p.id === task.project_id);
+                      const daysUntilDue = getDaysUntil(task.due_date);
+                      const isOverdue = daysUntilDue !== null && daysUntilDue < 0 && task.status !== "Done";
                       const taskProgress = getProgressPercentage(task.start_date, task.due_date);
-                      const isOverdue = getDaysUntil(task.due_date) !== null && getDaysUntil(task.due_date)! < 0;
+                      
+                      let cardBg = "bg-white";
+                      let borderColor = "border-slate-200";
+                      if (isOverdue) {
+                        cardBg = "bg-red-50/50";
+                        borderColor = "border-red-200";
+                      } else if (task.status === "Done") {
+                        cardBg = "bg-emerald-50/30";
+                        borderColor = "border-emerald-200";
+                      }
 
                       return (
                         <div
                           key={task.id}
-                          className={`rounded-xl border p-4 transition hover:shadow-sm ${
-                            isOverdue && task.status !== "Done"
-                              ? "border-red-200 bg-red-50/30"
-                              : task.status === "Done"
-                              ? "border-emerald-200 bg-emerald-50/30"
-                              : "border-slate-200 bg-white"
-                          }`}
+                          className={`rounded-xl border ${borderColor} ${cardBg} p-4 transition hover:shadow-sm`}
                         >
                           <div className="flex flex-wrap items-start gap-3">
                             <div className="mt-0.5">
@@ -823,47 +886,46 @@ export default function SchedulePage() {
                                 {project?.name || "Unknown project"}
                               </p>
 
-                              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
-                                  <p className="text-[8px] font-bold uppercase text-slate-400">Task Start</p>
-                                  <p className="text-xs font-semibold text-slate-700">{formatDate(task.start_date)}</p>
+                              {/* Task Timeline - Start Date, Deadline, Days Left in same row */}
+                              <div className="mt-3 flex flex-wrap items-center gap-3">
+                                <div className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5">
+                                  <Calendar size={12} className="text-slate-400" />
+                                  <span className="text-[10px] font-medium text-slate-600">
+                                    Start: {formatDate(task.start_date)}
+                                  </span>
                                 </div>
-                                <div className={`rounded-lg px-3 py-2 ${isOverdue && task.status !== "Done" ? "bg-red-50" : "bg-slate-50"}`}>
-                                  <p className={`text-[8px] font-bold uppercase ${isOverdue && task.status !== "Done" ? "text-red-400" : "text-slate-400"}`}>
-                                    Task Due
-                                  </p>
-                                  <p className={`text-xs font-semibold ${isOverdue && task.status !== "Done" ? "text-red-600" : "text-slate-700"}`}>
-                                    {formatDate(task.due_date)}
-                                  </p>
+                                <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${isOverdue ? "bg-red-50" : "bg-slate-50"}`}>
+                                  <Calendar size={12} className={isOverdue ? "text-red-400" : "text-slate-400"} />
+                                  <span className={`text-[10px] font-medium ${isOverdue ? "text-red-600" : "text-slate-600"}`}>
+                                    Due: {formatDate(task.due_date)}
+                                  </span>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
-                                  <p className="text-[8px] font-bold uppercase text-slate-400">Project Start</p>
-                                  <p className="text-xs font-semibold text-slate-700">{formatDate(project?.start_date)}</p>
-                                </div>
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
-                                  <p className="text-[8px] font-bold uppercase text-slate-400">Project Deadline</p>
-                                  <p className="text-xs font-semibold text-slate-700">{formatDate(project?.deadline)}</p>
-                                </div>
-                              </div>
-
-                              {task.status !== "Done" && task.start_date && task.due_date && (
-                                <div className="mt-3 flex items-center gap-3">
-                                  <span className="text-[9px] font-medium text-slate-500">Progress</span>
-                                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                                    <div
-                                      className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                                      style={{ width: `${Math.min(taskProgress, 100)}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-[10px] font-medium text-slate-600">{Math.min(taskProgress, 100)}%</span>
-                                </div>
-                              )}
-
-                              {task.due_date && (
-                                <div className="mt-2">
+                                <div className="flex items-center gap-1.5">
                                   <DueBadge date={task.due_date} />
                                 </div>
-                              )}
+                                {task.status !== "Done" && task.start_date && task.due_date && (
+                                  <div className="flex items-center gap-2 ml-auto">
+                                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                                      <div
+                                        className={`h-full rounded-full transition-all duration-500 ${
+                                          taskProgress >= 75 ? "bg-emerald-500" :
+                                          taskProgress >= 50 ? "bg-blue-500" :
+                                          taskProgress >= 25 ? "bg-amber-500" :
+                                          "bg-red-400"
+                                        }`}
+                                        style={{ width: `${Math.min(taskProgress, 100)}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-[9px] font-medium text-slate-500">{Math.min(taskProgress, 100)}%</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Project Timeline for context */}
+                              <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-slate-400">
+                                <span>📁 Project Start: {formatDate(project?.start_date)}</span>
+                                <span>📅 Project Deadline: {formatDate(project?.deadline)}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
