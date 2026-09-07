@@ -20,10 +20,6 @@ import {
   GanttChart,
   Timer,
   Flag,
-  Sparkles,
-  Target,
-  Layers,
-  BarChart3,
 } from "lucide-react";
 
 /* =========================================================
@@ -149,25 +145,6 @@ function getProgressPercentage(startDate?: string | null, endDate?: string | nul
 }
 
 /* =========================================================
-   PROJECT COLORS
-========================================================= */
-
-const PROJECT_COLORS = [
-  { bg: "bg-gradient-to-r from-blue-600 to-blue-700", light: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", accent: "from-blue-500 to-blue-600" },
-  { bg: "bg-gradient-to-r from-purple-600 to-purple-700", light: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", accent: "from-purple-500 to-purple-600" },
-  { bg: "bg-gradient-to-r from-emerald-600 to-emerald-700", light: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", accent: "from-emerald-500 to-emerald-600" },
-  { bg: "bg-gradient-to-r from-rose-600 to-rose-700", light: "bg-rose-50", border: "border-rose-200", text: "text-rose-700", accent: "from-rose-500 to-rose-600" },
-  { bg: "bg-gradient-to-r from-amber-600 to-amber-700", light: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", accent: "from-amber-500 to-amber-600" },
-  { bg: "bg-gradient-to-r from-cyan-600 to-cyan-700", light: "bg-cyan-50", border: "border-cyan-200", text: "text-cyan-700", accent: "from-cyan-500 to-cyan-600" },
-  { bg: "bg-gradient-to-r from-indigo-600 to-indigo-700", light: "bg-indigo-50", border: "border-indigo-200", text: "text-indigo-700", accent: "from-indigo-500 to-indigo-600" },
-  { bg: "bg-gradient-to-r from-teal-600 to-teal-700", light: "bg-teal-50", border: "border-teal-200", text: "text-teal-700", accent: "from-teal-500 to-teal-600" },
-];
-
-function getProjectColor(index: number) {
-  return PROJECT_COLORS[index % PROJECT_COLORS.length];
-}
-
-/* =========================================================
    BADGES
 ========================================================= */
 
@@ -222,47 +199,47 @@ function PriorityBadge({ priority }: { priority?: Priority }) {
   );
 }
 
-function DueBadge({ date }: { date?: string | null }) {
+function DaysRemainingBadge({ date }: { date?: string | null }) {
   const days = getDaysUntil(date);
   if (days === null) {
-    return <span className="text-[9px] font-medium text-gray-400">No due date</span>;
+    return <span className="text-xs text-gray-400">No due date</span>;
   }
   if (days < 0) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[9px] font-bold text-red-600 animate-pulse">
-        <AlertTriangle size={11} />
-        {Math.abs(days)}d overdue
+      <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-bold text-red-700 animate-pulse">
+        <AlertTriangle size={14} />
+        {Math.abs(days)} days overdue
       </span>
     );
   }
   if (days === 0) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-[9px] font-bold text-orange-700">
-        <Timer size={11} />
+      <span className="inline-flex items-center gap-1.5 rounded-lg bg-orange-100 px-3 py-1.5 text-xs font-bold text-orange-700">
+        <Timer size={14} />
         Due today
       </span>
     );
   }
   if (days <= 3) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-[9px] font-bold text-orange-700">
-        <Timer size={11} />
-        {days}d left
+      <span className="inline-flex items-center gap-1.5 rounded-lg bg-orange-100 px-3 py-1.5 text-xs font-bold text-orange-700">
+        <Timer size={14} />
+        {days} days left
       </span>
     );
   }
   if (days <= 7) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[9px] font-bold text-amber-700">
-        <Timer size={11} />
-        {days}d left
+      <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700">
+        <Timer size={14} />
+        {days} days left
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold text-emerald-700">
-      <Timer size={11} />
-      {days}d left
+    <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700">
+      <Timer size={14} />
+      {days} days left
     </span>
   );
 }
@@ -619,15 +596,17 @@ export default function SchedulePage() {
                   const progress = projectTasks.length > 0 ? Math.round((completedProjectTasks / projectTasks.length) * 100) : 0;
                   const daysUntilDeadline = getDaysUntil(project.deadline);
                   const isOverdue = daysUntilDeadline !== null && daysUntilDeadline < 0;
-                  const color = getProjectColor(index);
+
+                  // ✅ SAME COLOR FOR ALL PROJECTS - Dark Navy
+                  const headerColor = "bg-gradient-to-r from-[#1a1a2e] to-[#16213e]";
 
                   return (
                     <div
                       key={project.id}
                       className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md"
                     >
-                      {/* Project Header - Darker and more prominent */}
-                      <div className={`bg-gradient-to-r ${color.accent} px-5 py-4 text-white`}>
+                      {/* Project Header - Consistent Dark Color */}
+                      <div className={`${headerColor} px-5 py-4 text-white`}>
                         <div className="flex flex-wrap items-start gap-3">
                           <button
                             type="button"
@@ -666,7 +645,7 @@ export default function SchedulePage() {
                           </div>
                         </div>
 
-                        {/* Progress Bar - White version */}
+                        {/* Progress Bar */}
                         <div className="mt-3">
                           <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/20">
                             <div
@@ -681,7 +660,7 @@ export default function SchedulePage() {
                           </div>
                         </div>
 
-                        {/* Timeline - White version */}
+                        {/* Timeline */}
                         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                           <div className="rounded-lg bg-white/10 px-3 py-2 backdrop-blur-sm">
                             <p className="text-[8px] font-bold uppercase text-white/50">Start</p>
@@ -703,14 +682,14 @@ export default function SchedulePage() {
                           </div>
                           <div className="rounded-lg bg-white/10 px-3 py-2 backdrop-blur-sm">
                             <p className="text-[8px] font-bold uppercase text-white/50">Time Left</p>
-                            <DueBadge date={project.deadline} />
+                            <DaysRemainingBadge date={project.deadline} />
                           </div>
                         </div>
                       </div>
 
                       {/* Tasks Section */}
                       {expanded && (
-                        <div className={`border-t ${color.border} ${color.light} px-5 py-4`}>
+                        <div className="border-t border-slate-200 bg-slate-50/50 px-5 py-4">
                           {projectTasks.length === 0 ? (
                             <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-8 text-center">
                               <ClipboardList size={22} className="mx-auto text-slate-300" />
@@ -719,92 +698,66 @@ export default function SchedulePage() {
                           ) : (
                             <div className="space-y-2.5">
                               {projectTasks.map((task) => {
-                                const daysUntilDue = getDaysUntil(task.due_date);
-                                const isTaskOverdue = daysUntilDue !== null && daysUntilDue < 0 && task.status !== "Done";
-                                const taskProgress = getProgressPercentage(task.start_date, task.due_date);
-                                
-                                let dueColor = "text-slate-700";
-                                let dueBg = "bg-slate-50";
-                                let dueBorder = "border-slate-200";
-                                if (isTaskOverdue) {
-                                  dueColor = "text-red-600";
-                                  dueBg = "bg-red-50";
-                                  dueBorder = "border-red-200";
-                                } else if (daysUntilDue !== null && daysUntilDue <= 3 && task.status !== "Done") {
-                                  dueColor = "text-orange-600";
-                                  dueBg = "bg-orange-50";
-                                  dueBorder = "border-orange-200";
-                                } else if (daysUntilDue !== null && daysUntilDue <= 7 && task.status !== "Done") {
-                                  dueColor = "text-amber-600";
-                                  dueBg = "bg-amber-50";
-                                  dueBorder = "border-amber-200";
-                                }
-
                                 return (
                                   <div
                                     key={task.id}
-                                    className={`rounded-xl border ${dueBorder} bg-white p-4 transition hover:shadow-sm`}
+                                    className="rounded-xl border border-slate-200 bg-white p-4 transition hover:shadow-sm"
                                   >
-                                    <div className="flex flex-wrap items-start gap-3">
-                                      {/* Task Status Icon */}
-                                      <div className="mt-0.5">
-                                        {task.status === "Done" ? (
-                                          <CheckCircle2 size={16} className="text-emerald-500" />
-                                        ) : task.status === "In Progress" ? (
-                                          <Clock3 size={16} className="text-blue-500" />
-                                        ) : (
-                                          <Circle size={16} className="text-slate-300" />
-                                        )}
+                                    {/* Task Row: Name | Start Date | Deadline | Days Left | Assignee */}
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-5 sm:gap-3">
+                                      {/* Task Name with Status & Priority */}
+                                      <div className="sm:col-span-1">
+                                        <div className="flex items-start gap-2">
+                                          <div className="mt-0.5">
+                                            {task.status === "Done" ? (
+                                              <CheckCircle2 size={16} className="text-emerald-500" />
+                                            ) : task.status === "In Progress" ? (
+                                              <Clock3 size={16} className="text-blue-500" />
+                                            ) : (
+                                              <Circle size={16} className="text-slate-300" />
+                                            )}
+                                          </div>
+                                          <div>
+                                            <p className="text-sm font-bold text-slate-800">{task.name}</p>
+                                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                              <StatusBadge status={task.status} />
+                                              <PriorityBadge priority={task.priority} />
+                                            </div>
+                                          </div>
+                                        </div>
                                       </div>
 
-                                      {/* Task Name and Details */}
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <p className="text-sm font-bold text-slate-800">{task.name}</p>
-                                          <StatusBadge status={task.status} />
-                                          <PriorityBadge priority={task.priority} />
-                                          {task.assignee_name && (
-                                            <span className="text-xs text-slate-500">· {task.assignee_name}</span>
-                                          )}
+                                      {/* Start Date */}
+                                      <div className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2">
+                                        <Calendar size={14} className="text-slate-400" />
+                                        <div>
+                                          <p className="text-[8px] font-bold uppercase text-slate-400">Start</p>
+                                          <p className="text-xs font-medium text-slate-700">{formatDate(task.start_date)}</p>
                                         </div>
+                                      </div>
 
-                                        {task.description && (
-                                          <p className="mt-1 text-xs text-slate-500 line-clamp-1">{task.description}</p>
-                                        )}
+                                      {/* Deadline */}
+                                      <div className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2">
+                                        <Calendar size={14} className="text-slate-400" />
+                                        <div>
+                                          <p className="text-[8px] font-bold uppercase text-slate-400">Deadline</p>
+                                          <p className="text-xs font-medium text-slate-700">{formatDate(task.due_date)}</p>
+                                        </div>
+                                      </div>
 
-                                        {/* Task Timeline - Start Date, Deadline, Days Left in same row */}
-                                        <div className="mt-2 flex flex-wrap items-center gap-3">
-                                          <div className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5">
-                                            <Calendar size={12} className="text-slate-400" />
-                                            <span className="text-[10px] font-medium text-slate-600">
-                                              Start: {formatDate(task.start_date)}
-                                            </span>
-                                          </div>
-                                          <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${dueBg}`}>
-                                            <Calendar size={12} className={isTaskOverdue ? "text-red-400" : "text-slate-400"} />
-                                            <span className={`text-[10px] font-medium ${dueColor}`}>
-                                              Due: {formatDate(task.due_date)}
-                                            </span>
-                                          </div>
-                                          <div className="flex items-center gap-1.5">
-                                            <DueBadge date={task.due_date} />
-                                          </div>
-                                          {task.status !== "Done" && task.start_date && task.due_date && (
-                                            <div className="flex items-center gap-2 ml-auto">
-                                              <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
-                                                <div
-                                                  className={`h-full rounded-full transition-all duration-500 ${
-                                                    taskProgress >= 75 ? "bg-emerald-500" :
-                                                    taskProgress >= 50 ? "bg-blue-500" :
-                                                    taskProgress >= 25 ? "bg-amber-500" :
-                                                    "bg-red-400"
-                                                  }`}
-                                                  style={{ width: `${Math.min(taskProgress, 100)}%` }}
-                                                />
-                                              </div>
-                                              <span className="text-[9px] font-medium text-slate-500">{Math.min(taskProgress, 100)}%</span>
-                                            </div>
-                                          )}
+                                      {/* Days Remaining - Color coded */}
+                                      <div className="flex items-center">
+                                        <DaysRemainingBadge date={task.due_date} />
+                                      </div>
+
+                                      {/* Assignee */}
+                                      <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                                        <User size={14} className="text-slate-400" />
+                                        <div>
+                                          <p className="text-[8px] font-bold uppercase text-slate-400">Assignee</p>
+                                          <p className="text-xs font-medium text-slate-700">
+                                            {task.assignee_name || "Unassigned"}
+                                          </p>
                                         </div>
                                       </div>
                                     </div>
@@ -844,87 +797,82 @@ export default function SchedulePage() {
                   <div className="space-y-3">
                     {filteredTasks.map((task) => {
                       const project = projects.find((p) => p.id === task.project_id);
-                      const daysUntilDue = getDaysUntil(task.due_date);
-                      const isOverdue = daysUntilDue !== null && daysUntilDue < 0 && task.status !== "Done";
-                      const taskProgress = getProgressPercentage(task.start_date, task.due_date);
-                      
-                      let cardBg = "bg-white";
-                      let borderColor = "border-slate-200";
-                      if (isOverdue) {
-                        cardBg = "bg-red-50/50";
-                        borderColor = "border-red-200";
-                      } else if (task.status === "Done") {
-                        cardBg = "bg-emerald-50/30";
-                        borderColor = "border-emerald-200";
-                      }
+                      const isOverdue = getDaysUntil(task.due_date) !== null && getDaysUntil(task.due_date)! < 0 && task.status !== "Done";
 
                       return (
                         <div
                           key={task.id}
-                          className={`rounded-xl border ${borderColor} ${cardBg} p-4 transition hover:shadow-sm`}
+                          className={`rounded-xl border p-4 transition hover:shadow-sm ${
+                            isOverdue && task.status !== "Done"
+                              ? "border-red-200 bg-red-50/30"
+                              : task.status === "Done"
+                              ? "border-emerald-200 bg-emerald-50/30"
+                              : "border-slate-200 bg-white"
+                          }`}
                         >
-                          <div className="flex flex-wrap items-start gap-3">
-                            <div className="mt-0.5">
-                              {task.status === "Done" ? (
-                                <CheckCircle2 size={18} className="text-emerald-500" />
-                              ) : task.status === "In Progress" ? (
-                                <Clock3 size={18} className="text-blue-500" />
-                              ) : (
-                                <Circle size={18} className="text-slate-300" />
-                              )}
+                          {/* Task Row: Name | Start Date | Deadline | Days Left | Assignee */}
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-5 sm:gap-3">
+                            {/* Task Name with Status & Priority */}
+                            <div className="sm:col-span-1">
+                              <div className="flex items-start gap-2">
+                                <div className="mt-0.5">
+                                  {task.status === "Done" ? (
+                                    <CheckCircle2 size={18} className="text-emerald-500" />
+                                  ) : task.status === "In Progress" ? (
+                                    <Clock3 size={18} className="text-blue-500" />
+                                  ) : (
+                                    <Circle size={18} className="text-slate-300" />
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-slate-900">{task.name}</p>
+                                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                                    <FolderKanban size={12} />
+                                    {project?.name || "Unknown project"}
+                                  </p>
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                    <StatusBadge status={task.status} />
+                                    <PriorityBadge priority={task.priority} />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
 
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="text-sm font-bold text-slate-900">{task.name}</h3>
-                                <StatusBadge status={task.status} />
-                                <PriorityBadge priority={task.priority} />
+                            {/* Start Date */}
+                            <div className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2">
+                              <Calendar size={14} className="text-slate-400" />
+                              <div>
+                                <p className="text-[8px] font-bold uppercase text-slate-400">Start</p>
+                                <p className="text-xs font-medium text-slate-700">{formatDate(task.start_date)}</p>
                               </div>
+                            </div>
 
-                              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                                <FolderKanban size={12} />
-                                {project?.name || "Unknown project"}
-                              </p>
-
-                              {/* Task Timeline - Start Date, Deadline, Days Left in same row */}
-                              <div className="mt-3 flex flex-wrap items-center gap-3">
-                                <div className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5">
-                                  <Calendar size={12} className="text-slate-400" />
-                                  <span className="text-[10px] font-medium text-slate-600">
-                                    Start: {formatDate(task.start_date)}
-                                  </span>
-                                </div>
-                                <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${isOverdue ? "bg-red-50" : "bg-slate-50"}`}>
-                                  <Calendar size={12} className={isOverdue ? "text-red-400" : "text-slate-400"} />
-                                  <span className={`text-[10px] font-medium ${isOverdue ? "text-red-600" : "text-slate-600"}`}>
-                                    Due: {formatDate(task.due_date)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <DueBadge date={task.due_date} />
-                                </div>
-                                {task.status !== "Done" && task.start_date && task.due_date && (
-                                  <div className="flex items-center gap-2 ml-auto">
-                                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
-                                      <div
-                                        className={`h-full rounded-full transition-all duration-500 ${
-                                          taskProgress >= 75 ? "bg-emerald-500" :
-                                          taskProgress >= 50 ? "bg-blue-500" :
-                                          taskProgress >= 25 ? "bg-amber-500" :
-                                          "bg-red-400"
-                                        }`}
-                                        style={{ width: `${Math.min(taskProgress, 100)}%` }}
-                                      />
-                                    </div>
-                                    <span className="text-[9px] font-medium text-slate-500">{Math.min(taskProgress, 100)}%</span>
-                                  </div>
-                                )}
+                            {/* Deadline */}
+                            <div className={`flex items-center gap-1.5 rounded-lg px-3 py-2 ${isOverdue && task.status !== "Done" ? "bg-red-50" : "bg-slate-50"}`}>
+                              <Calendar size={14} className={isOverdue && task.status !== "Done" ? "text-red-400" : "text-slate-400"} />
+                              <div>
+                                <p className={`text-[8px] font-bold uppercase ${isOverdue && task.status !== "Done" ? "text-red-400" : "text-slate-400"}`}>
+                                  Deadline
+                                </p>
+                                <p className={`text-xs font-medium ${isOverdue && task.status !== "Done" ? "text-red-600" : "text-slate-700"}`}>
+                                  {formatDate(task.due_date)}
+                                </p>
                               </div>
+                            </div>
 
-                              {/* Project Timeline for context */}
-                              <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-slate-400">
-                                <span>📁 Project Start: {formatDate(project?.start_date)}</span>
-                                <span>📅 Project Deadline: {formatDate(project?.deadline)}</span>
+                            {/* Days Remaining - Color coded */}
+                            <div className="flex items-center">
+                              <DaysRemainingBadge date={task.due_date} />
+                            </div>
+
+                            {/* Assignee */}
+                            <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                              <User size={14} className="text-slate-400" />
+                              <div>
+                                <p className="text-[8px] font-bold uppercase text-slate-400">Assignee</p>
+                                <p className="text-xs font-medium text-slate-700">
+                                  {task.assignee_name || "Unassigned"}
+                                </p>
                               </div>
                             </div>
                           </div>
