@@ -16,14 +16,20 @@ import {
   Loader2,
   RefreshCw,
   AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  GanttChart,
+  Sparkles,
+  Timer,
+  Flag,
 } from "lucide-react";
 
 /* =========================================================
    API
 ========================================================= */
 
-const API_BASE =
-  "https://backend-five-swart-88.vercel.app/api";
+const API_BASE = "https://backend-five-swart-88.vercel.app/api";
 
 /* =========================================================
    TYPES
@@ -90,24 +96,15 @@ type CurrentUser = {
 
 function getToken() {
   if (typeof window === "undefined") return "";
-
-  return (
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    ""
-  );
+  return localStorage.getItem("token") || localStorage.getItem("accessToken") || "";
 }
 
 function getStoredUser(): CurrentUser | null {
   if (typeof window === "undefined") return null;
-
   try {
     const raw = localStorage.getItem("user");
-
     if (!raw) return null;
-
     const parsed = JSON.parse(raw);
-
     return {
       id: parsed.id || parsed.user_id || parsed.userId,
       full_name: parsed.full_name || parsed.fullName || parsed.name,
@@ -122,13 +119,8 @@ function getStoredUser(): CurrentUser | null {
 
 function formatDate(date?: string | null) {
   if (!date) return "Not set";
-
   const parsed = new Date(date);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "Not set";
-  }
-
+  if (Number.isNaN(parsed.getTime())) return "Not set";
   return parsed.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -138,20 +130,21 @@ function formatDate(date?: string | null) {
 
 function getDaysUntil(date?: string | null) {
   if (!date) return null;
-
   const today = new Date();
-
   today.setHours(0, 0, 0, 0);
-
   const target = new Date(`${date.substring(0, 10)}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
 
-  if (Number.isNaN(target.getTime())) {
-    return null;
-  }
-
-  return Math.ceil(
-    (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
+function getProgressPercentage(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate).getTime();
+  const end = new Date(endDate).getTime();
+  const now = Date.now();
+  if (now < start) return 0;
+  if (now > end) return 100;
+  return Math.round(((now - start) / (end - start)) * 100);
 }
 
 /* =========================================================
@@ -161,24 +154,22 @@ function getDaysUntil(date?: string | null) {
 function StatusBadge({ status }: { status?: string }) {
   if (status === "Done") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-700">
-        <CheckCircle2 size={11} />
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-bold text-emerald-700">
+        <CheckCircle2 size={12} />
         Done
       </span>
     );
   }
-
   if (status === "In Progress") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700">
-        <Clock3 size={11} />
+      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-[10px] font-bold text-blue-700">
+        <Clock3 size={12} />
         In Progress
       </span>
     );
   }
-
   return (
-    <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-[9px] font-bold text-gray-600">
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-[10px] font-bold text-gray-600">
       <Circle size={10} />
       To Do
     </span>
@@ -187,71 +178,61 @@ function StatusBadge({ status }: { status?: string }) {
 
 function PriorityBadge({ priority }: { priority?: Priority }) {
   const value = priority || "Medium";
-
   if (value === "High") {
     return (
-      <span className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[9px] font-bold text-red-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[9px] font-bold text-red-600">
+        <Flag size={10} />
         High
       </span>
     );
   }
-
   if (value === "Medium") {
     return (
-      <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-bold text-amber-700">
+        <Flag size={10} />
         Medium
       </span>
     );
   }
-
   return (
-    <span className="rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-[9px] font-bold text-gray-500">
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-[9px] font-bold text-gray-500">
+      <Flag size={10} />
       Low
     </span>
   );
 }
 
-/* Days-left / overdue pill. Reused for both project deadlines and task due dates. */
 function DueBadge({ date }: { date?: string | null }) {
   const days = getDaysUntil(date);
-
   if (days === null) {
-    return (
-      <span className="text-[8px] font-semibold text-gray-400">
-        No due date
-      </span>
-    );
+    return <span className="text-[9px] font-medium text-gray-400">No due date</span>;
   }
-
   if (days < 0) {
     return (
-      <span className="flex items-center gap-1 text-[8px] font-semibold text-red-600">
-        <AlertTriangle size={10} />
-        {Math.abs(days)} days overdue
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[9px] font-bold text-red-600">
+        <AlertTriangle size={11} />
+        {Math.abs(days)}d overdue
       </span>
     );
   }
-
   if (days === 0) {
     return (
-      <span className="text-[8px] font-semibold text-amber-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-bold text-amber-700">
+        <Timer size={11} />
         Due today
       </span>
     );
   }
-
   if (days <= 3) {
     return (
-      <span className="text-[8px] font-semibold text-amber-600">
-        {days} days left
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[9px] font-bold text-amber-700">
+        <Timer size={11} />
+        {days}d left
       </span>
     );
   }
-
   return (
-    <span className="text-[8px] font-semibold text-gray-400">
-      {days} days left
-    </span>
+    <span className="text-[9px] font-medium text-gray-500">{days} days left</span>
   );
 }
 
@@ -261,17 +242,11 @@ function DueBadge({ date }: { date?: string | null }) {
 
 export default function SchedulePage() {
   const [user, setUser] = useState<CurrentUser | null>(null);
-
   const [projects, setProjects] = useState<Project[]>([]);
-
   const [tasks, setTasks] = useState<Task[]>([]);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
-
   const [search, setSearch] = useState("");
-
   const [expandedProjects, setExpandedProjects] = useState<string[]>([]);
 
   /* =========================================================
@@ -280,7 +255,6 @@ export default function SchedulePage() {
 
   useEffect(() => {
     const storedUser = getStoredUser();
-
     setUser(storedUser);
   }, []);
 
@@ -290,7 +264,6 @@ export default function SchedulePage() {
 
   const getHeaders = () => {
     const token = getToken();
-
     return {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -298,7 +271,7 @@ export default function SchedulePage() {
   };
 
   /* =========================================================
-     LOAD PROJECTS + TASKS (role based)
+     LOAD PROJECTS + TASKS
   ========================================================= */
 
   const loadData = async () => {
@@ -307,7 +280,6 @@ export default function SchedulePage() {
       setError("");
 
       const storedUser = getStoredUser();
-
       if (!storedUser?.id) {
         setError("User session not found. Please login again.");
         return;
@@ -315,38 +287,21 @@ export default function SchedulePage() {
 
       setUser(storedUser);
 
-      /* -----------------------------------------------------
-         PROJECTS
-      ----------------------------------------------------- */
-
       const projectResponse = await fetch(`${API_BASE}/projects`, {
         method: "GET",
         headers: getHeaders(),
       });
 
       if (!projectResponse.ok) {
-        throw new Error(
-          `Projects request failed: ${projectResponse.status}`
-        );
+        throw new Error(`Projects request failed: ${projectResponse.status}`);
       }
 
       const projectData = await projectResponse.json();
-
-      const allProjects: Project[] =
-        projectData.projects || projectData.data || [];
-
-      /* -----------------------------------------------------
-         ROLE BASED PROJECT FILTERING
-
-         Executive Manager -> all projects
-         Project Manager   -> only projects assigned to them
-         Member            -> projects narrowed down below,
-                               once we know which tasks are theirs
-      ----------------------------------------------------- */
+      const allProjects: Project[] = projectData.projects || projectData.data || [];
 
       let allowedProjects: Project[] = [];
 
-      if (storedUser.role === "Executive Manager") {
+      if (storedUser.role === "Executive Manager" || storedUser.role === "System Administrator") {
         allowedProjects = allProjects;
       } else if (storedUser.role === "Project Manager") {
         allowedProjects = allProjects.filter(
@@ -360,41 +315,18 @@ export default function SchedulePage() {
         allowedProjects = [];
       }
 
-      /* -----------------------------------------------------
-         FETCH TASKS FOR ALLOWED PROJECTS
-      ----------------------------------------------------- */
-
       const taskResults = await Promise.all(
         allowedProjects.map(async (project) => {
           try {
-            const response = await fetch(
-              `${API_BASE}/tasks/project/${project.id}`,
-              {
-                method: "GET",
-                headers: getHeaders(),
-              }
-            );
-
-            if (!response.ok) {
-              console.error(
-                `Failed to load tasks for project ${project.id}`
-              );
-
-              return [];
-            }
-
+            const response = await fetch(`${API_BASE}/tasks/project/${project.id}`, {
+              method: "GET",
+              headers: getHeaders(),
+            });
+            if (!response.ok) return [];
             const data = await response.json();
-
-            // getProjectTasks returns a bare array (res.json(result.rows)),
-            // not { tasks: [...] } or { data: [...] } — handle both shapes.
-            if (Array.isArray(data)) {
-              return data;
-            }
-
-            return data.tasks || data.data || [];
+            return Array.isArray(data) ? data : data.tasks || data.data || [];
           } catch (taskError) {
             console.error("Task loading error:", taskError);
-
             return [];
           }
         })
@@ -402,26 +334,14 @@ export default function SchedulePage() {
 
       const allTasks: Task[] = taskResults.flat();
 
-      /* -----------------------------------------------------
-         MEMBER FILTER
-
-         Members only see their own tasks, and only the
-         projects those tasks belong to.
-      ----------------------------------------------------- */
-
       if (storedUser.role === "Member") {
         const memberTasks = allTasks.filter(
           (task) =>
             task.assignee_id === storedUser.id ||
             task.assignee_id === String(storedUser.id)
         );
-
         setTasks(memberTasks);
-
-        const memberProjectIds = new Set(
-          memberTasks.map((task) => task.project_id)
-        );
-
+        const memberProjectIds = new Set(memberTasks.map((task) => task.project_id));
         allowedProjects = allowedProjects.filter((project) =>
           memberProjectIds.has(project.id)
         );
@@ -430,11 +350,9 @@ export default function SchedulePage() {
       }
 
       setProjects(allowedProjects);
-
       setExpandedProjects(allowedProjects.map((project) => project.id));
     } catch (err: any) {
       console.error("Schedule data loading error:", err);
-
       setError(err?.message || "Failed to load schedule data.");
     } finally {
       setLoading(false);
@@ -443,65 +361,42 @@ export default function SchedulePage() {
 
   useEffect(() => {
     if (!user) return;
-
     loadData();
   }, [user?.id]);
-
-  /* =========================================================
-     PROJECT TASKS
-  ========================================================= */
 
   const getProjectTasks = (projectId: string) => {
     return tasks.filter((task) => task.project_id === projectId);
   };
 
   const isManagerView =
-    user?.role === "Executive Manager" || user?.role === "Project Manager";
-
-  /* =========================================================
-     SEARCH
-  ========================================================= */
+    user?.role === "Executive Manager" ||
+    user?.role === "System Administrator" ||
+    user?.role === "Project Manager";
 
   const filteredProjects = useMemo(() => {
     const query = search.toLowerCase().trim();
-
-    if (!query) {
-      return projects;
-    }
-
+    if (!query) return projects;
     return projects.filter((project) => {
       const projectTasks = getProjectTasks(project.id);
-
       return (
         project.name.toLowerCase().includes(query) ||
         project.domain?.toLowerCase().includes(query) ||
-        projectTasks.some((task) =>
-          task.name.toLowerCase().includes(query)
-        )
+        projectTasks.some((task) => task.name.toLowerCase().includes(query))
       );
     });
   }, [projects, tasks, search]);
 
   const filteredTasks = useMemo(() => {
     const query = search.toLowerCase().trim();
-
-    if (!query) {
-      return tasks;
-    }
-
+    if (!query) return tasks;
     return tasks.filter((task) => {
       const project = projects.find((p) => p.id === task.project_id);
-
       return (
         task.name.toLowerCase().includes(query) ||
         project?.name.toLowerCase().includes(query)
       );
     });
   }, [tasks, projects, search]);
-
-  /* =========================================================
-     TOGGLE PROJECT
-  ========================================================= */
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects((previous) =>
@@ -511,105 +406,82 @@ export default function SchedulePage() {
     );
   };
 
-  /* =========================================================
-     STATS
-  ========================================================= */
-
   const totalTasks = tasks.length;
-
-  const completedTasks = tasks.filter(
-    (task) => task.status === "Done"
-  ).length;
-
+  const completedTasks = tasks.filter((task) => task.status === "Done").length;
   const overdueTasks = tasks.filter((task) => {
     const days = getDaysUntil(task.due_date);
     return days !== null && days < 0 && task.status !== "Done";
   }).length;
-
   const upcomingDeadlines = projects.filter((project) => {
     const days = getDaysUntil(project.deadline);
     return days !== null && days >= 0 && days <= 7;
   }).length;
 
-  /* =========================================================
-     LOADING
-  ========================================================= */
-
   if (loading) {
     return (
-      <main className="min-h-[calc(100vh-72px)] bg-[#f5f6f8] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-center py-32">
+      <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 px-4 py-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-center py-32">
           <div className="text-center">
-            <Loader2
-              size={30}
-              className="mx-auto animate-spin text-[#07111f]"
-            />
-
-            <p className="mt-3 text-sm font-semibold text-gray-700">
-              Loading schedule...
-            </p>
-
-            <p className="mt-1 text-xs text-gray-400">
-              Loading projects and tasks based on your role.
-            </p>
+            <div className="relative mx-auto h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-slate-200"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-t-[#1a1a2e] animate-spin"></div>
+            </div>
+            <p className="mt-4 text-sm font-semibold text-slate-700">Loading your schedule...</p>
+            <p className="mt-1 text-xs text-slate-400">Fetching projects and tasks</p>
           </div>
         </div>
       </main>
     );
   }
 
-  /* =========================================================
-     RENDER
-  ========================================================= */
-
   return (
-    <main className="min-h-[calc(100vh-72px)] bg-[#f5f6f8] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mx-auto max-w-[1600px]">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <div className="mx-auto max-w-7xl">
         {/* ================================================= 
             HEADER
         ================================================= */}
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#07111f] text-white">
-                <CalendarClock size={19} />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#1a1a2e] via-[#16213e] to-[#0f3460] px-6 py-8 sm:px-8 sm:py-10">
+          <div className="absolute right-0 top-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl"></div>
+          
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm">
+                <GanttChart size={28} className="text-white" />
               </div>
-
-              <h1 className="text-[30px] font-semibold tracking-tight text-[#07111f]">
-                Schedule
-              </h1>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                  Schedule
+                </h1>
+                <p className="mt-1.5 text-sm text-blue-200/80">
+                  {isManagerView
+                    ? "Project and task timelines across your portfolio"
+                    : "Your tasks and project timelines at a glance"}
+                </p>
+                {user && (
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 backdrop-blur-sm">
+                    <User size={13} className="text-blue-300" />
+                    <span className="text-xs font-medium text-white">
+                      {user.full_name || user.name || user.email}
+                    </span>
+                    <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[9px] font-bold text-blue-200">
+                      {user.role}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
-              {isManagerView
-                ? "Project and task timelines for everything assigned to you."
-                : "Your tasks and the timelines of the projects they belong to."}
-            </p>
-
-            {user && (
-              <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <User size={13} className="text-gray-400" />
-
-                <span className="text-[10px] font-semibold text-gray-600">
-                  {user.full_name || user.name || user.email}
-                </span>
-
-                <span className="rounded-md bg-gray-100 px-2 py-1 text-[8px] font-bold text-gray-600">
-                  {user.role}
-                </span>
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => loadData()}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white/10 px-5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              Refresh
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => loadData()}
-            className="flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
-          >
-            <RefreshCw size={14} />
-            Refresh
-          </button>
         </div>
 
         {/* ================================================= 
@@ -617,96 +489,76 @@ export default function SchedulePage() {
         ================================================= */}
 
         {error && (
-          <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
-            {error}
+          <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-5 py-3.5 text-sm font-medium text-red-700">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={16} />
+              {error}
+            </div>
           </div>
         )}
 
         {/* ================================================= 
-            SUMMARY
+            STATS CARDS
         ================================================= */}
 
-        <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {isManagerView && (
-            <div className="rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                  Projects
-                </p>
-
-                <FolderKanban size={16} className="text-gray-400" />
-              </div>
-
-              <p className="mt-2 text-2xl font-bold text-[#07111f]">
-                {projects.length}
-              </p>
-
-              <p className="mt-1 text-[9px] text-gray-400">
-                Projects visible to you
-              </p>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4">
+          <div className="group rounded-2xl border-l-4 border-l-blue-500 bg-white p-4 shadow-sm transition hover:shadow-md">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                Tasks
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {isManagerView ? "Projects" : "Tasks"}
               </p>
-
-              <ClipboardList size={16} className="text-gray-400" />
+              <FolderKanban size={16} className="text-blue-500" />
             </div>
-
-            <p className="mt-2 text-2xl font-bold text-[#07111f]">
-              {totalTasks}
+            <p className="mt-2 text-2xl font-bold text-slate-900">
+              {isManagerView ? projects.length : totalTasks}
             </p>
-
-            <p className="mt-1 text-[9px] text-gray-400">
-              {isManagerView ? "Tasks across your projects" : "Tasks assigned to you"}
+            <p className="mt-0.5 text-[9px] text-slate-400">
+              {isManagerView ? "Active projects" : "Assigned to you"}
             </p>
           </div>
 
-          <div className="rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
+          <div className="group rounded-2xl border-l-4 border-l-emerald-500 bg-white p-4 shadow-sm transition hover:shadow-md">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Completed
+              </p>
+              <CheckCircle2 size={16} className="text-emerald-500" />
+            </div>
+            <p className="mt-2 text-2xl font-bold text-slate-900">
+              {completedTasks}
+            </p>
+            <p className="mt-0.5 text-[9px] text-slate-400">
+              {totalTasks > 0 ? `${Math.round((completedTasks / totalTasks) * 100)}% done` : "No tasks"}
+            </p>
+          </div>
+
+          <div className="group rounded-2xl border-l-4 border-l-red-500 bg-white p-4 shadow-sm transition hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Overdue
               </p>
-
               <AlertTriangle size={16} className="text-red-500" />
             </div>
-
-            <p className="mt-2 text-2xl font-bold text-red-700">
-              {overdueTasks}
-            </p>
-
-            <p className="mt-1 text-[9px] text-gray-400">
-              Tasks past their due date
-            </p>
+            <p className="mt-2 text-2xl font-bold text-red-600">{overdueTasks}</p>
+            <p className="mt-0.5 text-[9px] text-slate-400">Tasks past due date</p>
           </div>
 
-          <div className="rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
+          <div className="group rounded-2xl border-l-4 border-l-amber-500 bg-white p-4 shadow-sm transition hover:shadow-md">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                {isManagerView ? "Deadlines this week" : "Completed"}
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {isManagerView ? "Upcoming" : "Progress"}
               </p>
-
               {isManagerView ? (
                 <Calendar size={16} className="text-amber-500" />
               ) : (
-                <CheckCircle2 size={16} className="text-emerald-500" />
+                <TrendingUp size={16} className="text-amber-500" />
               )}
             </div>
-
-            <p
-              className={`mt-2 text-2xl font-bold ${isManagerView ? "text-amber-700" : "text-emerald-700"
-                }`}
-            >
-              {isManagerView ? upcomingDeadlines : completedTasks}
+            <p className="mt-2 text-2xl font-bold text-amber-600">
+              {isManagerView ? upcomingDeadlines : totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%
             </p>
-
-            <p className="mt-1 text-[9px] text-gray-400">
-              {isManagerView
-                ? "Project deadlines within 7 days"
-                : "Tasks you have completed"}
+            <p className="mt-0.5 text-[9px] text-slate-400">
+              {isManagerView ? "Deadlines in 7 days" : "Task completion rate"}
             </p>
           </div>
         </div>
@@ -716,406 +568,310 @@ export default function SchedulePage() {
         ================================================= */}
 
         <div className="relative mt-6 max-w-sm">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={
-              isManagerView ? "Search projects or tasks..." : "Search your tasks..."
-            }
-            className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-xs text-gray-800 outline-none placeholder:text-gray-400 focus:border-[#07111f] focus:ring-2 focus:ring-gray-100"
+            placeholder={isManagerView ? "Search projects or tasks..." : "Search your tasks..."}
+            className="h-11 w-full rounded-xl border-0 bg-white px-10 text-sm text-slate-800 outline-none ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-[#1a1a2e]"
           />
         </div>
 
         {/* ================================================= 
-            EXECUTIVE MANAGER / PROJECT MANAGER VIEW
-            Projects, each with its schedule (created / start /
-            deadline) and its tasks nested underneath with
-            their own start / due dates.
+            MANAGER VIEW
         ================================================= */}
 
         {isManagerView ? (
-          <section className="mt-5 overflow-hidden rounded-2xl border border-gray-300 bg-white shadow-sm">
-            <div className="flex items-center gap-3 border-b border-gray-300 bg-[#07111f] px-5 py-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white">
-                <FolderKanban size={17} />
+          <section className="mt-6">
+            {filteredProjects.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-16 text-center">
+                <FolderKanban size={36} className="mx-auto text-slate-300" />
+                <p className="mt-3 text-sm font-bold text-slate-700">No projects found</p>
+                <p className="mt-1 text-xs text-slate-400">No projects are available for your role.</p>
               </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredProjects.map((project) => {
+                  const projectTasks = getProjectTasks(project.id);
+                  const expanded = expandedProjects.includes(project.id);
+                  const completedProjectTasks = projectTasks.filter(t => t.status === "Done").length;
+                  const progress = projectTasks.length > 0 ? Math.round((completedProjectTasks / projectTasks.length) * 100) : 0;
+                  const daysUntilDeadline = getDaysUntil(project.deadline);
+                  const isOverdue = daysUntilDeadline !== null && daysUntilDeadline < 0;
 
-              <div>
-                <h2 className="text-sm font-bold text-white">
-                  Project & Task Schedule
-                </h2>
+                  return (
+                    <div
+                      key={project.id}
+                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
+                    >
+                      {/* Project Header */}
+                      <div className="bg-gradient-to-r from-slate-50 to-white px-5 py-4">
+                        <div className="flex flex-wrap items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleProject(project.id)}
+                            className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+                          >
+                            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          </button>
 
-                <p className="mt-0.5 text-[10px] text-gray-400">
-                  Creation date, start date and deadline for every
-                  project, with each task's own timeline underneath.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4">
-              {filteredProjects.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300 px-5 py-16 text-center">
-                  <FolderKanban
-                    size={30}
-                    className="mx-auto text-gray-300"
-                  />
-
-                  <p className="mt-3 text-sm font-bold text-gray-700">
-                    No projects found
-                  </p>
-
-                  <p className="mt-1 text-xs text-gray-400">
-                    No projects are available for your role.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredProjects.map((project) => {
-                    const projectTasks = getProjectTasks(project.id);
-
-                    const expanded = expandedProjects.includes(
-                      project.id
-                    );
-
-                    return (
-                      <div
-                        key={project.id}
-                        className="overflow-hidden rounded-xl border border-gray-300 bg-white"
-                      >
-                        {/* PROJECT ROW */}
-
-                        <div className="flex flex-col gap-3 bg-gray-50 p-4">
-                          <div className="flex items-start gap-3">
-                            <button
-                              type="button"
-                              onClick={() => toggleProject(project.id)}
-                              className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-500 hover:bg-gray-100"
-                            >
-                              {expanded ? (
-                                <ChevronDown size={15} />
-                              ) : (
-                                <ChevronRight size={15} />
-                              )}
-                            </button>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="truncate text-sm font-bold text-gray-900">
-                                  {project.name}
-                                </h3>
-
-                                <span className="rounded-md border border-gray-200 bg-white px-2 py-1 text-[8px] font-bold text-gray-500">
-                                  {project.status || "Active"}
-                                </span>
-                              </div>
-
-                              <p className="mt-1 text-[9px] text-gray-400">
-                                {project.domain || "No domain"}
-                                {project.manager_name
-                                  ? ` · Managed by ${project.manager_name}`
-                                  : ""}
-                              </p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-base font-bold text-slate-900">{project.name}</h3>
+                              <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold ${
+                                project.status === "Done" ? "bg-emerald-100 text-emerald-700" :
+                                project.status === "In Progress" ? "bg-blue-100 text-blue-700" :
+                                "bg-slate-100 text-slate-600"
+                              }`}>
+                                {project.status || "Active"}
+                              </span>
+                              <PriorityBadge priority={project.priority} />
                             </div>
-
-                            <PriorityBadge priority={project.priority} />
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {project.domain || "No domain"}
+                              {project.manager_name && ` · Managed by ${project.manager_name}`}
+                            </p>
                           </div>
 
-                          {/* PROJECT SCHEDULE */}
-
-                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                            <div className="rounded-lg border border-gray-200 bg-white p-2.5">
-                              <div className="flex items-center gap-1.5">
-                                <Clock3
-                                  size={11}
-                                  className="text-gray-400"
-                                />
-
-                                <span className="text-[8px] font-bold uppercase text-gray-400">
-                                  Created
-                                </span>
-                              </div>
-
-                              <p className="mt-1 text-[9px] font-bold text-gray-700">
-                                {formatDate(project.created_at)}
-                              </p>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <div className="text-right">
+                              <p className="text-[9px] font-medium text-slate-400">Progress</p>
+                              <p className="text-sm font-bold text-slate-900">{progress}%</p>
                             </div>
-
-                            <div className="rounded-lg border border-gray-200 bg-white p-2.5">
-                              <div className="flex items-center gap-1.5">
-                                <Calendar
-                                  size={11}
-                                  className="text-gray-400"
-                                />
-
-                                <span className="text-[8px] font-bold uppercase text-gray-400">
-                                  Start
-                                </span>
-                              </div>
-
-                              <p className="mt-1 text-[9px] font-bold text-gray-700">
-                                {formatDate(project.start_date)}
-                              </p>
-                            </div>
-
-                            <div className="rounded-lg border border-red-100 bg-red-50 p-2.5">
-                              <div className="flex items-center gap-1.5">
-                                <Calendar
-                                  size={11}
-                                  className="text-red-400"
-                                />
-
-                                <span className="text-[8px] font-bold uppercase text-red-400">
-                                  Deadline
-                                </span>
-                              </div>
-
-                              <p className="mt-1 text-[9px] font-bold text-red-700">
-                                {formatDate(project.deadline)}
-                              </p>
-                            </div>
-
-                            <div className="rounded-lg border border-gray-200 bg-white p-2.5">
-                              <div className="flex items-center gap-1.5">
-                                <ClipboardList
-                                  size={11}
-                                  className="text-gray-400"
-                                />
-
-                                <span className="text-[8px] font-bold uppercase text-gray-400">
-                                  Time left
-                                </span>
-                              </div>
-
-                              <p className="mt-1">
-                                <DueBadge date={project.deadline} />
-                              </p>
+                            <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center text-white text-xs font-bold">
+                              {projectTasks.length}
                             </div>
                           </div>
                         </div>
 
-                        {/* TASKS */}
+                        {/* Progress Bar */}
+                        <div className="mt-3">
+                          <div className="relative h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className={`h-full rounded-full transition-all duration-700 ${
+                                progress === 100 ? "bg-emerald-500" :
+                                progress >= 60 ? "bg-blue-500" :
+                                progress >= 30 ? "bg-amber-500" :
+                                "bg-red-400"
+                              }`}
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                        </div>
 
-                        {expanded && (
-                          <div className="border-t border-gray-200 bg-[#fafafa] p-3">
-                            {projectTasks.length === 0 ? (
-                              <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-8 text-center">
-                                <ClipboardList
-                                  size={22}
-                                  className="mx-auto text-gray-300"
-                                />
+                        {/* Timeline */}
+                        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          <div className="rounded-lg bg-slate-50 px-3 py-2">
+                            <p className="text-[8px] font-bold uppercase text-slate-400">Start</p>
+                            <p className="text-xs font-semibold text-slate-700">{formatDate(project.start_date)}</p>
+                          </div>
+                          <div className={`rounded-lg px-3 py-2 ${isOverdue ? "bg-red-50" : "bg-slate-50"}`}>
+                            <p className={`text-[8px] font-bold uppercase ${isOverdue ? "text-red-400" : "text-slate-400"}`}>
+                              Deadline
+                            </p>
+                            <p className={`text-xs font-semibold ${isOverdue ? "text-red-600" : "text-slate-700"}`}>
+                              {formatDate(project.deadline)}
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-slate-50 px-3 py-2">
+                            <p className="text-[8px] font-bold uppercase text-slate-400">Tasks</p>
+                            <p className="text-xs font-semibold text-slate-700">
+                              {completedProjectTasks}/{projectTasks.length} done
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-slate-50 px-3 py-2">
+                            <p className="text-[8px] font-bold uppercase text-slate-400">Time Left</p>
+                            <DueBadge date={project.deadline} />
+                          </div>
+                        </div>
+                      </div>
 
-                                <p className="mt-2 text-[10px] font-bold text-gray-600">
-                                  No tasks
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="space-y-2">
-                                {projectTasks.map((task) => (
+                      {/* Tasks */}
+                      {expanded && (
+                        <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-4">
+                          {projectTasks.length === 0 ? (
+                            <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-8 text-center">
+                              <ClipboardList size={22} className="mx-auto text-slate-300" />
+                              <p className="mt-2 text-xs font-medium text-slate-500">No tasks yet</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2.5">
+                              {projectTasks.map((task) => {
+                                const taskProgress = getProgressPercentage(task.start_date, task.due_date);
+                                return (
                                   <div
                                     key={task.id}
-                                    className="rounded-xl border border-gray-300 bg-white p-3"
+                                    className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300"
                                   >
-                                    <div className="flex items-start gap-3">
+                                    <div className="flex flex-wrap items-start gap-3">
                                       <div className="mt-0.5">
                                         {task.status === "Done" ? (
-                                          <CheckCircle2
-                                            size={14}
-                                            className="text-emerald-600"
-                                          />
+                                          <CheckCircle2 size={16} className="text-emerald-500" />
+                                        ) : task.status === "In Progress" ? (
+                                          <Clock3 size={16} className="text-blue-500" />
                                         ) : (
-                                          <Circle
-                                            size={14}
-                                            className="text-gray-300"
-                                          />
+                                          <Circle size={16} className="text-slate-300" />
                                         )}
                                       </div>
 
                                       <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
-                                          <p className="text-xs font-bold text-gray-800">
-                                            {task.name}
-                                          </p>
-
+                                          <p className="text-sm font-bold text-slate-800">{task.name}</p>
+                                          <StatusBadge status={task.status} />
+                                          <PriorityBadge priority={task.priority} />
                                           {task.assignee_name && (
-                                            <span className="text-[9px] text-gray-400">
-                                              · {task.assignee_name}
-                                            </span>
+                                            <span className="text-xs text-slate-500">· {task.assignee_name}</span>
                                           )}
                                         </div>
-
+                                        {task.description && (
+                                          <p className="mt-1 text-xs text-slate-500 line-clamp-1">{task.description}</p>
+                                        )}
                                         <div className="mt-2 flex flex-wrap items-center gap-3">
-                                          <StatusBadge status={task.status} />
-
-                                          <PriorityBadge
-                                            priority={task.priority}
-                                          />
-
-                                          <span className="flex items-center gap-1 text-[8px] text-gray-500">
-                                            <Calendar size={10} />
+                                          <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                                            <Calendar size={11} />
                                             Start: {formatDate(task.start_date)}
                                           </span>
-
-                                          <span className="flex items-center gap-1 text-[8px] text-gray-500">
-                                            <Calendar size={10} />
+                                          <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                                            <Calendar size={11} />
                                             Due: {formatDate(task.due_date)}
                                           </span>
-
                                           <DueBadge date={task.due_date} />
+                                          {task.status !== "Done" && task.start_date && task.due_date && (
+                                            <div className="flex items-center gap-1.5">
+                                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                                                <div
+                                                  className="h-full rounded-full bg-blue-500"
+                                                  style={{ width: `${Math.min(taskProgress, 100)}%` }}
+                                                />
+                                              </div>
+                                              <span className="text-[9px] text-slate-400">{Math.min(taskProgress, 100)}%</span>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         ) : (
           /* ================================================= 
               MEMBER VIEW
-              A flat list of the member's own tasks, each one
-              showing its own schedule plus the parent
-              project's start/deadline for context.
           ================================================= */
 
-          <section className="mt-5 overflow-hidden rounded-2xl border border-gray-300 bg-white shadow-sm">
-            <div className="flex items-center gap-3 border-b border-gray-300 bg-[#07111f] px-5 py-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white">
-                <ClipboardList size={17} />
+          <section className="mt-6">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <h2 className="text-sm font-bold text-slate-900">My Tasks</h2>
+                <p className="mt-0.5 text-xs text-slate-500">Tasks assigned to you with project context</p>
               </div>
 
-              <div>
-                <h2 className="text-sm font-bold text-white">
-                  My Task Schedule
-                </h2>
+              <div className="p-4">
+                {filteredTasks.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 px-5 py-16 text-center">
+                    <ClipboardList size={32} className="mx-auto text-slate-300" />
+                    <p className="mt-3 text-sm font-bold text-slate-700">No tasks assigned</p>
+                    <p className="mt-1 text-xs text-slate-400">You don't have any tasks yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredTasks.map((task) => {
+                      const project = projects.find((p) => p.id === task.project_id);
+                      const taskProgress = getProgressPercentage(task.start_date, task.due_date);
+                      const isOverdue = getDaysUntil(task.due_date) !== null && getDaysUntil(task.due_date)! < 0;
 
-                <p className="mt-0.5 text-[10px] text-gray-400">
-                  Your tasks, with the dates of the project each one
-                  belongs to.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4">
-              {filteredTasks.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300 px-5 py-16 text-center">
-                  <ClipboardList
-                    size={30}
-                    className="mx-auto text-gray-300"
-                  />
-
-                  <p className="mt-3 text-sm font-bold text-gray-700">
-                    No tasks found
-                  </p>
-
-                  <p className="mt-1 text-xs text-gray-400">
-                    You don't have any tasks assigned yet.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredTasks.map((task) => {
-                    const project = projects.find(
-                      (p) => p.id === task.project_id
-                    );
-
-                    return (
-                      <div
-                        key={task.id}
-                        className="rounded-xl border border-gray-300 bg-white p-4"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="mt-0.5">
-                            {task.status === "Done" ? (
-                              <CheckCircle2
-                                size={16}
-                                className="text-emerald-600"
-                              />
-                            ) : (
-                              <Circle size={16} className="text-gray-300" />
-                            )}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-sm font-bold text-gray-900">
-                                {task.name}
-                              </h3>
-
-                              <StatusBadge status={task.status} />
-
-                              <PriorityBadge priority={task.priority} />
+                      return (
+                        <div
+                          key={task.id}
+                          className={`rounded-xl border p-4 transition hover:shadow-sm ${
+                            isOverdue && task.status !== "Done"
+                              ? "border-red-200 bg-red-50/30"
+                              : task.status === "Done"
+                              ? "border-emerald-200 bg-emerald-50/30"
+                              : "border-slate-200 bg-white"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-start gap-3">
+                            <div className="mt-0.5">
+                              {task.status === "Done" ? (
+                                <CheckCircle2 size={18} className="text-emerald-500" />
+                              ) : task.status === "In Progress" ? (
+                                <Clock3 size={18} className="text-blue-500" />
+                              ) : (
+                                <Circle size={18} className="text-slate-300" />
+                              )}
                             </div>
 
-                            <p className="mt-1 flex items-center gap-1.5 text-[10px] text-gray-400">
-                              <FolderKanban size={11} />
-                              {project?.name || "Unknown project"}
-                            </p>
-
-                            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                              <div className="rounded-lg border border-gray-200 bg-gray-50 p-2.5">
-                                <p className="text-[8px] font-bold uppercase text-gray-400">
-                                  Task Start
-                                </p>
-
-                                <p className="mt-1 text-[9px] font-bold text-gray-700">
-                                  {formatDate(task.start_date)}
-                                </p>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-sm font-bold text-slate-900">{task.name}</h3>
+                                <StatusBadge status={task.status} />
+                                <PriorityBadge priority={task.priority} />
                               </div>
 
-                              <div className="rounded-lg border border-red-100 bg-red-50 p-2.5">
-                                <p className="text-[8px] font-bold uppercase text-red-400">
-                                  Task Due
-                                </p>
+                              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                                <FolderKanban size={12} />
+                                {project?.name || "Unknown project"}
+                              </p>
 
-                                <p className="mt-1 text-[9px] font-bold text-red-700">
-                                  {formatDate(task.due_date)}
-                                </p>
+                              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <p className="text-[8px] font-bold uppercase text-slate-400">Task Start</p>
+                                  <p className="text-xs font-semibold text-slate-700">{formatDate(task.start_date)}</p>
+                                </div>
+                                <div className={`rounded-lg px-3 py-2 ${isOverdue && task.status !== "Done" ? "bg-red-50" : "bg-slate-50"}`}>
+                                  <p className={`text-[8px] font-bold uppercase ${isOverdue && task.status !== "Done" ? "text-red-400" : "text-slate-400"}`}>
+                                    Task Due
+                                  </p>
+                                  <p className={`text-xs font-semibold ${isOverdue && task.status !== "Done" ? "text-red-600" : "text-slate-700"}`}>
+                                    {formatDate(task.due_date)}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <p className="text-[8px] font-bold uppercase text-slate-400">Project Start</p>
+                                  <p className="text-xs font-semibold text-slate-700">{formatDate(project?.start_date)}</p>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <p className="text-[8px] font-bold uppercase text-slate-400">Project Deadline</p>
+                                  <p className="text-xs font-semibold text-slate-700">{formatDate(project?.deadline)}</p>
+                                </div>
+                              </div>
 
-                                <p className="mt-1">
+                              {task.status !== "Done" && task.start_date && task.due_date && (
+                                <div className="mt-3 flex items-center gap-3">
+                                  <span className="text-[9px] font-medium text-slate-500">Progress</span>
+                                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                                    <div
+                                      className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                                      style={{ width: `${Math.min(taskProgress, 100)}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-[10px] font-medium text-slate-600">{Math.min(taskProgress, 100)}%</span>
+                                </div>
+                              )}
+
+                              {task.due_date && (
+                                <div className="mt-2">
                                   <DueBadge date={task.due_date} />
-                                </p>
-                              </div>
-
-                              <div className="rounded-lg border border-gray-200 bg-gray-50 p-2.5">
-                                <p className="text-[8px] font-bold uppercase text-gray-400">
-                                  Project Start
-                                </p>
-
-                                <p className="mt-1 text-[9px] font-bold text-gray-700">
-                                  {formatDate(project?.start_date)}
-                                </p>
-                              </div>
-
-                              <div className="rounded-lg border border-gray-200 bg-gray-50 p-2.5">
-                                <p className="text-[8px] font-bold uppercase text-gray-400">
-                                  Project Deadline
-                                </p>
-
-                                <p className="mt-1 text-[9px] font-bold text-gray-700">
-                                  {formatDate(project?.deadline)}
-                                </p>
-                              </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         )}
