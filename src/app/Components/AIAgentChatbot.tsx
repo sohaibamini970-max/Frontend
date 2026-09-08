@@ -86,7 +86,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
   const [conversationHistory, setConversationHistory] = useState<ConversationHistory[]>([]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -99,6 +99,15 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);
+
+  // Auto-resize textarea
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = inputRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+  }, []);
 
   // Get auth headers
   const getAuthHeaders = (): HeadersInit => ({
@@ -121,6 +130,11 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
     setInput("");
     setShowSuggestions(false);
     setLoading(true);
+
+    // Reset textarea height
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
 
     // Add to conversation history
     const newHistory: ConversationHistory[] = [
@@ -183,12 +197,14 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Handle key press
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === "Enter" && !e.shiftKey) {
+  // Handle key press - Enter to send, Ctrl+Enter for new line
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
       sendMessage(input);
     }
+    // Ctrl+Enter or Shift+Enter for new line (default behavior)
+    // No need to prevent default for these
   };
 
   // Format timestamp
@@ -222,7 +238,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-24 right-4 z-[200] w-[400px] max-w-[calc(100vw-2rem)]">
+    <div className="fixed bottom-24 right-4 z-[200] w-[560px] max-w-[calc(100vw-2rem)]">
       <div className="flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between bg-[#07111f] px-4 py-3 text-white">
@@ -350,23 +366,29 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        {/* Input */}
+        {/* Input - Updated with textarea */}
         <div className="border-t border-gray-200 bg-white p-3">
-          <div className="flex items-center gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Ask me anything..."
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-500 focus:ring-2 focus:ring-gray-100 placeholder:text-gray-400"
-              disabled={loading}
-            />
+          <div className="flex items-end gap-2">
+            <div className="flex-1 relative">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                  setInput(e.target.value);
+                  adjustTextareaHeight();
+                }}
+                onKeyDown={handleKeyPress}
+                placeholder="Ask me anything... (Ctrl+Enter for new line)"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-500 focus:ring-2 focus:ring-gray-100 placeholder:text-gray-400 resize-none min-h-[42px] max-h-[120px]"
+                disabled={loading}
+                rows={1}
+                style={{ height: 'auto' }}
+              />
+            </div>
             <button
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || loading}
-              className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#07111f] text-white hover:bg-[#111c2c] disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#07111f] text-white hover:bg-[#111c2c] disabled:opacity-40 disabled:cursor-not-allowed transition"
               aria-label="Send message"
             >
               {loading ? (
