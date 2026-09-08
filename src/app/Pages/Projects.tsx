@@ -29,6 +29,32 @@ import {
 
 const API_BASE = "https://backend-five-swart-88.vercel.app";
 
+// Add this helper function near the top of your file, after the imports
+
+/* =========================================================
+   DATE FORMATTER
+========================================================= */
+
+const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return "Not set";
+  
+  try {
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) return "Not set";
+    
+    // Format as "Sep 14, 2026"
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  } catch (error) {
+    return "Not set";
+  }
+};
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -2344,8 +2370,7 @@ const handleChangeProjectStatus = async () => {
                               </div>
 
                               <p className="mt-1 text-[10px] font-medium text-gray-700">
-                                {project.startDate ||
-                                  "Not set"}
+                                {formatDate (project.startDate) }
                               </p>
 
                             </div>
@@ -2366,8 +2391,7 @@ const handleChangeProjectStatus = async () => {
                               </div>
 
                               <p className="mt-1 text-[10px] font-medium text-gray-700">
-                                {project.deadline ||
-                                  "Not set"}
+                                       {formatDate(project.deadline)}
                               </p>
 
                             </div>
