@@ -19,6 +19,8 @@ import {
   FolderKanban,
   ListTodo,
   FileText,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 // ============================================================
@@ -74,6 +76,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
 
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [suggestions, setSuggestions] = useState<string[]>([
     "Create a new project called 'AI Platform' with high priority",
     "Show me all my projects",
@@ -207,6 +210,11 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
     // No need to prevent default for these
   };
 
+  // Toggle maximize
+  const toggleMaximize = (): void => {
+    setIsMaximized(!isMaximized);
+  };
+
   // Format timestamp
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -238,10 +246,22 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-24 right-4 z-[200] w-[560px] max-w-[calc(100vw-2rem)]">
-      <div className="flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+    <div
+      className={`fixed z-[200] transition-all duration-300 ease-in-out ${
+        isMaximized
+          ? "inset-0 bottom-0 right-0 w-full h-full max-w-full rounded-none"
+          : "bottom-24 right-4 w-[560px] max-w-[calc(100vw-2rem)] rounded-2xl"
+      }`}
+    >
+      <div
+        className={`flex flex-col bg-white shadow-2xl overflow-hidden ${
+          isMaximized
+            ? "h-full w-full rounded-none border-0"
+            : "h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl border border-gray-200"
+        }`}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between bg-[#07111f] px-4 py-3 text-white">
+        <div className="flex items-center justify-between bg-[#07111f] px-4 py-3 text-white flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/20 text-blue-400">
               <Bot size={18} />
@@ -251,17 +271,30 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
               <p className="text-[10px] text-gray-400">Powered by Gemini AI</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 hover:bg-white/10"
-            aria-label="Close chatbot"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleMaximize}
+              className="rounded-lg p-1.5 hover:bg-white/10 transition"
+              aria-label={isMaximized ? "Minimize" : "Maximize"}
+            >
+              {isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 hover:bg-white/10 transition"
+              aria-label="Close chatbot"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4 space-y-3">
+        <div
+          className={`flex-1 overflow-y-auto bg-gray-50 p-4 space-y-3 ${
+            isMaximized ? "p-6" : ""
+          }`}
+        >
           {messages.map((message) => (
             <div
               key={message.id}
@@ -274,7 +307,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                     : message.isError
                     ? "bg-red-50 text-red-700 border border-red-200"
                     : "bg-white text-gray-800 border border-gray-200"
-                }`}
+                } ${isMaximized ? "max-w-[75%]" : ""}`}
               >
                 {message.role === "assistant" && !message.isError && (
                   <div className="mb-1 flex items-center gap-1">
@@ -339,7 +372,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
 
         {/* Suggestions */}
         {showSuggestions && messages.length > 0 && !loading && (
-          <div className="border-t border-gray-100 bg-gray-50 px-4 py-2">
+          <div className="border-t border-gray-100 bg-gray-50 px-4 py-2 flex-shrink-0">
             <div className="flex items-center justify-between">
               <span className="text-[9px] font-medium uppercase tracking-wider text-gray-400">
                 Suggestions
@@ -366,8 +399,8 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        {/* Input - Updated with textarea */}
-        <div className="border-t border-gray-200 bg-white p-3">
+        {/* Input */}
+        <div className="border-t border-gray-200 bg-white p-3 flex-shrink-0">
           <div className="flex items-end gap-2">
             <div className="flex-1 relative">
               <textarea
