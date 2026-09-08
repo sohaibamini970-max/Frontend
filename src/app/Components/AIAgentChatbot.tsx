@@ -21,6 +21,7 @@ import {
   FileText,
   Maximize2,
   Minimize2,
+  Sparkles,
 } from "lucide-react";
 
 // ============================================================
@@ -233,7 +234,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
             href={part}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
+            className="text-blue-400 hover:text-blue-300 underline"
           >
             {part}
           </a>
@@ -254,34 +255,34 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       }`}
     >
       <div
-        className={`flex flex-col bg-white shadow-2xl overflow-hidden ${
+        className={`flex flex-col bg-[#1a1a2e] shadow-2xl overflow-hidden ${
           isMaximized
             ? "h-full w-full rounded-none border-0"
-            : "h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl border border-gray-200"
+            : "h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl border border-[#2d2d44]"
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between bg-[#07111f] px-4 py-3 text-white flex-shrink-0">
+        <div className="flex items-center justify-between bg-gradient-to-r from-[#16213e] to-[#1a1a2e] px-4 py-3 text-white flex-shrink-0 border-b border-[#2d2d44]">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/20 text-blue-400">
-              <Bot size={18} />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/20">
+              <Sparkles size={16} className="text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold">AI Assistant</h3>
+              <h3 className="text-sm font-semibold text-white">AI Assistant</h3>
               <p className="text-[10px] text-gray-400">Powered by Gemini AI</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
             <button
               onClick={toggleMaximize}
-              className="rounded-lg p-1.5 hover:bg-white/10 transition"
+              className="rounded-lg p-1.5 hover:bg-white/10 transition text-gray-400 hover:text-white"
               aria-label={isMaximized ? "Minimize" : "Maximize"}
             >
               {isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
             </button>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 hover:bg-white/10 transition"
+              className="rounded-lg p-1.5 hover:bg-white/10 transition text-gray-400 hover:text-white"
               aria-label="Close chatbot"
             >
               <X size={18} />
@@ -291,9 +292,9 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
 
         {/* Messages */}
         <div
-          className={`flex-1 overflow-y-auto bg-gray-50 p-4 space-y-3 ${
+          className={`flex-1 overflow-y-auto p-4 space-y-3 ${
             isMaximized ? "p-6" : ""
-          }`}
+          } bg-gradient-to-b from-[#1a1a2e] to-[#16213e]`}
         >
           {messages.map((message) => (
             <div
@@ -303,15 +304,15 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
               <div
                 className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
                   message.role === "user"
-                    ? "bg-[#07111f] text-white"
+                    ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
                     : message.isError
-                    ? "bg-red-50 text-red-700 border border-red-200"
-                    : "bg-white text-gray-800 border border-gray-200"
+                    ? "bg-red-900/50 text-red-200 border border-red-700"
+                    : "bg-[#2d2d44] text-gray-200 border border-[#3d3d5c]"
                 } ${isMaximized ? "max-w-[75%]" : ""}`}
               >
                 {message.role === "assistant" && !message.isError && (
                   <div className="mb-1 flex items-center gap-1">
-                    <Bot size={14} className="text-gray-400" />
+                    <Bot size={14} className="text-blue-400" />
                     <span className="text-[10px] font-medium text-gray-400">
                       Assistant
                     </span>
@@ -323,7 +324,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
 
                 {/* Show function called */}
                 {message.functionCalled && (
-                  <div className="mt-2 rounded-lg bg-gray-100 px-3 py-1.5 text-[10px] text-gray-500">
+                  <div className="mt-2 rounded-lg bg-[#1a1a2e] px-3 py-1.5 text-[10px] text-gray-400 border border-[#2d2d44]">
                     🔧 Action: {message.functionCalled}
                   </div>
                 )}
@@ -333,15 +334,15 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                   <div className="mt-2 flex items-center gap-1.5">
                     {message.data.success ? (
                       <>
-                        <Check size={14} className="text-emerald-500" />
-                        <span className="text-[10px] text-emerald-600">
+                        <Check size={14} className="text-emerald-400" />
+                        <span className="text-[10px] text-emerald-400">
                           Operation successful
                         </span>
                       </>
                     ) : (
                       <>
-                        <AlertCircle size={14} className="text-red-500" />
-                        <span className="text-[10px] text-red-600">
+                        <AlertCircle size={14} className="text-red-400" />
+                        <span className="text-[10px] text-red-400">
                           Operation failed
                         </span>
                       </>
@@ -349,7 +350,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                   </div>
                 )}
 
-                <div className="mt-1 text-[9px] text-gray-400">
+                <div className="mt-1 text-[9px] text-gray-500">
                   {formatTime(message.timestamp)}
                 </div>
               </div>
@@ -358,10 +359,10 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="max-w-[85%] rounded-2xl bg-white px-4 py-3 border border-gray-200">
+              <div className="max-w-[85%] rounded-2xl bg-[#2d2d44] px-4 py-3 border border-[#3d3d5c]">
                 <div className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin text-gray-400" />
-                  <span className="text-sm text-gray-500">Thinking...</span>
+                  <Loader2 size={16} className="animate-spin text-blue-400" />
+                  <span className="text-sm text-gray-400">Thinking...</span>
                 </div>
               </div>
             </div>
@@ -372,14 +373,14 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
 
         {/* Suggestions */}
         {showSuggestions && messages.length > 0 && !loading && (
-          <div className="border-t border-gray-100 bg-gray-50 px-4 py-2 flex-shrink-0">
+          <div className="border-t border-[#2d2d44] bg-[#1a1a2e] px-4 py-2 flex-shrink-0">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-medium uppercase tracking-wider text-gray-400">
+              <span className="text-[9px] font-medium uppercase tracking-wider text-gray-500">
                 Suggestions
               </span>
               <button
                 onClick={() => setShowSuggestions(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-500 hover:text-gray-300"
                 aria-label="Hide suggestions"
               >
                 <ChevronUp size={14} />
@@ -390,7 +391,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                 <button
                   key={index}
                   onClick={() => sendMessage(suggestion)}
-                  className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[10px] text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition"
+                  className="rounded-full border border-[#2d2d44] bg-[#16213e] px-2.5 py-1 text-[10px] text-gray-300 hover:bg-[#2d2d44] hover:border-[#3d3d5c] transition"
                 >
                   {suggestion.length > 40 ? suggestion.slice(0, 40) + "..." : suggestion}
                 </button>
@@ -400,7 +401,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
         )}
 
         {/* Input */}
-        <div className="border-t border-gray-200 bg-white p-3 flex-shrink-0">
+        <div className="border-t border-[#2d2d44] bg-[#1a1a2e] p-3 flex-shrink-0">
           <div className="flex items-end gap-2">
             <div className="flex-1 relative">
               <textarea
@@ -412,7 +413,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                 }}
                 onKeyDown={handleKeyPress}
                 placeholder="Ask me anything... (Ctrl+Enter for new line)"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-500 focus:ring-2 focus:ring-gray-100 placeholder:text-gray-400 resize-none min-h-[42px] max-h-[120px]"
+                className="w-full rounded-lg border border-[#2d2d44] bg-[#16213e] px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 placeholder:text-gray-500 resize-none min-h-[42px] max-h-[120px]"
                 disabled={loading}
                 rows={1}
                 style={{ height: 'auto' }}
@@ -421,7 +422,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
             <button
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || loading}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#07111f] text-white hover:bg-[#111c2c] disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-blue-500/20"
               aria-label="Send message"
             >
               {loading ? (
@@ -431,7 +432,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
               )}
             </button>
           </div>
-          <div className="mt-1.5 flex justify-between text-[9px] text-gray-400">
+          <div className="mt-1.5 flex justify-between text-[9px] text-gray-500">
             <span>Powered by Google Gemini AI</span>
             <span>Role-based permissions apply</span>
           </div>
