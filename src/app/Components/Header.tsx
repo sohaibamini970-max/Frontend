@@ -121,7 +121,6 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard" },
   { name: "Projects", href: "/projects" },
   { name: "Tasks", href: "/tasks" },
-  { name: "Team", href: "/teams" },
   { name: "Reports", href: "/reports" },
   { name: "Schedule", href: "/schedule" },
 ];
@@ -256,7 +255,7 @@ export default function Header() {
           badge: `${completedProjects}`,
           note: "completed",
           icon: FolderKanban,
-          iconClass: "bg-[#e7f5ee] text-[#2e9460]",
+          iconClass: "bg-[#e8f5e9] text-[#2e7d32]",
         },
         {
           value: String(totalTasks),
@@ -265,7 +264,7 @@ export default function Header() {
           badge: `${completedTasks}`,
           note: "done",
           icon: CheckSquare,
-          iconClass: "bg-[#e8f1ff] text-[#3b78bd]",
+          iconClass: "bg-[#e3f2fd] text-[#1565c0]",
         },
         {
           value: String(completedTasks),
@@ -274,7 +273,7 @@ export default function Header() {
           badge: `${completionRate}%`,
           note: "of team tasks",
           icon: TrendingUp,
-          iconClass: "bg-[#f1eafa] text-[#8a5ba5]",
+          iconClass: "bg-[#f3e5f5] text-[#7b1fa2]",
         },
         {
           value: String(overdueTasks),
@@ -283,7 +282,7 @@ export default function Header() {
           badge: overdueTasks > 0 ? "!" : "✓",
           note: overdueTasks > 0 ? "needs attention" : "all on track",
           icon: CalendarDays,
-          iconClass: "bg-[#fae9ec] text-[#c35c68]",
+          iconClass: "bg-[#fce4ec] text-[#c62828]",
         },
       ];
     }
@@ -301,7 +300,7 @@ export default function Header() {
           badge: `${completedProjects}`,
           note: "completed",
           icon: FolderKanban,
-          iconClass: "bg-[#e7f5ee] text-[#2e9460]",
+          iconClass: "bg-[#e8f5e9] text-[#2e7d32]",
         },
         {
           value: String(totalTasks),
@@ -310,7 +309,7 @@ export default function Header() {
           badge: `${completedTasks}`,
           note: "done",
           icon: CheckSquare,
-          iconClass: "bg-[#e8f1ff] text-[#3b78bd]",
+          iconClass: "bg-[#e3f2fd] text-[#1565c0]",
         },
         {
           value: String(completedTasks),
@@ -319,7 +318,7 @@ export default function Header() {
           badge: `${completionRate}%`,
           note: "of team tasks",
           icon: TrendingUp,
-          iconClass: "bg-[#f1eafa] text-[#8a5ba5]",
+          iconClass: "bg-[#f3e5f5] text-[#7b1fa2]",
         },
         {
           value: String(overdueTasks),
@@ -328,7 +327,7 @@ export default function Header() {
           badge: overdueTasks > 0 ? "!" : "✓",
           note: overdueTasks > 0 ? "needs attention" : "all on track",
           icon: CalendarDays,
-          iconClass: "bg-[#fae9ec] text-[#c35c68]",
+          iconClass: "bg-[#fce4ec] text-[#c62828]",
         },
       ];
     }
@@ -347,7 +346,7 @@ export default function Header() {
         badge: `${projects.length}`,
         note: "assigned to you",
         icon: FolderKanban,
-        iconClass: "bg-[#e7f5ee] text-[#2e9460]",
+        iconClass: "bg-[#e8f5e9] text-[#2e7d32]",
       },
       {
         value: String(totalTasks),
@@ -356,7 +355,7 @@ export default function Header() {
         badge: `${completedTasks}`,
         note: "done",
         icon: CheckSquare,
-        iconClass: "bg-[#e8f1ff] text-[#3b78bd]",
+        iconClass: "bg-[#e3f2fd] text-[#1565c0]",
       },
       {
         value: String(completedTasks),
@@ -365,7 +364,7 @@ export default function Header() {
         badge: `${completionRate}%`,
         note: "of your tasks",
         icon: TrendingUp,
-        iconClass: "bg-[#f1eafa] text-[#8a5ba5]",
+        iconClass: "bg-[#f3e5f5] text-[#7b1fa2]",
       },
       {
         value: String(overdueTasks),
@@ -374,7 +373,7 @@ export default function Header() {
         badge: `${dueSoon}`,
         note: overdueTasks > 0 ? "needs attention" : "due within 3 days",
         icon: CalendarDays,
-        iconClass: "bg-[#fae9ec] text-[#c35c68]",
+        iconClass: "bg-[#fce4ec] text-[#c62828]",
       },
     ];
   }, [user, isOrgWide, projects, tasks]);
@@ -395,7 +394,7 @@ export default function Header() {
       items.push({
         id: `task-assigned-${task.id}`,
         icon: UserPlus,
-        iconClass: "bg-[#e8f1ff] text-[#3b78bd]",
+        iconClass: "bg-[#e3f2fd] text-[#1565c0]",
         title: "Task assigned to you",
         description: `"${task.name}"${task.project_name ? ` in ${task.project_name}` : ""
           }`,
@@ -411,7 +410,7 @@ export default function Header() {
         items.push({
           id: `project-assigned-${project.id}`,
           icon: FolderKanban,
-          iconClass: "bg-[#e7f5ee] text-[#2e9460]",
+          iconClass: "bg-[#e8f5e9] text-[#2e7d32]",
           title: "Project assigned to you",
           description: `You're now managing "${project.name}"`,
           time,
@@ -428,7 +427,7 @@ export default function Header() {
         items.push({
           id: `task-completed-${task.id}`,
           icon: CheckCircle2,
-          iconClass: "bg-[#e7f5ee] text-[#2e9460]",
+          iconClass: "bg-[#e8f5e9] text-[#2e7d32]",
           title: "Task completed",
           description: `"${task.name}" was marked done`,
           time,
@@ -443,7 +442,7 @@ export default function Header() {
         items.push({
           id: `project-completed-${project.id}`,
           icon: TrendingUp,
-          iconClass: "bg-[#f1eafa] text-[#8a5ba5]",
+          iconClass: "bg-[#f3e5f5] text-[#7b1fa2]",
           title: "Project completed",
           description: `"${project.name}" was marked completed`,
           time,
@@ -498,32 +497,32 @@ export default function Header() {
   };
 
   return (
-    <header className="border-b border-[#d5d5d5] bg-[#f0f2f5]">
+    <header className="border-b border-[#1a2a3a] bg-[#1a2a3a]">
 
       {/* =====================================================
-          TOP NAVIGATION
+          TOP NAVIGATION - Dark background
       ===================================================== */}
       <div className="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-10">
 
         <div className="flex h-[68px] items-center justify-between">
 
-          {/* LOGO */}
+          {/* LOGO - White text */}
           <Link
             href="/dashboard"
             className="flex shrink-0 items-center gap-3"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d5d5d5] bg-white shadow-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 shadow-sm">
               <div className="relative h-5 w-5">
-                <span className="absolute left-[2px] top-[8px] h-[10px] w-[10px] rotate-45 rounded-[3px] bg-[#17232d]" />
-                <span className="absolute left-[8px] top-[2px] h-[13px] w-[9px] rotate-45 rounded-[3px] bg-[#17232d]" />
+                <span className="absolute left-[2px] top-[8px] h-[10px] w-[10px] rotate-45 rounded-[3px] bg-white" />
+                <span className="absolute left-[8px] top-[2px] h-[13px] w-[9px] rotate-45 rounded-[3px] bg-white" />
               </div>
             </div>
-            <span className="text-[20px] font-medium tracking-[-0.6px] text-[#18212b]">
+            <span className="text-[20px] font-medium tracking-[-0.6px] text-white">
               ProjectSpace
             </span>
           </Link>
 
-          {/* DESKTOP NAVIGATION */}
+          {/* DESKTOP NAVIGATION - White text */}
           <nav className="hidden h-full items-center gap-8 lg:flex">
             {[
               ...navigation,
@@ -544,14 +543,14 @@ export default function Header() {
                     text-[14px] font-medium
                     transition-colors
                     ${active
-                      ? "text-[#18212b]"
-                      : "text-[#7a7a7a] hover:text-[#18212b]"
+                      ? "text-white"
+                      : "text-white/60 hover:text-white"
                     }
                   `}
                 >
                   {item.name}
                   {active && (
-                    <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-[#18212b]" />
+                    <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-white" />
                   )}
                 </Link>
               );
@@ -565,33 +564,33 @@ export default function Header() {
             <div className="relative">
               <button
                 onClick={toggleNotifications}
-                className="relative flex h-10 w-10 items-center justify-center rounded-full text-[#18212b] transition hover:bg-[#e8eaed]"
+                className="relative flex h-10 w-10 items-center justify-center rounded-full text-white transition hover:bg-white/10"
                 aria-label="Notifications"
               >
                 <Bell size={21} strokeWidth={1.7} />
                 {unreadCount > 0 && (
-                  <span className="absolute right-[3px] top-[2px] flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-[#18212b] px-1 text-[8px] font-bold text-white">
+                  <span className="absolute right-[3px] top-[2px] flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-[#ef5350] px-1 text-[8px] font-bold text-white">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </button>
 
               {notifOpen && (
-                <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border border-[#d5d5d5] bg-white shadow-[0_16px_40px_rgba(15,23,42,0.14)]">
-                  <div className="border-b border-[#f0f0f0] px-4 py-3">
-                    <p className="text-sm font-semibold text-[#18212b]">
+                <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border border-[#2a3a4a] bg-[#1a2a3a] shadow-[0_16px_40px_rgba(0,0,0,0.4)]">
+                  <div className="border-b border-[#2a3a4a] px-4 py-3">
+                    <p className="text-sm font-semibold text-white">
                       Notifications
                     </p>
                   </div>
                   <div className="max-h-96 overflow-y-auto">
                     {dataLoading ? (
                       <div className="flex items-center justify-center py-10">
-                        <Loader2 size={20} className="animate-spin text-[#b0b0b0]" />
+                        <Loader2 size={20} className="animate-spin text-white/40" />
                       </div>
                     ) : notifications.length === 0 ? (
                       <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-                        <Inbox size={22} className="text-[#d5d5d5]" />
-                        <p className="text-xs text-[#b0b0b0]">
+                        <Inbox size={22} className="text-white/30" />
+                        <p className="text-xs text-white/40">
                           No notifications yet
                         </p>
                       </div>
@@ -601,7 +600,7 @@ export default function Header() {
                         return (
                           <div
                             key={n.id}
-                            className="flex gap-3 border-b border-[#f0f0f0] px-4 py-3 last:border-0 hover:bg-[#fafafa]"
+                            className="flex gap-3 border-b border-[#2a3a4a] px-4 py-3 last:border-0 hover:bg-white/5"
                           >
                             <div
                               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${n.iconClass}`}
@@ -609,13 +608,13 @@ export default function Header() {
                               <Icon size={14} />
                             </div>
                             <div className="min-w-0">
-                              <p className="text-xs font-semibold text-[#18212b]">
+                              <p className="text-xs font-semibold text-white">
                                 {n.title}
                               </p>
-                              <p className="mt-0.5 truncate text-[11px] text-[#7a7a7a]">
+                              <p className="mt-0.5 truncate text-[11px] text-white/60">
                                 {n.description}
                               </p>
-                              <p className="mt-1 text-[10px] text-[#b0b0b0]">
+                              <p className="mt-1 text-[10px] text-white/40">
                                 {formatRelativeTime(n.time)}
                               </p>
                             </div>
@@ -635,44 +634,44 @@ export default function Header() {
                   setNotifOpen(false);
                   setProfileOpen(!profileOpen);
                 }}
-                className="flex items-center gap-2 rounded-xl px-1.5 py-1.5 transition hover:bg-[#e8eaed]"
+                className="flex items-center gap-2 rounded-xl px-1.5 py-1.5 transition hover:bg-white/10"
               >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d5d5d5] bg-[#d5d5d5] text-[11px] font-semibold text-[#18212b]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/20 text-[11px] font-semibold text-white">
                   {loading ? "..." : getInitials(user?.fullName)}
                 </div>
                 <div className="hidden text-left sm:block">
-                  <p className="text-[13px] font-medium text-[#18212b]">
+                  <p className="text-[13px] font-medium text-white">
                     {loading ? "Loading..." : user?.fullName || "Guest User"}
                   </p>
-                  <p className="text-[11px] text-[#7a7a7a]">
+                  <p className="text-[11px] text-white/60">
                     {loading ? "..." : user?.role || "Member"}
                   </p>
                 </div>
                 <ChevronDown
                   size={16}
-                  className={`text-[#7a7a7a] transition-transform ${profileOpen ? "rotate-180" : ""
+                  className={`text-white/60 transition-transform ${profileOpen ? "rotate-180" : ""
                     }`}
                 />
               </button>
 
               {/* PROFILE DROPDOWN */}
               {profileOpen && (
-                <div className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-2xl border border-[#d5d5d5] bg-white p-1.5 shadow-[0_16px_40px_rgba(15,23,42,0.14)]">
-                  <div className="border-b border-[#f0f0f0] px-3 py-3">
-                    <p className="text-sm font-semibold text-[#18212b]">
+                <div className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-2xl border border-[#2a3a4a] bg-[#1a2a3a] p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.4)]">
+                  <div className="border-b border-[#2a3a4a] px-3 py-3">
+                    <p className="text-sm font-semibold text-white">
                       {user?.fullName || "User Account"}
                     </p>
-                    <p className="mt-0.5 text-xs text-[#b0b0b0]">
+                    <p className="mt-0.5 text-xs text-white/40">
                       {user?.email || "user@projectspace.com"}
                     </p>
                   </div>
-                  <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#7a7a7a] transition hover:bg-[#f5f5f5] hover:text-[#18212b]">
+                  <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white">
                     <User size={16} />
                     Profile
                   </button>
                   <button
                     onClick={() => router.push("/settings/password")}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#7a7a7a] transition hover:bg-[#f5f5f5] hover:text-[#18212b]"
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
                   >
                     <Settings size={16} />
                     Change Password
@@ -683,7 +682,7 @@ export default function Header() {
                       logout();
                       router.replace("/login");
                     }}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#c35c68] transition hover:bg-[#fae9ec]"
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#ef5350] transition hover:bg-[#ef5350]/10"
                   >
                     <LogOut size={16} />
                     Logout
@@ -695,7 +694,7 @@ export default function Header() {
             {/* MOBILE */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-[#7a7a7a] transition hover:bg-[#e8eaed] lg:hidden"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-white/70 transition hover:bg-white/10 lg:hidden"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X size={21} /> : <Menu size={21} />}
@@ -706,7 +705,7 @@ export default function Header() {
 
         {/* MOBILE NAV */}
         {mobileMenuOpen && (
-          <nav className="border-t border-[#f0f0f0] py-3 lg:hidden">
+          <nav className="border-t border-[#2a3a4a] py-3 lg:hidden">
             {[
               ...navigation,
               ...(isSystemAdministrator
@@ -725,8 +724,8 @@ export default function Header() {
                   className={`
                     block rounded-lg px-4 py-3 text-sm
                     ${active
-                      ? "bg-[#e8eaed] font-semibold text-[#18212b]"
-                      : "text-[#7a7a7a] hover:bg-[#e8eaed] hover:text-[#18212b]"
+                      ? "bg-white/10 font-semibold text-white"
+                      : "text-white/60 hover:bg-white/5 hover:text-white"
                     }
                   `}
                 >
@@ -739,15 +738,15 @@ export default function Header() {
       </div>
 
       {/* =====================================================
-          DASHBOARD HERO - Light background with darker cards area
+          DASHBOARD HERO - Dark background with transparent glass cards
       ===================================================== */}
-      <div className="border-t border-[#d5d5d5] bg-[#f0f2f5]">
+      <div className="border-t border-[#2a3a4a] bg-[#1a2a3a]">
         <div className="mx-auto max-w-[1440px] px-5 py-10 sm:px-8 lg:px-10">
           <div className="grid items-start gap-8 lg:grid-cols-[1fr_650px]">
 
-            {/* LEFT - Welcome Text - Dark text on light background */}
+            {/* LEFT - Welcome Text - White text */}
             <div className="max-w-[560px] pt-1">
-              <h2 className="text-[32px] font-light tracking-[-0.5px] text-[#18212b] sm:text-[38px]">
+              <h2 className="text-[32px] font-light tracking-[-0.5px] text-white sm:text-[38px]">
                 WELCOME BACK,
                 <br />
                 <span className="font-semibold">
@@ -755,57 +754,57 @@ export default function Header() {
                 </span>
               </h2>
 
-              <p className="mt-4 text-[18px] font-medium text-[#18212b]">
+              <p className="mt-4 text-[18px] font-medium text-white/90">
                 Here's what's happening in your projects today.
               </p>
 
-              <p className="mt-2 text-[14px] text-[#7a7a7a]">
+              <p className="mt-2 text-[14px] text-white/60">
                 Stay up to date with your projects, tasks and team activity.
               </p>
             </div>
 
-            {/* RIGHT - STAT CARDS - Slightly darker blue/gray background */}
+            {/* RIGHT - STAT CARDS - Glass/Transparent background */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
 
               {dataLoading ? (
-                <div className="col-span-2 flex min-h-[145px] items-center justify-center rounded-2xl border border-[#c8cdd4] bg-[#e4e7ec] sm:col-span-4">
-                  <Loader2 size={22} className="animate-spin text-[#7a7a7a]" />
+                <div className="col-span-2 flex min-h-[145px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm sm:col-span-4">
+                  <Loader2 size={22} className="animate-spin text-white/60" />
                 </div>
               ) : (
                 statsData.map((stat, index) => {
                   const Icon = stat.icon;
 
-                  const cardColors = [
-                    { icon: "bg-[#e7f5ee] text-[#2e9460]" },
-                    { icon: "bg-[#e8f1ff] text-[#3b78bd]" },
-                    { icon: "bg-[#f1eafa] text-[#8a5ba5]" },
-                    { icon: "bg-[#fae9ec] text-[#c35c68]" },
-                  ][index] || { icon: "bg-[#f5f5f5] text-[#7a7a7a]" };
+                  const cardIconColors = [
+                    { bg: "bg-[#e8f5e9]/20 text-[#81c784]" },
+                    { bg: "bg-[#e3f2fd]/20 text-[#64b5f6]" },
+                    { bg: "bg-[#f3e5f5]/20 text-[#ce93d8]" },
+                    { bg: "bg-[#fce4ec]/20 text-[#ef9a9a]" },
+                  ][index] || { bg: "bg-white/10 text-white/60" };
 
                   return (
                     <div
                       key={stat.label + stat.label2}
-                      className="min-h-[145px] rounded-2xl border border-[#c8cdd4] bg-[#e4e7ec] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                      className="min-h-[145px] rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm p-4 shadow-[0_4px_20px_rgba(0,0,0,0.15)] transition hover:bg-white/15"
                     >
                       <div className="flex items-start justify-between">
-                        <span className="text-[30px] font-medium leading-none tracking-tight text-[#18212b]">
+                        <span className="text-[30px] font-medium leading-none tracking-tight text-white">
                           {stat.value}
                         </span>
                         <div
-                          className={`flex h-11 w-11 items-center justify-center rounded-xl ${cardColors.icon}`}
+                          className={`flex h-11 w-11 items-center justify-center rounded-xl ${cardIconColors.bg}`}
                         >
                           <Icon size={20} strokeWidth={1.8} />
                         </div>
                       </div>
 
-                      <p className="mt-4 text-[13px] font-medium leading-tight text-[#18212b]">
+                      <p className="mt-4 text-[13px] font-medium leading-tight text-white/90">
                         {stat.label}
                         <br />
                         {stat.label2}
                       </p>
 
-                      <p className="mt-2 text-[11px] text-[#2e9460]">
-                        <span className="font-bold text-[#2e9460]">
+                      <p className="mt-2 text-[11px] text-[#81c784]">
+                        <span className="font-bold text-[#81c784]">
                           {stat.badge}
                         </span>{" "}
                         {stat.note}
