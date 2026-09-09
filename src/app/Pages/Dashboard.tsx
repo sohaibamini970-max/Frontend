@@ -102,7 +102,631 @@ type DashboardData = {
 };
 
 /* =========================================================
-   COMPONENT
+   PROJECT GRAPH COLORS
+========================================================= */
+
+const PROJECT_OVERVIEW_COLORS = [
+  {
+    bar: "from-[#42b5e8] to-[#2d6dcc]",
+    icon: "bg-[#172b3a] text-[#42b5e8]",
+  },
+  {
+    bar: "from-[#69d19a] to-[#3ca67d]",
+    icon: "bg-[#172b3a] text-[#69d19a]",
+  },
+  {
+    bar: "from-[#9670ed] to-[#493bc0]",
+    icon: "bg-[#172b3a] text-[#9670ed]",
+  },
+  {
+    bar: "from-[#ffb25b] to-[#ed7440]",
+    icon: "bg-[#172b3a] text-[#ffb25b]",
+  },
+  {
+    bar: "from-[#4fc1c2] to-[#218a9b]",
+    icon: "bg-[#172b3a] text-[#4fc1c2]",
+  },
+  {
+    bar: "from-[#ed5d91] to-[#bd2f70]",
+    icon: "bg-[#172b3a] text-[#ed5d91]",
+  },
+  {
+    bar: "from-[#315da5] to-[#172d61]",
+    icon: "bg-[#172b3a] text-[#7fa8ff]",
+  },
+  {
+    bar: "from-[#f8d95c] to-[#d8aa2c]",
+    icon: "bg-[#172b3a] text-[#f8d95c]",
+  },
+];
+
+/* =========================================================
+   DASHBOARD STAT COMPONENT
+========================================================= */
+
+function DashboardStat({
+  icon,
+  label,
+  value,
+  className,
+  iconClass,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  className: string;
+  iconClass: string;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border border-white/70 p-5 ${className}`}
+    >
+      <div className="flex items-center gap-2.5">
+        <span className={iconClass}>{icon}</span>
+        <span className="text-[10px] font-bold uppercase tracking-wide text-[#697783]">
+          {label}
+        </span>
+      </div>
+      <p className="mt-3 text-[26px] font-bold text-[#172633]">{value}</p>
+    </div>
+  );
+}
+
+/* =========================================================
+   EMPTY STATE COMPONENT
+========================================================= */
+
+function EmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-6 py-12 text-center">
+      <Users size={28} className="mx-auto text-gray-300" />
+      <p className="mt-3 text-[13px] font-bold text-gray-600">{title}</p>
+      <p className="mt-1.5 text-[11px] text-gray-400">{description}</p>
+    </div>
+  );
+}
+
+/* =========================================================
+   PROJECT CARD COMPONENT
+========================================================= */
+
+function ProjectCard({
+  project,
+  onView,
+  getInitials,
+  getProjectStatusClass,
+  formatDate,
+}: {
+  project: Project;
+  onView: () => void;
+  getInitials: (name: string) => string;
+  getProjectStatusClass: (status: string) => string;
+  formatDate: (date?: string | null) => string;
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  const status = project.status || "Unassigned";
+  const statusClass = getProjectStatusClass(status);
+  const description =
+    project.about_description || project.about_title || "No project description available.";
+  const progress = Math.min(100, Math.max(0, Number(project.progress) || 0));
+
+  return (
+    <>
+      <div className="group overflow-hidden rounded-2xl border border-[#dfe5ea] bg-white shadow-[0_4px_18px_rgba(24,39,54,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(24,39,54,0.12)]">
+        <div className="relative overflow-hidden bg-[#172b3a] px-6 pb-6 pt-6">
+          <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-[#557bd2]/20" />
+          <div className="absolute -bottom-16 right-20 h-32 w-32 rounded-full bg-[#438d5d]/10" />
+          <div className="absolute right-5 top-10 h-12 w-12 rotate-12 rounded-xl border border-white/10 bg-white/5" />
+
+          <div className="relative flex items-start justify-between">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-white backdrop-blur-sm">
+              <FolderKanban size={19} />
+            </div>
+            <span className={`rounded-full px-3 py-1.5 text-[9px] font-bold ${statusClass}`}>
+              {status}
+            </span>
+          </div>
+
+          <div className="relative mt-8">
+            <h3 className="truncate text-[18px] font-bold text-white">{project.name}</h3>
+            <p className="mt-2 line-clamp-2 min-h-[40px] text-[11px] leading-5 text-white/65">
+              {description}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-[#f7f9fb] p-4">
+              <div className="flex items-center gap-2">
+                <CalendarDays size={13} className="text-[#557bd2]" />
+                <p className="text-[9px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                  Deadline
+                </p>
+              </div>
+              <p className="mt-2 text-[11px] font-bold text-[#44515c]">
+                {project.deadline ? formatDate(project.deadline) : "Not set"}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-[#f7f9fb] p-4">
+              <div className="flex items-center gap-2">
+                <FolderKanban size={13} className="text-[#895a9d]" />
+                <p className="text-[9px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                  Domain
+                </p>
+              </div>
+              <p className="mt-2 truncate text-[11px] font-bold text-[#44515c]">
+                {project.domain || "General"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <div className="mb-2.5 flex items-center justify-between">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                Project Progress
+              </p>
+              <span className="text-[13px] font-bold text-[#172b3a]">{progress}%</span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-[#e9edf1]">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#557bd2] via-[#6689dd] to-[#8ca7ec] transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between border-t border-[#edf0f3] pt-5">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#557bd2] to-[#314f9c] text-[9px] font-bold text-white">
+                {getInitials(project.manager_name || "PM")}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[8px] font-bold uppercase tracking-wide text-[#a0a9b2]">
+                  Project Manager
+                </p>
+                <p className="truncate text-[10px] font-bold text-[#44515c]">
+                  {project.manager_name || "Not assigned"}
+                </p>
+              </div>
+            </div>
+            <span className="rounded-lg bg-[#f0f4ff] px-2.5 py-1.5 text-[9px] font-bold text-[#557bd2]">
+              {project.priority || "Normal"}
+            </span>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-2.5">
+            <button
+              onClick={onView}
+              className="flex items-center justify-center gap-2 rounded-xl bg-[#557bd2] py-3.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#456bc2] active:scale-[0.98]"
+            >
+              <Eye size={14} />
+              View Project
+            </button>
+            <button
+              onClick={() => setDetailsOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-xl bg-[#172b3a] py-3.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#223d50] active:scale-[0.98]"
+            >
+              <Eye size={14} />
+              Details
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {detailsOpen && (
+        <ProjectDetailsModal
+          project={project}
+          onClose={() => setDetailsOpen(false)}
+          onView={onView}
+          getProjectStatusClass={getProjectStatusClass}
+          formatDate={formatDate}
+        />
+      )}
+    </>
+  );
+}
+
+/* =========================================================
+   PROJECT DETAILS MODAL
+========================================================= */
+
+function ProjectDetailsModal({
+  project,
+  onClose,
+  onView,
+  getProjectStatusClass,
+  formatDate,
+}: {
+  project: Project;
+  onClose: () => void;
+  onView: () => void;
+  getProjectStatusClass: (status: string) => string;
+  formatDate: (date?: string | null) => string;
+}) {
+  const status = project.status || "Unassigned";
+  const description =
+    project.about_description || project.about_title || "No project description available.";
+  const progress = Math.min(100, Math.max(0, Number(project.progress) || 0));
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#172b3a]/55 px-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[580px] overflow-hidden rounded-2xl bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="relative overflow-hidden bg-[#172b3a] px-6 py-6">
+          <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#557bd2]/20" />
+          <div className="relative flex items-center justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 text-white">
+                <FolderKanban size={21} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="truncate text-[18px] font-bold text-white">{project.name}</h2>
+                <p className="mt-1 text-[11px] text-white/60">Project Details</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            >
+              <X size={17} />
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-[68vh] overflow-y-auto p-6">
+          <div className="grid grid-cols-2 gap-3">
+            <ProjectDetailItem label="Status" value={status} />
+            <ProjectDetailItem label="Progress" value={`${progress}%`} />
+          </div>
+
+          <div className="mt-5 rounded-xl border border-[#edf0f3] bg-[#fafbfd] p-5">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[#98a2ac]">
+              Description
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-[12px] leading-6 text-[#5f6b75]">
+              {description}
+            </p>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <ProjectDetailItem label="Domain" value={project.domain || "Not specified"} />
+            <ProjectDetailItem label="Priority" value={project.priority || "Not specified"} />
+            <ProjectDetailItem
+              label="Start Date"
+              value={project.start_date ? formatDate(project.start_date) : "Not specified"}
+            />
+            <ProjectDetailItem
+              label="Deadline"
+              value={project.deadline ? formatDate(project.deadline) : "Not specified"}
+            />
+            <ProjectDetailItem label="Project Manager" value={project.manager_name || "Not assigned"} />
+            <ProjectDetailItem label="Manager Role" value={project.manager_name ? "Project Manager" : "Not assigned"} />
+          </div>
+
+          {project.creator_name && (
+            <div className="mt-4 rounded-xl border border-[#edf0f3] bg-[#fafbfd] p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                Created By
+              </p>
+              <p className="mt-1.5 text-[12px] font-bold text-[#44515c]">{project.creator_name}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-[#edf0f3] bg-[#fafbfd] p-5">
+          <button
+            onClick={onView}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#557bd2] py-3.5 text-[11px] font-bold text-white transition hover:bg-[#456bc2]"
+          >
+            <Eye size={15} />
+            Open Project
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   PROJECT OVERVIEW MODAL
+========================================================= */
+
+function ProjectOverviewModal({
+  project,
+  projectOverview,
+  tasks,
+  projects,
+  onClose,
+  onViewProject,
+  formatDate,
+}: {
+  project: Project;
+  projectOverview: Array<{
+    project: Project;
+    totalTasks: number;
+    completedTasks: number;
+    progress: number;
+  }>;
+  tasks: Task[];
+  projects: Project[];
+  onClose: () => void;
+  onViewProject: (projectId: string) => void;
+  formatDate: (date?: string | null) => string;
+}) {
+  const projectTasks = tasks.filter((task) => String(task.project_id || "") === String(project.id));
+  const totalTasks = projectTasks.length;
+  const completedTasks = projectTasks.filter((task) => {
+    const status = task.status?.toLowerCase().trim();
+    return status === "done" || status === "completed";
+  }).length;
+  const inProgressTasks = projectTasks.filter((task) => {
+    const status = task.status?.toLowerCase().trim();
+    return status === "in progress" || status === "in_progress";
+  }).length;
+  const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#172b3a]/55 px-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[580px] overflow-hidden rounded-2xl bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="relative overflow-hidden bg-[#172b3a] px-6 py-6">
+          <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#557bd2]/20" />
+          <div className="absolute -bottom-16 left-20 h-28 w-28 rounded-full bg-[#438d5d]/10" />
+          <div className="relative flex items-start justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
+                <FolderKanban size={22} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="truncate text-[18px] font-bold text-white">{project.name}</h2>
+                <p className="mt-1 text-[11px] text-white/60">Project Progress Details</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            >
+              <X size={17} />
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-[68vh] overflow-y-auto p-6">
+          <div className="rounded-2xl border border-[#e8edf2] bg-[#fafbfd] p-6">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                  Task Completion
+                </p>
+                <p className="mt-1 text-[30px] font-bold text-[#172633]">{progress}%</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-[#98a2ac]">Completed</p>
+                <p className="text-[14px] font-bold text-[#438d5d]">
+                  {completedTasks} / {totalTasks}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 h-3 overflow-hidden rounded-full bg-[#e9edf1]">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#557bd2] to-[#7c9bea] transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            <ModalStat icon={<Circle size={14} />} label="Total Tasks" value={totalTasks} iconClass="text-[#557bd2]" />
+            <ModalStat
+              icon={<CheckCircle2 size={14} />}
+              label="Completed"
+              value={completedTasks}
+              iconClass="text-[#438d5d]"
+            />
+            <ModalStat
+              icon={<Clock3 size={14} />}
+              label="In Progress"
+              value={inProgressTasks}
+              iconClass="text-[#be8944]"
+            />
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <ProjectDetailItem label="Status" value={project.status || "Not specified"} />
+            <ProjectDetailItem label="Priority" value={project.priority || "Not specified"} />
+            <ProjectDetailItem label="Domain" value={project.domain || "General"} />
+            <ProjectDetailItem label="Project Manager" value={project.manager_name || "Not assigned"} />
+            <ProjectDetailItem
+              label="Start Date"
+              value={project.start_date ? formatDate(project.start_date) : "Not specified"}
+            />
+            <ProjectDetailItem
+              label="Deadline"
+              value={project.deadline ? formatDate(project.deadline) : "Not specified"}
+            />
+          </div>
+
+          {(project.about_description || project.about_title) && (
+            <div className="mt-5 rounded-xl border border-[#edf0f3] bg-[#fafbfd] p-5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[#98a2ac]">
+                Description
+              </p>
+              <p className="mt-2 whitespace-pre-wrap text-[12px] leading-6 text-[#5f6b75]">
+                {project.about_description || project.about_title}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-[#edf0f3] bg-[#fafbfd] p-5">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onViewProject(project.id);
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#557bd2] py-3.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#456bc2]"
+          >
+            <Eye size={15} />
+            Open Project
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   MODAL STAT
+========================================================= */
+
+function ModalStat({
+  icon,
+  label,
+  value,
+  iconClass,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  iconClass: string;
+}) {
+  return (
+    <div className="rounded-xl border border-[#edf0f3] bg-[#fafbfd] p-4">
+      <div className="flex items-center gap-2">
+        <span className={iconClass}>{icon}</span>
+        <span className="text-[9px] font-semibold text-[#7b8794]">{label}</span>
+      </div>
+      <p className={`mt-2 text-[22px] font-bold ${iconClass}`}>{value}</p>
+    </div>
+  );
+}
+
+/* =========================================================
+   PROJECT DETAIL ITEM
+========================================================= */
+
+function ProjectDetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+      <p className="mt-1.5 truncate text-[11px] font-bold text-gray-700">{value}</p>
+    </div>
+  );
+}
+
+/* =========================================================
+   TEAM ITEM
+========================================================= */
+
+function TeamItemNew({
+  color,
+  label,
+  value,
+}: {
+  color: string;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="flex min-w-[120px] items-center justify-between gap-5">
+      <div className="flex items-center gap-2.5">
+        <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
+        <span className="text-[10px] font-medium text-[#697783]">{label}</span>
+      </div>
+      <span className="text-[11px] font-bold text-[#34424d]">{value}</span>
+    </div>
+  );
+}
+
+/* =========================================================
+   SCHEDULE ITEM
+========================================================= */
+
+function ScheduleItem({
+  task,
+  projects,
+}: {
+  task: Task;
+  projects: Project[];
+}) {
+  const project = projects.find((item) => String(item.id) === String(task.project_id || ""));
+  const taskName = task.name || task.title || "Untitled Task";
+  const initials = taskName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join("");
+
+  const dueDate = task.due_date ? new Date(task.due_date) : null;
+  const time = dueDate
+    ? dueDate.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "--:--";
+
+  const type = task.status || "Pending";
+  let statusClass = "bg-[#f3eafa] text-[#85579a]";
+  const normalized = type.toLowerCase();
+  if (normalized.includes("review")) {
+    statusClass = "bg-[#f8f0e4] text-[#ad8144]";
+  } else if (normalized.includes("progress")) {
+    statusClass = "bg-[#edf2ff] text-[#5577c2]";
+  } else if (normalized.includes("done") || normalized.includes("complete")) {
+    statusClass = "bg-[#eaf5ed] text-[#438759]";
+  } else if (normalized.includes("todo") || normalized.includes("to do") || normalized.includes("pending")) {
+    statusClass = "bg-[#f3eafa] text-[#85579a]";
+  }
+
+  return (
+    <div className="relative flex min-h-[58px] items-center">
+      <div className="w-[56px] shrink-0 text-[10px] font-medium text-gray-400">{time}</div>
+      <div className="relative z-10 mx-[7px] flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full border border-white bg-gray-300 shadow-sm" />
+      <div className="ml-3 flex min-w-0 flex-1 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-300 to-gray-600 text-[8px] font-bold text-white">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <span className="block truncate text-[11px] font-semibold text-[#34424d]">{taskName}</span>
+            {project && (
+              <span className="mt-0.5 block truncate text-[9px] text-gray-400">{project.name}</span>
+            )}
+          </div>
+        </div>
+        <span className={`shrink-0 rounded-full px-2.5 py-1.5 text-[9px] font-semibold ${statusClass}`}>
+          {type}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   MAIN DASHBOARD COMPONENT
 ========================================================= */
 
 export default function Dashboard() {
@@ -150,7 +774,7 @@ export default function Dashboard() {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message || "Failed to load dashboard");
       }
@@ -159,7 +783,6 @@ export default function Dashboard() {
 
       const endTime = performance.now();
       console.log(`⏱️ Dashboard loaded in ${(endTime - startTime).toFixed(2)}ms`);
-
     } catch (err) {
       console.error("Dashboard loading error:", err);
       setError(err instanceof Error ? err.message : "Failed to load dashboard.");
@@ -206,7 +829,7 @@ export default function Dashboard() {
   const getProjectStatusClass = useCallback((status: string) => {
     const normalized = status.toLowerCase();
     if (normalized.includes("progress")) return "bg-[#edf2ff] text-[#5577c2]";
-    if (normalized.includes("done") || normalized.includes("complete")) 
+    if (normalized.includes("done") || normalized.includes("complete"))
       return "bg-[#eaf5ed] text-[#438759]";
     if (normalized.includes("pause")) return "bg-[#f8f0e4] text-[#ad8144]";
     if (normalized.includes("backlog")) return "bg-[#f3eafa] text-[#85579a]";
@@ -248,9 +871,7 @@ export default function Dashboard() {
         <div className="flex min-h-[70vh] items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <RefreshCw size={30} className="animate-spin text-[#557bd2]" />
-            <p className="text-[14px] font-semibold text-gray-600">
-              Loading dashboard...
-            </p>
+            <p className="text-[14px] font-semibold text-gray-600">Loading dashboard...</p>
           </div>
         </div>
       </main>
@@ -264,9 +885,7 @@ export default function Dashboard() {
         <div className="mx-auto max-w-[1440px] px-5 py-6 sm:px-8 lg:px-10">
           <div className="rounded-2xl border border-red-200 bg-white p-10 text-center">
             <AlertCircle className="mx-auto text-red-500" size={34} />
-            <h2 className="mt-4 text-[18px] font-bold text-gray-900">
-              Unable to load dashboard
-            </h2>
+            <h2 className="mt-4 text-[18px] font-bold text-gray-900">Unable to load dashboard</h2>
             <p className="mt-2 text-[13px] text-gray-500">{error}</p>
             <button
               onClick={handleRefresh}
@@ -296,7 +915,7 @@ export default function Dashboard() {
     isManagement,
     isProjectManager,
     isMember,
-    roleDescription
+    roleDescription,
   } = dashboardData;
 
   const formattedScheduleDate = scheduleDate.toLocaleDateString("en-US", {
@@ -305,221 +924,4 @@ export default function Dashboard() {
     weekday: "long",
   });
 
-  // Filter schedule tasks for selected date
-  const filteredScheduleTasks = useMemo(() => {
-    const selectedDate = scheduleDate.toISOString().split("T")[0];
-    const filtered = scheduleTasks.filter((task) => {
-      if (!task.due_date) return false;
-      return task.due_date.split("T")[0] === selectedDate;
-    });
-    return filtered.length > 0 ? filtered.slice(0, 8) : scheduleTasks.slice(0, 8);
-  }, [scheduleTasks, scheduleDate]);
-
-  return (
-    <main className="min-h-screen bg-[#c4c4c4]">
-      <div className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10">
-        {/* =================================================
-            PAGE HEADER
-        ================================================= */}
-        <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="mb-2 flex flex-wrap items-center gap-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#557bd2]">
-                Workspace Overview
-              </p>
-              {user.role && (
-                <span className="rounded-full border border-[#d5e0f7] bg-[#edf2ff] px-3 py-1.5 text-[10px] font-bold text-[#557bd2]">
-                  {user.role}
-                </span>
-              )}
-            </div>
-            <h1 className="text-[30px] font-bold tracking-tight text-[#16212d] sm:text-[32px]">
-              Dashboard
-            </h1>
-            <p className="mt-2 max-w-[700px] text-[13px] leading-5 text-[#697783]">
-              {roleDescription}
-            </p>
-          </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex w-fit items-center gap-2.5 rounded-xl bg-[#172b3a] px-5 py-3 text-[12px] font-bold text-white shadow-sm transition hover:bg-[#223d50] disabled:opacity-50"
-          >
-            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
-            Refresh Dashboard
-          </button>
-        </div>
-
-        {/* =================================================
-            ROW 1 — PROJECTS OVERVIEW
-        ================================================= */}
-        <section className="mb-7 overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
-          <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-            <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-[25px] font-bold text-[#172633]">
-                  Projects Overview
-                </h2>
-                <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[13px] font-bold text-[#557bd2]">
-                  {projectOverview.length}
-                </span>
-              </div>
-              <p className="mt-1.5 text-[13px] text-[#7b8794]">
-                Track project progress and task completion at a glance
-              </p>
-            </div>
-            <div className="flex w-fit items-center gap-2.5 rounded-xl border border-[#dfe5ea] bg-[#fafbfd] px-4 py-3">
-              <CalendarDays size={15} className="text-[#557bd2]" />
-              <span className="text-[13px] font-semibold text-[#53616d]">
-                Data: {new Date().toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
-          </div>
-
-          {projectOverview.length === 0 ? (
-            <div className="flex min-h-[330px] items-center justify-center px-5">
-              <EmptyState
-                title={isProjectManager ? "No projects assigned to you" : 
-                       isMember ? "No assigned projects yet" : "No projects available"}
-                description={isProjectManager ? "Projects assigned to you will appear here." :
-                            isMember ? "Projects will appear here when tasks are assigned to you." :
-                            "Projects will appear here once they are created."}
-              />
-            </div>
-          ) : (
-            <div className="px-5 pb-6 pt-7 sm:px-7 sm:pb-7">
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-x-0 bottom-[72px] h-px bg-[#6f7b87]" />
-                <div className="relative flex flex-wrap justify-start gap-x-8 gap-y-8 pl-6">
-                  {projectOverview.map(({ project, totalTasks, completedTasks, progress }, index) => {
-                    const color = PROJECT_OVERVIEW_COLORS[index % PROJECT_OVERVIEW_COLORS.length];
-                    return (
-                      <button
-                        key={project.id}
-                        type="button"
-                        onClick={() => setSelectedOverviewProject(project)}
-                        className="group flex w-[120px] flex-col items-center rounded-xl px-1 pt-1 transition hover:bg-[#fafbfd]"
-                      >
-                        <div className="mb-3 h-6">
-                          <span className="text-[15px] font-bold text-[#172633] transition group-hover:text-[#557bd2]">
-                            {progress}%
-                          </span>
-                        </div>
-                        <div className="relative flex h-[200px] w-full max-w-[42px] items-end justify-center">
-                          <div
-                            className={`absolute bottom-0 h-full w-full rounded-t-xl opacity-[0.035] ${color.bar}`}
-                          />
-                          <div
-                            className={`relative z-10 w-full rounded-t-xl bg-gradient-to-t ${color.bar} shadow-[0_8px_18px_rgba(85,123,210,0.16)] transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_12px_25px_rgba(85,123,210,0.22)]`}
-                            style={{
-                              height: `${Math.max(progress, progress === 0 ? 2 : 8)}%`,
-                            }}
-                          >
-                            <div className="absolute inset-x-0 top-0 h-12 rounded-t-xl bg-white/10" />
-                          </div>
-                        </div>
-                        <div className="mt-2 min-h-[52px] w-[125px] text-center">
-                          <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a98a8]">
-                            Project {index + 1}
-                          </p>
-                          <p className="text-[12px] font-bold uppercase leading-4 text-[#172633] transition group-hover:text-[#557bd2]">
-                            {project.name}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="mt-6 flex items-center justify-center">
-                <div className="flex items-center gap-2.5 rounded-full bg-[#f7f9fb] px-5 py-2.5">
-                  <Eye size={18} className="text-[#557bd2]" />
-                  <span className="text-[14px] font-medium text-[#7b8794]">
-                    Click any project bar to view detailed progress
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* =================================================
-            ROW 2 — ACTIVE PROJECTS
-        ================================================= */}
-        <section className="mb-7">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-[19px] font-bold text-[#172633]">
-                  Active Projects
-                </h2>
-                <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[11px] font-bold text-[#557bd2]">
-                  {activeProjects.length}
-                </span>
-              </div>
-              <p className="mt-1.5 text-[12px] text-[#8b96a3]">
-                Current projects requiring attention
-              </p>
-            </div>
-            <button
-              onClick={() => router.push("/projects")}
-              className="flex items-center gap-2 rounded-lg border border-[#dce2e8] bg-white px-4 py-2.5 text-[11px] font-semibold text-[#53616d] shadow-sm transition hover:border-[#557bd2] hover:text-[#557bd2]"
-            >
-              View all projects
-              <ChevronRight size={14} />
-            </button>
-          </div>
-
-          {activeProjects.length === 0 ? (
-            <EmptyState
-              title={isProjectManager ? "No active assigned projects" :
-                     isMember ? "No active projects assigned to you" : "No active projects"}
-              description={isProjectManager ? "Active projects managed by you will appear here." :
-                          isMember ? "Projects with your assigned tasks will appear here." :
-                          "There are currently no active projects available."}
-            />
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {activeProjects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onView={() => router.push(`/projects?projectId=${project.id}`)}
-                  getInitials={getInitials}
-                  getProjectStatusClass={getProjectStatusClass}
-                  formatDate={formatDate}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Continue with Team Overview, Task Stats, and Schedule sections... */}
-        {/* These sections remain the same as before, using the dashboardData props */}
-      </div>
-
-      {/* Project Overview Modal - Same as before */}
-      {selectedOverviewProject && (
-        <ProjectOverviewModal
-          project={selectedOverviewProject}
-          projectOverview={projectOverview}
-          tasks={tasks}
-          projects={projects}
-          onClose={() => setSelectedOverviewProject(null)}
-          onViewProject={(projectId) => {
-            setSelectedOverviewProject(null);
-            router.push(`/projects?projectId=${projectId}`);
-          }}
-          formatDate={formatDate}
-        />
-      )}
-    </main>
-  );
-}
-
-// [Rest of the helper components remain the same...]
-// EmptyState, DashboardStat, ProjectCard, ScheduleItem, etc.
+ 
