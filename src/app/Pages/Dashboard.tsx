@@ -315,96 +315,53 @@ export default function Dashboard() {
                 "Content-Type": "application/json",
             };
 
-            /* =====================================================
-                     DASHBOARD TEAM OVERVIEW
-               ===================================================== */
+            /*
+             * IMPORTANT PERFORMANCE CHANGE
+             * --------------------------------
+             * The old dashboard created a waterfall:
+             * team overview -> projects -> teams -> tasks.
+             *
+             * Start every request that does NOT depend on projects at once.
+             * Tasks start immediately when projects arrive and run in parallel
+             * with teams/members parsing.
+             */
 
-            try {
-                const teamOverviewResponse = await fetch(
-                    `${API_BASE}/dashboard/team-overview`,
-                    {
-                        headers,
-                    }
-                );
-
-                if (teamOverviewResponse.ok) {
-                    const teamOverviewData =
-                        await teamOverviewResponse.json();
-
-                    setTeamRoleStats({
-                        developers:
-                            Number(
-                                teamOverviewData?.developers
-                            ) || 0,
-
-                        designers:
-                            Number(
-                                teamOverviewData?.designers
-                            ) || 0,
-
-                        managers:
-                            Number(
-                                teamOverviewData?.managers
-                            ) || 0,
-
-                        qa:
-                            Number(
-                                teamOverviewData?.qa
-                            ) || 0,
-
-                        other:
-                            Number(
-                                teamOverviewData?.other
-                            ) || 0,
-
-                        total:
-                            Number(
-                                teamOverviewData?.total
-                            ) || 0,
-                    });
-                }
-            } catch (teamError) {
-                console.error(
-                    "Failed to load team overview:",
-                    teamError
-                );
-
-                setTeamRoleStats({
-                    developers: 0,
-                    designers: 0,
-                    managers: 0,
-                    qa: 0,
-                    other: 0,
-                    total: 0,
-                });
-            }
-
-            /* =====================================================
-               PROJECTS
-            ===================================================== */
-
-            const projectsResponse = await fetch(
-                `${API_BASE}/projects`,
-                {
+            const fetchJson = async (url: string) => {
+                const response = await fetch(url, {
+                    method: "GET",
                     headers,
+                    cache: "no-store",
+                });
+
+                if (response.status === 401) {
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("user");
+                    router.push("/login");
+                    throw new Error("Unauthorized");
                 }
-            );
 
-            if (projectsResponse.status === 401) {
-                localStorage.removeItem("token");
-                localStorage.removeItem("user");
-                router.push("/login");
-                return;
-            }
+                if (!response.ok) {
+                    throw new Error(`Request failed: ${response.status}`);
+                }
 
-            if (!projectsResponse.ok) {
-                throw new Error(
-                    "Failed to load projects."
-                );
-            }
+                return response.json();
+            };
 
-            const projectsData =
-                await projectsResponse.json();
+            const projectsPromise = fetchJson(`${API_BASE}/projects`);
+            const teamOverviewPromise = fetchJson(
+                `${API_BASE}/dashboard/team-overview`
+            ).catch(() => null);
+
+            const teamsPromise = fetchJson(`${API_BASE}/teams`).catch(() => null);
+            const membersPromise = fetchJson(
+                `${API_BASE}/teams/members`
+            ).catch(() => null);
+
+            /*
+             * Resolve projects first because task URLs need project IDs.
+             * Do NOT wait for the other requests before starting tasks.
+             */
+            const projectsData = await projectsPromise;
 
             const loadedProjects: Project[] =
                 projectsData?.projects ||
@@ -412,33 +369,80 @@ export default function Dashboard() {
                 projectsData ||
                 [];
 
-            const validProjects =
-                Array.isArray(loadedProjects)
-                    ? loadedProjects
-                    : [];
+            const validProjects: Project[] = Array.isArray(loadedProjects)
+                ? loadedProjects
+                : [];
 
             setProjects(validProjects);
 
-            /* =====================================================
-               TEAMS
-            ===================================================== */
+            /*
+             * Start ALL project task requests immediately.
+             * They run while the team/member requests are still in flight.
+             */
+            const taskPromise = Promise.all(
+                validProjects.map(async (project) => {
+                    try {
+                        const response = await fetch(
+                            `${API_BASE}/tasks/project/${project.id}`,
+                            {
+                                method: "GET",
+                                headers,
+                                cache: "no-store",
+                            }
+                        );
 
-            const [
-                teamsResponse,
-                membersResponse,
-            ] = await Promise.all([
-                fetch(`${API_BASE}/teams`, {
-                    headers,
-                }),
-                fetch(`${API_BASE}/teams/members`, {
-                    headers,
-                }),
-            ]);
+                        if (!response.ok) return [];
 
-            if (teamsResponse.ok) {
-                const teamsData =
-                    await teamsResponse.json();
+                        const data = await response.json();
 
+                        const projectTasks =
+                            data?.tasks ||
+                            data?.data ||
+                            data ||
+                            [];
+
+                        if (!Array.isArray(projectTasks)) return [];
+
+                        return projectTasks.map((task: Task) => ({
+                            ...task,
+                            project_id:
+                                task.project_id || project.id,
+                        }));
+                    } catch {
+                        return [];
+                    }
+                })
+            ).then((results) => results.flat());
+
+            /*
+             * Team data and team overview are independent of projects.
+             * Wait for them together instead of sequentially.
+             */
+            const [teamOverviewData, teamsData, membersData] =
+                await Promise.all([
+                    teamOverviewPromise,
+                    teamsPromise,
+                    membersPromise,
+                ]);
+
+            if (teamOverviewData) {
+                setTeamRoleStats({
+                    developers:
+                        Number(teamOverviewData?.developers) || 0,
+                    designers:
+                        Number(teamOverviewData?.designers) || 0,
+                    managers:
+                        Number(teamOverviewData?.managers) || 0,
+                    qa:
+                        Number(teamOverviewData?.qa) || 0,
+                    other:
+                        Number(teamOverviewData?.other) || 0,
+                    total:
+                        Number(teamOverviewData?.total) || 0,
+                });
+            }
+
+            if (teamsData) {
                 const loadedTeams =
                     teamsData?.teams ||
                     teamsData?.data ||
@@ -452,10 +456,7 @@ export default function Dashboard() {
                 );
             }
 
-            if (membersResponse.ok) {
-                const membersData =
-                    await membersResponse.json();
-
+            if (membersData) {
                 const loadedMembers =
                     membersData?.members ||
                     membersData?.data ||
@@ -469,82 +470,45 @@ export default function Dashboard() {
                 );
             }
 
-            /* =====================================================
-               TASKS
-            ===================================================== */
+            /*
+             * MANAGEMENT / PROJECT MANAGER:
+             * The useful dashboard UI does not need task data to paint.
+             * Stop showing the full-screen loader now.
+             *
+             * MEMBER:
+             * Their visible projects are calculated from assigned tasks,
+             * so keep the loader until tasks arrive.
+             */
+            if (!isMember) {
+                setLoading(false);
+            }
 
-            const taskRequests =
-                validProjects.map(
-                    async (project) => {
-                        try {
-                            const response =
-                                await fetch(
-                                    `${API_BASE}/tasks/project/${project.id}`,
-                                    {
-                                        headers,
-                                    }
-                                );
+            const loadedTasks = await taskPromise;
+            setTasks(loadedTasks);
 
-                            if (!response.ok) {
-                                return [];
-                            }
-
-                            const data =
-                                await response.json();
-
-                            const projectTasks =
-                                data?.tasks ||
-                                data?.data ||
-                                data ||
-                                [];
-
-                            if (
-                                !Array.isArray(
-                                    projectTasks
-                                )
-                            ) {
-                                return [];
-                            }
-
-                            return projectTasks.map(
-                                (task: Task) => ({
-                                    ...task,
-                                    project_id:
-                                        task.project_id ||
-                                        project.id,
-                                })
-                            );
-                        } catch {
-                            return [];
-                        }
-                    }
-                );
-
-            const taskResults =
-                await Promise.all(
-                    taskRequests
-                );
-
-            setTasks(
-                taskResults.flat()
-            );
+            /*
+             * For members, tasks are required to determine visible projects.
+             */
+            if (isMember) {
+                setLoading(false);
+            }
         } catch (err) {
-            console.error(
-                "Dashboard loading error:",
-                err
-            );
+            console.error("Dashboard loading error:", err);
+
+            if (err instanceof Error && err.message === "Unauthorized") {
+                return;
+            }
 
             setError(
                 err instanceof Error
                     ? err.message
                     : "Failed to load dashboard."
             );
-        } finally {
             setLoading(false);
+        } finally {
             setRefreshing(false);
         }
     };
-
 
     const handleRefresh = async () => {
         await loadDashboard();
