@@ -739,84 +739,90 @@ export default function Header() {
       </div>
 
       {/* =====================================================
-          DASHBOARD HERO - BLUE/BACKGROUND EXACT MATCH
+          DASHBOARD HERO - WITH BACKGROUND IMAGE
       ===================================================== */}
-      <div className="bg-[#eef2f6] border-t border-[#d5d5d5]">
-        <div className="mx-auto max-w-[1440px] px-5 py-10 sm:px-8 lg:px-10">
-          <div className="grid items-start gap-8 lg:grid-cols-[1fr_650px]">
+      <div 
+        className="border-t border-[#d5d5d5] bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url('/Header-Img/header_background.jpg')` }}
+      >
+        {/* Overlay for better text readability */}
+        <div className="bg-black/30">
+          <div className="mx-auto max-w-[1440px] px-5 py-10 sm:px-8 lg:px-10">
+            <div className="grid items-start gap-8 lg:grid-cols-[1fr_650px]">
 
-            {/* LEFT - Welcome Text */}
-            <div className="max-w-[560px] pt-1">
-              <h2 className="text-[32px] font-light tracking-[-0.5px] text-[#18212b] sm:text-[38px]">
-                WELCOME BACK,
-                <br />
-                <span className="font-semibold">
-                  {user?.fullName?.toUpperCase() || "USER"}!
-                </span>
-              </h2>
+              {/* LEFT - Welcome Text */}
+              <div className="max-w-[560px] pt-1">
+                <h2 className="text-[32px] font-light tracking-[-0.5px] text-white sm:text-[38px]">
+                  WELCOME BACK,
+                  <br />
+                  <span className="font-semibold">
+                    {user?.fullName?.toUpperCase() || "USER"}!
+                  </span>
+                </h2>
 
-              <p className="mt-4 text-[18px] font-medium text-[#18212b]">
-                Here's what's happening in your projects today.
-              </p>
+                <p className="mt-4 text-[18px] font-medium text-white/90">
+                  Here's what's happening in your projects today.
+                </p>
 
-              <p className="mt-2 text-[14px] text-[#7a7a7a]">
-                Stay up to date with your projects, tasks and team activity.
-              </p>
-            </div>
+                <p className="mt-2 text-[14px] text-white/70">
+                  Stay up to date with your projects, tasks and team activity.
+                </p>
+              </div>
 
-            {/* RIGHT - STAT CARDS */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {/* RIGHT - STAT CARDS */}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
 
-              {dataLoading ? (
-                <div className="col-span-2 flex min-h-[145px] items-center justify-center rounded-2xl border border-[#d5d5d5] bg-white sm:col-span-4">
-                  <Loader2 size={22} className="animate-spin text-[#b0b0b0]" />
-                </div>
-              ) : (
-                statsData.map((stat, index) => {
-                  const Icon = stat.icon;
+                {dataLoading ? (
+                  <div className="col-span-2 flex min-h-[145px] items-center justify-center rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm sm:col-span-4">
+                    <Loader2 size={22} className="animate-spin text-white" />
+                  </div>
+                ) : (
+                  statsData.map((stat, index) => {
+                    const Icon = stat.icon;
 
-                  const cardColors = [
-                    { icon: "bg-[#e7f5ee] text-[#2e9460]" },
-                    { icon: "bg-[#e8f1ff] text-[#3b78bd]" },
-                    { icon: "bg-[#f1eafa] text-[#8a5ba5]" },
-                    { icon: "bg-[#fae9ec] text-[#c35c68]" },
-                  ][index] || { icon: "bg-[#f5f5f5] text-[#7a7a7a]" };
+                    const cardColors = [
+                      { icon: "bg-[#e7f5ee] text-[#2e9460]" },
+                      { icon: "bg-[#e8f1ff] text-[#3b78bd]" },
+                      { icon: "bg-[#f1eafa] text-[#8a5ba5]" },
+                      { icon: "bg-[#fae9ec] text-[#c35c68]" },
+                    ][index] || { icon: "bg-[#f5f5f5] text-[#7a7a7a]" };
 
-                  return (
-                    <div
-                      key={stat.label + stat.label2}
-                      className="min-h-[145px] rounded-2xl border border-[#d5d5d5] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)]"
-                    >
-                      <div className="flex items-start justify-between">
-                        <span className="text-[30px] font-medium leading-none tracking-tight text-[#18212b]">
-                          {stat.value}
-                        </span>
-                        <div
-                          className={`flex h-11 w-11 items-center justify-center rounded-xl ${cardColors.icon}`}
-                        >
-                          <Icon size={20} strokeWidth={1.8} />
+                    return (
+                      <div
+                        key={stat.label + stat.label2}
+                        className="min-h-[145px] rounded-2xl border border-white/20 bg-white/90 backdrop-blur-sm p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+                      >
+                        <div className="flex items-start justify-between">
+                          <span className="text-[30px] font-medium leading-none tracking-tight text-[#18212b]">
+                            {stat.value}
+                          </span>
+                          <div
+                            className={`flex h-11 w-11 items-center justify-center rounded-xl ${cardColors.icon}`}
+                          >
+                            <Icon size={20} strokeWidth={1.8} />
+                          </div>
                         </div>
+
+                        <p className="mt-4 text-[13px] font-medium leading-tight text-[#18212b]">
+                          {stat.label}
+                          <br />
+                          {stat.label2}
+                        </p>
+
+                        <p className="mt-2 text-[11px] text-[#2e9460]">
+                          <span className="font-bold text-[#2e9460]">
+                            {stat.badge}
+                          </span>{" "}
+                          {stat.note}
+                        </p>
                       </div>
+                    );
+                  })
+                )}
 
-                      <p className="mt-4 text-[13px] font-medium leading-tight text-[#18212b]">
-                        {stat.label}
-                        <br />
-                        {stat.label2}
-                      </p>
-
-                      <p className="mt-2 text-[11px] text-[#2e9460]">
-                        <span className="font-bold text-[#2e9460]">
-                          {stat.badge}
-                        </span>{" "}
-                        {stat.note}
-                      </p>
-                    </div>
-                  );
-                })
-              )}
+              </div>
 
             </div>
-
           </div>
         </div>
       </div>
