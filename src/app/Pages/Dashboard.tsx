@@ -824,25 +824,6 @@ export default function Dashboard() {
     return "bg-gray-100 text-gray-600";
   }, []);
 
-  // Create team gradient
-  const createTeamGradient = useCallback((stats: TeamRoleStats) => {
-    if (stats.total === 0) return "#e5e7eb";
-    const total = stats.total;
-    const developerDeg = (stats.developers / total) * 360;
-    const designerDeg = developerDeg + (stats.designers / total) * 360;
-    const managerDeg = designerDeg + (stats.managers / total) * 360;
-    const qaDeg = managerDeg + (stats.qa / total) * 360;
-    return `
-      conic-gradient(
-        #557bd2 0deg ${developerDeg}deg,
-        #438d5d ${developerDeg}deg ${designerDeg}deg,
-        #be8944 ${designerDeg}deg ${managerDeg}deg,
-        #895a9d ${managerDeg}deg ${qaDeg}deg,
-        #d15b58 ${qaDeg}deg 360deg
-      )
-    `;
-  }, []);
-
   // Date navigation
   const changeScheduleDate = useCallback((amount: number) => {
     setScheduleDate((current) => {
@@ -913,4 +894,22 @@ export default function Dashboard() {
   // Filter schedule tasks for selected date
   const filteredScheduleTasks = useMemo(() => {
     const selectedDate = scheduleDate.toISOString().split("T")[0];
-    const filtered =
+    const filtered = scheduleTasks.filter((task) => {
+      if (!task.due_date) return false;
+      return task.due_date.split("T")[0] === selectedDate;
+    });
+    return filtered.length > 0 ? filtered.slice(0, 8) : scheduleTasks.slice(0, 8);
+  }, [scheduleTasks, scheduleDate]);
+
+  // Create team gradient
+  const teamGradient = useMemo(() => {
+    if (teams.total === 0) return "#e5e7eb";
+    const total = teams.total;
+    const developerDeg = (teams.developers / total) * 360;
+    const designerDeg = developerDeg + (teams.designers / total) * 360;
+    const managerDeg = designerDeg + (teams.managers / total) * 360;
+    const qaDeg = managerDeg + (teams.qa / total) * 360;
+    return `
+      conic-gradient(
+        #557bd2 0deg ${developerDeg}deg,
+        #438d5d ${developerDeg}deg ${design
