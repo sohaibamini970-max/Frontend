@@ -739,30 +739,28 @@ export default function Header() {
       </div>
 
       {/* =====================================================
-          DASHBOARD HERO - White Background with Stats
+          DASHBOARD HERO - EXACT MATCH TO IMAGE
       ===================================================== */}
-      <div className="bg-white">
+      <div className="bg-white border-t border-[#e8e6e6]">
         <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">
           <div className="grid items-start gap-8 lg:grid-cols-[1fr_650px]">
 
-            {/* LEFT - Welcome Text */}
-            <div className="max-w-[560px] pt-2">
-              <div className="mb-4 inline-flex items-center gap-2 text-[15px] font-medium text-[#18212b]">
-                <span>Welcome back,</span>
-                <span className="font-semibold text-[#18212b]">
-                  {user?.fullName || "User"}!
-                </span>
-              </div>
-
-              <h1 className="text-[32px] font-medium leading-[1.08] tracking-[-1.7px] text-[#18212b] sm:text-[42px]">
-                Here's what's happening
+            {/* LEFT - Welcome Text - EXACT MATCH */}
+            <div className="max-w-[560px] pt-1">
+              <h2 className="text-[32px] font-light tracking-[-0.5px] text-[#18212b] sm:text-[38px]">
+                WELCOME BACK,
                 <br />
-                in your projects today.
-              </h1>
+                <span className="font-semibold">
+                  {user?.fullName?.toUpperCase() || "USER"}!
+                </span>
+              </h2>
 
-              <p className="mt-3 max-w-[430px] text-[14px] leading-6 text-[#7a7a7a]">
-                Stay up to date with your projects,
-                tasks and team activity.
+              <p className="mt-4 text-[18px] font-medium text-[#18212b]">
+                Here's what's happening in your projects today.
+              </p>
+
+              <p className="mt-2 text-[14px] text-[#7a7a7a]">
+                Stay up to date with your projects, tasks and team activity.
               </p>
             </div>
 
@@ -770,7 +768,7 @@ export default function Header() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
 
               {dataLoading ? (
-                <div className="col-span-2 flex min-h-[130px] items-center justify-center rounded-2xl border border-[#d5d5d5] bg-white sm:col-span-4">
+                <div className="col-span-2 flex min-h-[140px] items-center justify-center rounded-2xl border border-[#d5d5d5] bg-white sm:col-span-4">
                   <Loader2 size={22} className="animate-spin text-[#b0b0b0]" />
                 </div>
               ) : (
@@ -787,7 +785,7 @@ export default function Header() {
                   return (
                     <div
                       key={stat.label + stat.label2}
-                      className="min-h-[140px] rounded-2xl border border-[#d5d5d5] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)]"
+                      className="min-h-[145px] rounded-2xl border border-[#d5d5d5] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)]"
                     >
                       <div className="flex items-start justify-between">
                         <span className="text-[30px] font-medium leading-none tracking-tight text-[#18212b]">
