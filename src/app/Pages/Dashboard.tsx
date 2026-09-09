@@ -158,9 +158,7 @@ function DashboardStat({
   iconClass: string;
 }) {
   return (
-    <div
-      className={`rounded-2xl border border-white/70 p-5 ${className}`}
-    >
+    <div className={`rounded-2xl border border-white/70 p-5 ${className}`}>
       <div className="flex items-center gap-2.5">
         <span className={iconClass}>{icon}</span>
         <span className="text-[10px] font-bold uppercase tracking-wide text-[#697783]">
@@ -176,13 +174,7 @@ function DashboardStat({
    EMPTY STATE COMPONENT
 ========================================================= */
 
-function EmptyState({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
+function EmptyState({ title, description }: { title: string; description: string }) {
   return (
     <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-6 py-12 text-center">
       <Users size={28} className="mx-auto text-gray-300" />
@@ -413,8 +405,14 @@ function ProjectDetailsModal({
               label="Deadline"
               value={project.deadline ? formatDate(project.deadline) : "Not specified"}
             />
-            <ProjectDetailItem label="Project Manager" value={project.manager_name || "Not assigned"} />
-            <ProjectDetailItem label="Manager Role" value={project.manager_name ? "Project Manager" : "Not assigned"} />
+            <ProjectDetailItem
+              label="Project Manager"
+              value={project.manager_name || "Not assigned"}
+            />
+            <ProjectDetailItem
+              label="Manager Role"
+              value={project.manager_name ? "Project Manager" : "Not assigned"}
+            />
           </div>
 
           {project.creator_name && (
@@ -447,22 +445,13 @@ function ProjectDetailsModal({
 
 function ProjectOverviewModal({
   project,
-  projectOverview,
   tasks,
-  projects,
   onClose,
   onViewProject,
   formatDate,
 }: {
   project: Project;
-  projectOverview: Array<{
-    project: Project;
-    totalTasks: number;
-    completedTasks: number;
-    progress: number;
-  }>;
   tasks: Task[];
-  projects: Project[];
   onClose: () => void;
   onViewProject: (projectId: string) => void;
   formatDate: (date?: string | null) => string;
@@ -536,7 +525,12 @@ function ProjectOverviewModal({
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-3">
-            <ModalStat icon={<Circle size={14} />} label="Total Tasks" value={totalTasks} iconClass="text-[#557bd2]" />
+            <ModalStat
+              icon={<Circle size={14} />}
+              label="Total Tasks"
+              value={totalTasks}
+              iconClass="text-[#557bd2]"
+            />
             <ModalStat
               icon={<CheckCircle2 size={14} />}
               label="Completed"
@@ -664,13 +658,7 @@ function TeamItemNew({
    SCHEDULE ITEM
 ========================================================= */
 
-function ScheduleItem({
-  task,
-  projects,
-}: {
-  task: Task;
-  projects: Project[];
-}) {
+function ScheduleItem({ task, projects }: { task: Task; projects: Project[] }) {
   const project = projects.find((item) => String(item.id) === String(task.project_id || ""));
   const taskName = task.name || task.title || "Untitled Task";
   const initials = taskName
@@ -906,13 +894,11 @@ export default function Dashboard() {
     projects,
     tasks,
     teams,
-    projectStats,
     taskStats,
     activeProjects,
     domainStats,
     scheduleTasks,
     projectOverview,
-    isManagement,
     isProjectManager,
     isMember,
     roleDescription,
@@ -924,4 +910,7 @@ export default function Dashboard() {
     weekday: "long",
   });
 
- 
+  // Filter schedule tasks for selected date
+  const filteredScheduleTasks = useMemo(() => {
+    const selectedDate = scheduleDate.toISOString().split("T")[0];
+    const filtered =
