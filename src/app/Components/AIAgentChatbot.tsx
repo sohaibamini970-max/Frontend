@@ -75,6 +75,10 @@ interface ChatResponse {
   error?: string;
 }
 
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
 const formatDate = (date: Date): string => {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
@@ -139,6 +143,13 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);
+
+  // Close sidebar when maximized
+  useEffect(() => {
+    if (isMaximized) {
+      setIsSidebarOpen(false);
+    }
+  }, [isMaximized]);
 
   // Auto-resize textarea
   const adjustTextareaHeight = useCallback(() => {
@@ -205,8 +216,10 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       }));
       setConversationHistory(history);
     }
-    setIsSidebarOpen(false);
-  }, [chatSessions]);
+    if (!isMaximized) {
+      setIsSidebarOpen(false);
+    }
+  }, [chatSessions, isMaximized]);
 
   // Update chat title
   const updateChatTitle = useCallback((sessionId: string, firstMessage: string) => {
@@ -363,24 +376,14 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
 
   // Toggle sidebar
   const toggleSidebar = (): void => {
-    setIsSidebarOpen(!isSidebarOpen);
+    if (!isMaximized) {
+      setIsSidebarOpen(!isSidebarOpen);
+    }
   };
 
   // Format timestamp
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-
-  // Format date for sidebar
-  const formatDate = (date: Date): string => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (days === 0) return "Today";
-    if (days === 1) return "Yesterday";
-    if (days < 7) return `${days} days ago`;
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
   // Format content with links
@@ -465,7 +468,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
         {/* Sidebar */}
         <div
           className={`flex flex-col bg-gray-50 border-r border-gray-200 transition-all duration-300 ${
-            isSidebarOpen ? "w-[220px]" : "w-0"
+            isSidebarOpen && !isMaximized ? "w-[220px]" : "w-0"
           } overflow-hidden flex-shrink-0`}
         >
           <div className="p-3 border-b border-gray-200 flex-shrink-0">
@@ -580,13 +583,15 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
           {/* Header */}
           <div className="flex items-center justify-between bg-white px-4 py-3 flex-shrink-0 border-b border-gray-200">
             <div className="flex items-center gap-3 min-w-0">
-              <button
-                onClick={toggleSidebar}
-                className="rounded p-1 hover:bg-gray-100 transition text-gray-500 hover:text-gray-700 flex-shrink-0"
-                aria-label="Toggle sidebar"
-              >
-                {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-              </button>
+              {!isMaximized && (
+                <button
+                  onClick={toggleSidebar}
+                  className="rounded p-1 hover:bg-gray-100 transition text-gray-500 hover:text-gray-700 flex-shrink-0"
+                  aria-label="Toggle sidebar"
+                >
+                  {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                </button>
+              )}
               <div className="flex items-center gap-2 min-w-0">
                 <div className="flex h-7 w-7 items-center justify-center rounded bg-blue-600 flex-shrink-0">
                   <Sparkles size={14} className="text-white" />
