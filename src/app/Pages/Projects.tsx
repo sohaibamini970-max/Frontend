@@ -254,14 +254,14 @@ function TaskStatusBadge({ status }: { status: string }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium ${style}`}
+      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] font-medium ${style}`}
     >
       {status === "Done" ? (
-        <CheckCircle2 size={11} />
+        <CheckCircle2 size={13} />
       ) : status === "In Progress" ? (
-        <Clock3 size={11} />
+        <Clock3 size={13} />
       ) : (
-        <Circle size={10} />
+        <Circle size={13} />
       )}
 
       {status}
