@@ -909,7 +909,395 @@ export default function Dashboard() {
     const designerDeg = developerDeg + (teams.designers / total) * 360;
     const managerDeg = designerDeg + (teams.managers / total) * 360;
     const qaDeg = managerDeg + (teams.qa / total) * 360;
-    return `
-      conic-gradient(
-        #557bd2 0deg ${developerDeg}deg,
-        #438d5d ${developerDeg}deg ${design
+    return `conic-gradient(
+      #557bd2 0deg ${developerDeg}deg,
+      #438d5d ${developerDeg}deg ${designerDeg}deg,
+      #be8944 ${designerDeg}deg ${managerDeg}deg,
+      #895a9d ${managerDeg}deg ${qaDeg}deg,
+      #d15b58 ${qaDeg}deg 360deg
+    )`;
+  }, [teams]);
+
+  return (
+    <main className="min-h-screen bg-[#c4c4c4]">
+      <div className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10">
+        {/* Page Header */}
+        <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#557bd2]">
+                Workspace Overview
+              </p>
+              {user.role && (
+                <span className="rounded-full border border-[#d5e0f7] bg-[#edf2ff] px-3 py-1.5 text-[10px] font-bold text-[#557bd2]">
+                  {user.role}
+                </span>
+              )}
+            </div>
+            <h1 className="text-[30px] font-bold tracking-tight text-[#16212d] sm:text-[32px]">
+              Dashboard
+            </h1>
+            <p className="mt-2 max-w-[700px] text-[13px] leading-5 text-[#697783]">
+              {roleDescription}
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex w-fit items-center gap-2.5 rounded-xl bg-[#172b3a] px-5 py-3 text-[12px] font-bold text-white shadow-sm transition hover:bg-[#223d50] disabled:opacity-50"
+          >
+            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
+            Refresh Dashboard
+          </button>
+        </div>
+
+        {/* Projects Overview Section */}
+        <section className="mb-7 overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
+          <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+            <div>
+              <div className="flex items-center gap-3">
+                <h2 className="text-[25px] font-bold text-[#172633]">Projects Overview</h2>
+                <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[13px] font-bold text-[#557bd2]">
+                  {projectOverview.length}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[13px] text-[#7b8794]">
+                Track project progress and task completion at a glance
+              </p>
+            </div>
+            <div className="flex w-fit items-center gap-2.5 rounded-xl border border-[#dfe5ea] bg-[#fafbfd] px-4 py-3">
+              <CalendarDays size={15} className="text-[#557bd2]" />
+              <span className="text-[13px] font-semibold text-[#53616d]">
+                Data: {new Date().toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+          </div>
+
+          {projectOverview.length === 0 ? (
+            <div className="flex min-h-[330px] items-center justify-center px-5">
+              <EmptyState
+                title={isProjectManager ? "No projects assigned to you" : 
+                       isMember ? "No assigned projects yet" : "No projects available"}
+                description={isProjectManager ? "Projects assigned to you will appear here." :
+                            isMember ? "Projects will appear here when tasks are assigned to you." :
+                            "Projects will appear here once they are created."}
+              />
+            </div>
+          ) : (
+            <div className="px-5 pb-6 pt-7 sm:px-7 sm:pb-7">
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-x-0 bottom-[72px] h-px bg-[#6f7b87]" />
+                <div className="relative flex flex-wrap justify-start gap-x-8 gap-y-8 pl-6">
+                  {projectOverview.map(({ project, progress }, index) => {
+                    const color = PROJECT_OVERVIEW_COLORS[index % PROJECT_OVERVIEW_COLORS.length];
+                    return (
+                      <button
+                        key={project.id}
+                        type="button"
+                        onClick={() => setSelectedOverviewProject(project)}
+                        className="group flex w-[120px] flex-col items-center rounded-xl px-1 pt-1 transition hover:bg-[#fafbfd]"
+                      >
+                        <div className="mb-3 h-6">
+                          <span className="text-[15px] font-bold text-[#172633] transition group-hover:text-[#557bd2]">
+                            {progress}%
+                          </span>
+                        </div>
+                        <div className="relative flex h-[200px] w-full max-w-[42px] items-end justify-center">
+                          <div className={`absolute bottom-0 h-full w-full rounded-t-xl opacity-[0.035] ${color.bar}`} />
+                          <div
+                            className={`relative z-10 w-full rounded-t-xl bg-gradient-to-t ${color.bar} shadow-[0_8px_18px_rgba(85,123,210,0.16)] transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_12px_25px_rgba(85,123,210,0.22)]`}
+                            style={{
+                              height: `${Math.max(progress, progress === 0 ? 2 : 8)}%`,
+                            }}
+                          >
+                            <div className="absolute inset-x-0 top-0 h-12 rounded-t-xl bg-white/10" />
+                          </div>
+                        </div>
+                        <div className="mt-2 min-h-[52px] w-[125px] text-center">
+                          <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a98a8]">
+                            Project {index + 1}
+                          </p>
+                          <p className="text-[12px] font-bold uppercase leading-4 text-[#172633] transition group-hover:text-[#557bd2]">
+                            {project.name}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="mt-6 flex items-center justify-center">
+                <div className="flex items-center gap-2.5 rounded-full bg-[#f7f9fb] px-5 py-2.5">
+                  <Eye size={18} className="text-[#557bd2]" />
+                  <span className="text-[14px] font-medium text-[#7b8794]">
+                    Click any project bar to view detailed progress
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Active Projects Section */}
+        <section className="mb-7">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <h2 className="text-[19px] font-bold text-[#172633]">Active Projects</h2>
+                <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[11px] font-bold text-[#557bd2]">
+                  {activeProjects.length}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[12px] text-[#8b96a3]">Current projects requiring attention</p>
+            </div>
+            <button
+              onClick={() => router.push("/projects")}
+              className="flex items-center gap-2 rounded-lg border border-[#dce2e8] bg-white px-4 py-2.5 text-[11px] font-semibold text-[#53616d] shadow-sm transition hover:border-[#557bd2] hover:text-[#557bd2]"
+            >
+              View all projects
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {activeProjects.length === 0 ? (
+            <EmptyState
+              title={isProjectManager ? "No active assigned projects" :
+                     isMember ? "No active projects assigned to you" : "No active projects"}
+              description={isProjectManager ? "Active projects managed by you will appear here." :
+                          isMember ? "Projects with your assigned tasks will appear here." :
+                          "There are currently no active projects available."}
+            />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {activeProjects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onView={() => router.push(`/projects?projectId=${project.id}`)}
+                  getInitials={getInitials}
+                  getProjectStatusClass={getProjectStatusClass}
+                  formatDate={formatDate}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Task Stats Section */}
+        <section className="mb-7 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <DashboardStat
+            icon={<Circle size={17} />}
+            label="Total Tasks"
+            value={taskStats.total}
+            className="bg-[#edf2ff]"
+            iconClass="text-[#557bd2]"
+          />
+          <DashboardStat
+            icon={<CheckCircle2 size={17} />}
+            label="Completed"
+            value={taskStats.completed}
+            className="bg-[#eaf5ed]"
+            iconClass="text-[#438d59]"
+          />
+          <DashboardStat
+            icon={<Clock3 size={17} />}
+            label="In Progress"
+            value={taskStats.inProgress}
+            className="bg-[#f8f0e4]"
+            iconClass="text-[#be8944]"
+          />
+          <DashboardStat
+            icon={<FolderKanban size={17} />}
+            label="My Projects"
+            value={projects.length}
+            className="bg-[#f3eafa]"
+            iconClass="text-[#895a9d]"
+          />
+        </section>
+
+        {/* Team Overview Section */}
+        <section className="mb-7 rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
+          <div className="flex items-center justify-between border-b border-[#edf0f3] px-5 py-6 sm:px-7">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#edf2ff] text-[#557bd2]">
+                <Users size={19} />
+              </div>
+              <div>
+                <h2 className="text-[25px] font-bold text-[#172633]">Team Overview</h2>
+                <p className="mt-1 text-[14px] text-[#8b96a3]">Team members, roles and project domains</p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push("/teams")}
+              className="flex items-center gap-2 rounded-lg bg-[#172b3a] px-4 py-2.5 text-[15px] font-semibold text-white transition hover:bg-[#223d50]"
+            >
+              View teams
+              <ChevronRight size={13} />
+            </button>
+          </div>
+
+          <div className="grid gap-7 p-6 lg:grid-cols-[0.8fr_1.2fr] sm:p-7">
+            <div className="rounded-2xl border border-[#edf0f3] bg-[#fafbfd] p-6">
+              <div className="mb-6">
+                <p className="text-[14px] font-bold uppercase tracking-wider text-[#9aa4ae]">
+                  Team Distribution
+                </p>
+                <p className="mt-1.5 text-[12px] text-[#7f8a95]">Current workforce composition</p>
+              </div>
+              <div className="flex items-center justify-center gap-9">
+                <div className="relative h-[160px] w-[160px] shrink-0">
+                  <div className="absolute inset-0 rounded-full" style={{ background: teamGradient }} />
+                  <div className="absolute inset-[29px] flex flex-col items-center justify-center rounded-full bg-white shadow-sm">
+                    <span className="text-[25px] font-bold text-[#172633]">{teams.total}</span>
+                    <span className="mt-1 text-[12px] font-bold text-[#9aa4ae]">MEMBERS</span>
+                  </div>
+                </div>
+                <div className="space-y-3.5">
+                  <TeamItemNew color="bg-[#557bd2]" label="Developers" value={teams.developers} />
+                  <TeamItemNew color="bg-[#438d5d]" label="Designers" value={teams.designers} />
+                  <TeamItemNew color="bg-[#be8944]" label="Managers" value={teams.managers} />
+                  <TeamItemNew color="bg-[#895a9d]" label="QA Team" value={teams.qa} />
+                  <TeamItemNew color="bg-[#d15b58]" label="Other" value={teams.other} />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9aa4ae]">
+                    Project Domains
+                  </p>
+                  <p className="mt-1.5 text-[12px] text-[#7f8a95]">Distribution across active work</p>
+                </div>
+                <span className="rounded-full bg-[#f1f4f7] px-3 py-1.5 text-[9px] font-semibold text-[#697783]">
+                  {domainStats.length} domains
+                </span>
+              </div>
+
+              {domainStats.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[#dfe4e9] bg-[#fafbfd] px-4 py-10 text-center">
+                  <FolderKanban size={25} className="mx-auto text-[#c5ccd3]" />
+                  <p className="mt-3 text-[11px] font-medium text-[#8b96a3]">No project domains available</p>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {domainStats.map(([domain, count], index) => (
+                    <div
+                      key={domain}
+                      className="group flex items-center justify-between rounded-xl border border-[#edf0f3] bg-white px-4 py-3.5 transition hover:border-[#ccd8ed] hover:bg-[#fafcff]"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold text-white ${
+                            index % 4 === 0
+                              ? "bg-[#557bd2]"
+                              : index % 4 === 1
+                              ? "bg-[#438d5d]"
+                              : index % 4 === 2
+                              ? "bg-[#be8944]"
+                              : "bg-[#895a9d]"
+                          }`}
+                        >
+                          {domain.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="truncate text-[11px] font-semibold text-[#53616d]">{domain}</span>
+                      </div>
+                      <span className="ml-2 shrink-0 rounded-full bg-[#f1f4f7] px-2.5 py-1.5 text-[9px] font-bold text-[#66737e]">
+                        {count}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Task Schedule Section */}
+        <section className="overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
+          <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f5eff9] text-[#895a9d]">
+                <CalendarDays size={19} />
+              </div>
+              <div>
+                <h2 className="text-[18px] font-bold text-[#172633]">Task Schedule</h2>
+                <p className="mt-1 text-[11px] text-[#8b96a3]">Upcoming deadlines and scheduled tasks</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => changeScheduleDate(-1)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e1e6eb] bg-white text-[#697783] transition hover:bg-[#f5f7f9]"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <div className="min-w-[150px] rounded-lg bg-[#f5f7f9] px-4 py-2.5 text-center">
+                <span className="text-[10px] font-bold text-[#44515c]">{formattedScheduleDate}</span>
+              </div>
+              <button
+                onClick={() => changeScheduleDate(1)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e1e6eb] bg-white text-[#697783] transition hover:bg-[#f5f7f9]"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[450px] overflow-y-auto px-5 sm:px-7">
+            {filteredScheduleTasks.length === 0 ? (
+              <div className="flex min-h-[300px] items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f5f7f9]">
+                    <CalendarDays size={25} className="text-[#b7c0c8]" />
+                  </div>
+                  <p className="mt-4 text-[12px] font-semibold text-[#697783]">No scheduled tasks</p>
+                  <p className="mt-1.5 text-[10px] text-[#a0a9b2]">
+                    {isMember ? "Your tasks with due dates will appear here." : "Tasks with due dates will appear here."}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="relative py-5">
+                <div className="absolute bottom-0 left-[72px] top-0 w-px bg-[#e7ebef]" />
+                {filteredScheduleTasks.map((task, index) => (
+                  <ScheduleItem key={task.id || `${task.name}-${index}`} task={task} projects={projects} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-[#edf0f3] p-5 sm:p-6">
+            <button
+              onClick={() => router.push("/Schedule")}
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#172b3a] py-3.5 text-[11px] font-bold text-white transition hover:bg-[#223d50]"
+            >
+              <CalendarDays size={15} />
+              View Full Schedule
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </section>
+      </div>
+
+      {/* Project Overview Modal */}
+      {selectedOverviewProject && (
+        <ProjectOverviewModal
+          project={selectedOverviewProject}
+          tasks={tasks}
+          onClose={() => setSelectedOverviewProject(null)}
+          onViewProject={(projectId) => {
+            setSelectedOverviewProject(null);
+            router.push(`/projects?projectId=${projectId}`);
+          }}
+          formatDate={formatDate}
+        />
+      )}
+    </main>
+  );
+}
