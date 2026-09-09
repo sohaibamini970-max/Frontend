@@ -8,20 +8,20 @@ import {
   Bot,
   User,
   Loader2,
-  Plus,
   Calendar,
   Users,
   Flag,
   Check,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
   FolderKanban,
   ListTodo,
   FileText,
   Maximize2,
   Minimize2,
   Sparkles,
+  Paperclip,
+  Mic,
+  CornerDownLeft,
 } from "lucide-react";
 
 // ============================================================
@@ -70,7 +70,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       id: "welcome",
       role: "assistant",
       content:
-        "👋 Hello! I'm your AI Project Management Assistant.\n\nI can help you with:\n• Creating and managing projects\n• Creating and assigning tasks\n• Submitting work\n• Finding information about projects, tasks, and users\n\nJust tell me what you'd like to do!",
+        "Welcome to Project Management Assistant.\n\nI can help you with:\n• Project creation and management\n• Task assignment and tracking\n• Work submission and review\n• Project status and reporting\n\nHow can I assist you today?",
       timestamp: new Date(),
     },
   ]);
@@ -79,12 +79,12 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [suggestions, setSuggestions] = useState<string[]>([
-    "Create a new project called 'AI Platform' with high priority",
-    "Show me all my projects",
-    "Create a task for project 5b7896e6 called 'Design Login Page'",
-    "What's the status of all tasks?",
-    "Assign project abc-123 to manager John Doe",
-    "Submit work for task xyz-789: https://github.com/...",
+    "Create new project: 'Q4 Marketing Campaign'",
+    "Show all active projects",
+    "Create task: 'Finalize budget report'",
+    "View team task status",
+    "Assign project to department",
+    "Submit work for review",
   ]);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(true);
   const [conversationHistory, setConversationHistory] = useState<ConversationHistory[]>([]);
@@ -167,7 +167,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       const assistantMessage: Message = {
         id: Date.now().toString() + "-assistant",
         role: "assistant",
-        content: data.message || "Task completed successfully!",
+        content: data.message || "Operation completed successfully.",
         timestamp: new Date(),
         data: data.data,
         functionCalled: data.function_called,
@@ -190,7 +190,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       const errorMessage: Message = {
         id: Date.now().toString() + "-error",
         role: "assistant",
-        content: `❌ ${error.message || "Something went wrong. Please try again."}`,
+        content: `Error: ${error.message || "Unable to process request. Please try again."}`,
         timestamp: new Date(),
         isError: true,
       };
@@ -207,8 +207,6 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       e.preventDefault();
       sendMessage(input);
     }
-    // Ctrl+Enter or Shift+Enter for new line (default behavior)
-    // No need to prevent default for these
   };
 
   // Toggle maximize
@@ -234,7 +232,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
             href={part}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300 underline"
+            className="text-blue-600 hover:text-blue-700 underline"
           >
             {part}
           </a>
@@ -244,57 +242,89 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
     });
   };
 
+  // Format message with proper line breaks and bullet points
+  const formatMessageContent = (content: string): React.ReactNode => {
+    const lines = content.split('\n');
+    return lines.map((line, index) => {
+      if (line.trim().startsWith('•')) {
+        return (
+          <div key={index} className="flex items-start gap-2 ml-2">
+            <span className="text-blue-500">•</span>
+            <span>{line.trim().substring(1)}</span>
+          </div>
+        );
+      }
+      if (line.trim() === '') {
+        return <div key={index} className="h-2" />;
+      }
+      return <div key={index}>{line}</div>;
+    });
+  };
+
+  // Get function icon
+  const getFunctionIcon = (functionName: string | null) => {
+    if (!functionName) return null;
+    if (functionName.includes('project')) return <FolderKanban size={12} />;
+    if (functionName.includes('task')) return <ListTodo size={12} />;
+    if (functionName.includes('submit')) return <FileText size={12} />;
+    return <Sparkles size={12} />;
+  };
+
   if (!isOpen) return null;
 
   return (
     <div
       className={`fixed z-[200] transition-all duration-300 ease-in-out ${
         isMaximized
-          ? "inset-0 bottom-0 right-0 w-full h-full max-w-full rounded-none"
-          : "bottom-24 right-4 w-[560px] max-w-[calc(100vw-2rem)] rounded-2xl"
+          ? "inset-0 bottom-0 right-0 w-full h-full max-w-full"
+          : "bottom-8 right-8 w-[480px] max-w-[calc(100vw-2rem)]"
       }`}
     >
       <div
-        className={`flex flex-col bg-[#1a1a2e] shadow-2xl overflow-hidden ${
+        className={`flex flex-col bg-white shadow-xl overflow-hidden ${
           isMaximized
             ? "h-full w-full rounded-none border-0"
-            : "h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl border border-[#2d2d44]"
+            : "h-[580px] max-h-[calc(100vh-8rem)] rounded-lg border border-gray-200"
         }`}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between bg-gradient-to-r from-[#16213e] to-[#1a1a2e] px-4 py-3 text-white flex-shrink-0 border-b border-[#2d2d44]">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/20">
+        {/* Header - Professional */}
+        <div className="flex items-center justify-between bg-white px-5 py-3 flex-shrink-0 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded bg-blue-600">
               <Sparkles size={16} className="text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">AI Assistant</h3>
-              <p className="text-[10px] text-gray-400">Powered by Gemini AI</p>
+              <h3 className="text-sm font-medium text-gray-900">AI Assistant</h3>
+              <p className="text-xs text-gray-500">Project Management Agent</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium mr-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              Active
+            </span>
             <button
               onClick={toggleMaximize}
-              className="rounded-lg p-1.5 hover:bg-white/10 transition text-gray-400 hover:text-white"
+              className="rounded p-1 hover:bg-gray-100 transition text-gray-500 hover:text-gray-700"
               aria-label={isMaximized ? "Minimize" : "Maximize"}
             >
-              {isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 hover:bg-white/10 transition text-gray-400 hover:text-white"
+              className="rounded p-1 hover:bg-gray-100 transition text-gray-500 hover:text-gray-700"
               aria-label="Close chatbot"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
         </div>
 
         {/* Messages */}
         <div
-          className={`flex-1 overflow-y-auto p-4 space-y-3 ${
-            isMaximized ? "p-6" : ""
-          } bg-gradient-to-b from-[#1a1a2e] to-[#16213e]`}
+          className={`flex-1 overflow-y-auto px-5 py-4 space-y-4 ${
+            isMaximized ? "px-8 py-6" : ""
+          } bg-gray-50`}
         >
           {messages.map((message) => (
             <div
@@ -302,55 +332,56 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
               className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
+                className={`max-w-[85%] ${
                   message.role === "user"
-                    ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
+                    ? "bg-blue-600 text-white rounded-lg px-4 py-2.5"
                     : message.isError
-                    ? "bg-red-900/50 text-red-200 border border-red-700"
-                    : "bg-[#2d2d44] text-gray-200 border border-[#3d3d5c]"
-                } ${isMaximized ? "max-w-[75%]" : ""}`}
+                    ? "bg-red-50 text-red-800 rounded-lg px-4 py-2.5 border border-red-200"
+                    : "bg-white text-gray-800 rounded-lg px-4 py-2.5 border border-gray-200 shadow-sm"
+                } ${isMaximized ? "max-w-[70%]" : ""}`}
               >
                 {message.role === "assistant" && !message.isError && (
-                  <div className="mb-1 flex items-center gap-1">
-                    <Bot size={14} className="text-blue-400" />
-                    <span className="text-[10px] font-medium text-gray-400">
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <Bot size={14} className="text-blue-600" />
+                    <span className="text-xs font-medium text-gray-600">
                       Assistant
                     </span>
                   </div>
                 )}
-                <div className="text-sm whitespace-pre-wrap leading-relaxed">
-                  {formatContent(message.content)}
+                <div className="text-sm leading-relaxed">
+                  {formatMessageContent(message.content)}
                 </div>
 
-                {/* Show function called */}
+                {/* Function called */}
                 {message.functionCalled && (
-                  <div className="mt-2 rounded-lg bg-[#1a1a2e] px-3 py-1.5 text-[10px] text-gray-400 border border-[#2d2d44]">
-                    🔧 Action: {message.functionCalled}
+                  <div className="mt-2 flex items-center gap-1.5 rounded bg-gray-50 px-2.5 py-1 text-xs text-gray-600 border border-gray-200">
+                    {getFunctionIcon(message.functionCalled)}
+                    <span>Action: {message.functionCalled}</span>
                   </div>
                 )}
 
-                {/* Show data summary */}
+                {/* Status indicator */}
                 {message.data && message.data.success !== undefined && (
-                  <div className="mt-2 flex items-center gap-1.5">
+                  <div className="mt-2 flex items-center gap-1.5 text-xs">
                     {message.data.success ? (
                       <>
-                        <Check size={14} className="text-emerald-400" />
-                        <span className="text-[10px] text-emerald-400">
-                          Operation successful
+                        <Check size={13} className="text-green-600" />
+                        <span className="text-green-700 font-medium">
+                          Completed
                         </span>
                       </>
                     ) : (
                       <>
-                        <AlertCircle size={14} className="text-red-400" />
-                        <span className="text-[10px] text-red-400">
-                          Operation failed
+                        <AlertCircle size={13} className="text-red-600" />
+                        <span className="text-red-700 font-medium">
+                          Failed
                         </span>
                       </>
                     )}
                   </div>
                 )}
 
-                <div className="mt-1 text-[9px] text-gray-500">
+                <div className="mt-1.5 text-[10px] text-gray-400">
                   {formatTime(message.timestamp)}
                 </div>
               </div>
@@ -359,10 +390,10 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="max-w-[85%] rounded-2xl bg-[#2d2d44] px-4 py-3 border border-[#3d3d5c]">
+              <div className="bg-white text-gray-800 rounded-lg px-4 py-3 border border-gray-200 shadow-sm">
                 <div className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin text-blue-400" />
-                  <span className="text-sm text-gray-400">Thinking...</span>
+                  <Loader2 size={16} className="animate-spin text-blue-600" />
+                  <span className="text-sm text-gray-500">Processing...</span>
                 </div>
               </div>
             </div>
@@ -373,35 +404,35 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
 
         {/* Suggestions */}
         {showSuggestions && messages.length > 0 && !loading && (
-          <div className="border-t border-[#2d2d44] bg-[#1a1a2e] px-4 py-2 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] font-medium uppercase tracking-wider text-gray-500">
-                Suggestions
+          <div className="border-t border-gray-200 bg-white px-4 py-2.5 flex-shrink-0">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                Quick Actions
               </span>
               <button
                 onClick={() => setShowSuggestions(false)}
-                className="text-gray-500 hover:text-gray-300"
+                className="text-gray-400 hover:text-gray-600"
                 aria-label="Hide suggestions"
               >
-                <ChevronUp size={14} />
+                <span className="text-xs">×</span>
               </button>
             </div>
-            <div className="mt-1 flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {suggestions.slice(0, 4).map((suggestion, index) => (
                 <button
                   key={index}
                   onClick={() => sendMessage(suggestion)}
-                  className="rounded-full border border-[#2d2d44] bg-[#16213e] px-2.5 py-1 text-[10px] text-gray-300 hover:bg-[#2d2d44] hover:border-[#3d3d5c] transition"
+                  className="text-xs bg-gray-50 hover:bg-gray-100 text-gray-700 px-3 py-1 rounded border border-gray-200 transition whitespace-nowrap"
                 >
-                  {suggestion.length > 40 ? suggestion.slice(0, 40) + "..." : suggestion}
+                  {suggestion.length > 35 ? suggestion.slice(0, 35) + "..." : suggestion}
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Input */}
-        <div className="border-t border-[#2d2d44] bg-[#1a1a2e] p-3 flex-shrink-0">
+        {/* Input - Professional */}
+        <div className="border-t border-gray-200 bg-white px-4 py-3 flex-shrink-0">
           <div className="flex items-end gap-2">
             <div className="flex-1 relative">
               <textarea
@@ -412,8 +443,8 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                   adjustTextareaHeight();
                 }}
                 onKeyDown={handleKeyPress}
-                placeholder="Ask me anything... (Ctrl+Enter for new line)"
-                className="w-full rounded-lg border border-[#2d2d44] bg-[#16213e] px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 placeholder:text-gray-500 resize-none min-h-[42px] max-h-[120px]"
+                placeholder="Type your request..."
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder:text-gray-400 resize-none min-h-[40px] max-h-[120px]"
                 disabled={loading}
                 rows={1}
                 style={{ height: 'auto' }}
@@ -422,19 +453,25 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
             <button
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || loading}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-blue-500/20"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
               aria-label="Send message"
             >
               {loading ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
               ) : (
-                <Send size={18} />
+                <Send size={16} />
               )}
             </button>
           </div>
-          <div className="mt-1.5 flex justify-between text-[9px] text-gray-500">
-            <span>Powered by Google Gemini AI</span>
-            <span>Role-based permissions apply</span>
+          <div className="mt-1.5 flex items-center justify-between text-[10px] text-gray-400">
+            <div className="flex items-center gap-3">
+              <span>Enter to send · Shift+Enter for new line</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span>Gemini AI</span>
+              <span className="w-px h-3 bg-gray-300" />
+              <span>Role-based access</span>
+            </div>
           </div>
         </div>
       </div>
