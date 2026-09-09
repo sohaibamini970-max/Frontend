@@ -644,35 +644,8 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                   Welcome, {user.firstName}
                 </h2>
                 <p className="text-sm text-gray-600 max-w-sm">
-                  I'm your AI Project Management Assistant. I can help you create projects, 
-                  manage tasks, track progress, and more. How can I assist you today?
+                     How can I assist you today?
                 </p>
-                <div className="mt-6 flex flex-wrap gap-2 justify-center">
-                  <button
-                    onClick={() => sendMessage("Create a new project")}
-                    className="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-200 transition"
-                  >
-                    Create Project
-                  </button>
-                  <button
-                    onClick={() => sendMessage("Show all my projects")}
-                    className="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-200 transition"
-                  >
-                    View Projects
-                  </button>
-                  <button
-                    onClick={() => sendMessage("Create a new task")}
-                    className="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-200 transition"
-                  >
-                    Create Task
-                  </button>
-                  <button
-                    onClick={() => sendMessage("Show my tasks")}
-                    className="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-200 transition"
-                  >
-                    View Tasks
-                  </button>
-                </div>
               </div>
             )}
 
