@@ -1874,7 +1874,7 @@ export default function Dashboard() {
 
                         <button
                             onClick={() =>
-                                router.push("/Schedule")
+                                router.push("/schedule")
                             }
                             className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#172b3a] py-3.5 text-[11px] font-bold text-white transition hover:bg-[#223d50]"
                         >
