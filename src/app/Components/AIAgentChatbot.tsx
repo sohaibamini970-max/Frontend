@@ -116,7 +116,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
   ]);
 
   const [currentSessionId, setCurrentSessionId] = useState<string>("1");
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Initially closed
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
@@ -144,9 +144,11 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  // Close sidebar when maximized and when minimized
+  // Open sidebar when maximized, close when minimized
   useEffect(() => {
     if (isMaximized) {
+      setIsSidebarOpen(true);
+    } else {
       setIsSidebarOpen(false);
     }
   }, [isMaximized]);
@@ -178,8 +180,10 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
     setChatSessions(prev => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
     setConversationHistory([]);
-    setIsSidebarOpen(true);
-  }, []);
+    if (isMaximized) {
+      setIsSidebarOpen(true);
+    }
+  }, [isMaximized]);
 
   // Delete chat
   const deleteChat = useCallback((sessionId: string) => {
@@ -216,6 +220,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       }));
       setConversationHistory(history);
     }
+    // Keep sidebar open if maximized
     if (!isMaximized) {
       setIsSidebarOpen(false);
     }
@@ -374,9 +379,9 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
     setIsMaximized(!isMaximized);
   };
 
-  // Toggle sidebar
+  // Toggle sidebar - only works when maximized
   const toggleSidebar = (): void => {
-    if (!isMaximized) {
+    if (isMaximized) {
       setIsSidebarOpen(!isSidebarOpen);
     }
   };
@@ -468,7 +473,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
         {/* Sidebar */}
         <div
           className={`flex flex-col bg-gray-50 border-r border-gray-200 transition-all duration-300 ${
-            isSidebarOpen && !isMaximized ? "w-[220px]" : "w-0"
+            isSidebarOpen && isMaximized ? "w-[220px]" : "w-0"
           } overflow-hidden flex-shrink-0`}
         >
           <div className="p-3 border-b border-gray-200 flex-shrink-0">
@@ -583,7 +588,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
           {/* Header */}
           <div className="flex items-center justify-between bg-white px-4 py-3 flex-shrink-0 border-b border-gray-200">
             <div className="flex items-center gap-3 min-w-0">
-              {!isMaximized && (
+              {isMaximized && (
                 <button
                   onClick={toggleSidebar}
                   className="rounded p-1 hover:bg-gray-100 transition text-gray-500 hover:text-gray-700 flex-shrink-0"
