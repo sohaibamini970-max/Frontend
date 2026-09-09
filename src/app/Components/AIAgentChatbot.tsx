@@ -6,7 +6,6 @@ import {
   Send,
   X,
   Bot,
-  User,
   Loader2,
   Calendar,
   Users,
@@ -19,9 +18,6 @@ import {
   Maximize2,
   Minimize2,
   Sparkles,
-  Paperclip,
-  Mic,
-  CornerDownLeft,
 } from "lucide-react";
 
 // ============================================================
@@ -65,28 +61,17 @@ interface ChatResponse {
 const API_BASE = "https://backend-five-swart-88.vercel.app/api";
 
 const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content:
-        "Welcome to Project Management Assistant.\n\nI can help you with:\n• Project creation and management\n• Task assignment and tracking\n• Work submission and review\n• Project status and reporting\n\nHow can I assist you today?",
-      timestamp: new Date(),
-    },
-  ]);
+  // Get user info from localStorage or session
+  const user = typeof window !== 'undefined' ? {
+    firstName: localStorage.getItem("userFirstName") || "User",
+    lastName: localStorage.getItem("userLastName") || "",
+    email: localStorage.getItem("userEmail") || "",
+  } : { firstName: "User", lastName: "", email: "" };
 
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [isMaximized, setIsMaximized] = useState<boolean>(false);
-  const [suggestions, setSuggestions] = useState<string[]>([
-    "Create new project: 'Q4 Marketing Campaign'",
-    "Show all active projects",
-    "Create task: 'Finalize budget report'",
-    "View team task status",
-    "Assign project to department",
-    "Submit work for review",
-  ]);
-  const [showSuggestions, setShowSuggestions] = useState<boolean>(true);
   const [conversationHistory, setConversationHistory] = useState<ConversationHistory[]>([]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -132,7 +117,6 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
-    setShowSuggestions(false);
     setLoading(true);
 
     // Reset textarea height
@@ -181,9 +165,6 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
         ...prev,
         { role: "assistant", content: data.message || "" },
       ]);
-
-      // Show suggestions again after a delay
-      setTimeout(() => setShowSuggestions(true), 5000);
     } catch (error: any) {
       console.error("Chat error:", error);
 
@@ -201,7 +182,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Handle key press - Enter to send, Ctrl+Enter for new line
+  // Handle key press - Enter to send, Shift+Enter for new line
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
@@ -287,7 +268,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
             : "h-[580px] max-h-[calc(100vh-8rem)] rounded-lg border border-gray-200"
         }`}
       >
-        {/* Header - Professional */}
+        {/* Header */}
         <div className="flex items-center justify-between bg-white px-5 py-3 flex-shrink-0 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded bg-blue-600">
@@ -326,6 +307,49 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
             isMaximized ? "px-8 py-6" : ""
           } bg-gray-50`}
         >
+          {/* Welcome Message - Centered */}
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full text-center px-4">
+              <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4">
+                <Sparkles size={28} className="text-blue-600" />
+              </div>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                Welcome, {user.firstName}
+              </h2>
+              <p className="text-sm text-gray-600 max-w-sm">
+                I'm your AI Project Management Assistant. I can help you create projects, 
+                manage tasks, track progress, and more. How can I assist you today?
+              </p>
+              <div className="mt-6 flex flex-wrap gap-2 justify-center">
+                <button
+                  onClick={() => sendMessage("Create a new project")}
+                  className="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-200 transition"
+                >
+                  Create Project
+                </button>
+                <button
+                  onClick={() => sendMessage("Show all my projects")}
+                  className="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-200 transition"
+                >
+                  View Projects
+                </button>
+                <button
+                  onClick={() => sendMessage("Create a new task")}
+                  className="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-200 transition"
+                >
+                  Create Task
+                </button>
+                <button
+                  onClick={() => sendMessage("Show my tasks")}
+                  className="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-200 transition"
+                >
+                  View Tasks
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Chat Messages */}
           {messages.map((message) => (
             <div
               key={message.id}
@@ -402,36 +426,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Suggestions */}
-        {showSuggestions && messages.length > 0 && !loading && (
-          <div className="border-t border-gray-200 bg-white px-4 py-2.5 flex-shrink-0">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
-                Quick Actions
-              </span>
-              <button
-                onClick={() => setShowSuggestions(false)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label="Hide suggestions"
-              >
-                <span className="text-xs">×</span>
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {suggestions.slice(0, 4).map((suggestion, index) => (
-                <button
-                  key={index}
-                  onClick={() => sendMessage(suggestion)}
-                  className="text-xs bg-gray-50 hover:bg-gray-100 text-gray-700 px-3 py-1 rounded border border-gray-200 transition whitespace-nowrap"
-                >
-                  {suggestion.length > 35 ? suggestion.slice(0, 35) + "..." : suggestion}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Input - Professional */}
+        {/* Input */}
         <div className="border-t border-gray-200 bg-white px-4 py-3 flex-shrink-0">
           <div className="flex items-end gap-2">
             <div className="flex-1 relative">
@@ -443,7 +438,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                   adjustTextareaHeight();
                 }}
                 onKeyDown={handleKeyPress}
-                placeholder="Type your request..."
+                placeholder={messages.length === 0 ? "Type your request..." : "Type your message..."}
                 className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder:text-gray-400 resize-none min-h-[40px] max-h-[120px]"
                 disabled={loading}
                 rows={1}
