@@ -2050,13 +2050,13 @@ const handleChangeProjectStatus = async () => {
 
                                 <div className="min-w-0 pr-5">
 
-                                  <h3 className="truncate text-sm font-semibold text-gray-900">
+                                  <h3 className="truncate text-lg font-semibold text-gray-900">
                                     {
                                       project.name
                                     }
                                   </h3>
 
-                                  <p className="mt-0.5 truncate text-[10px] text-gray-400">
+                                  <p className="mt-0.5 truncate text-[14px] text-gray-400">
                                     {
                                       project.domain
                                     }
@@ -2218,13 +2218,13 @@ const handleChangeProjectStatus = async () => {
 
                           <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
 
-                            <p className="text-xs font-semibold text-gray-800">
+                            <p className="text-sm font-semibold text-gray-800">
                               {
                                 project.aboutTitle
                               }
                             </p>
 
-                            <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-gray-500">
+                            <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-gray-500">
                               {project.aboutDescription ||
                                 "No project description provided."}
                             </p>
@@ -2236,7 +2236,7 @@ const handleChangeProjectStatus = async () => {
                           <div className="mt-4 flex flex-wrap items-center gap-2">
 
                             <span
-                              className={`inline-flex rounded-md px-2.5 py-1 text-[10px] font-medium ${
+                              className={`inline-flex rounded-md px-2.5 py-1 text-[12px] font-medium ${
                                 statusStyles[
                                   project.status
                                 ]
@@ -2247,7 +2247,7 @@ const handleChangeProjectStatus = async () => {
                               }
                             </span>
 
-                            <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-medium text-gray-500">
+                            <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[12px] font-medium text-gray-500">
                               <Flag
                                 size={
                                   10
@@ -2258,7 +2258,7 @@ const handleChangeProjectStatus = async () => {
                             </span>
 
                             {allTasksDone && (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-medium text-emerald-600">
+                              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[12px] font-medium text-emerald-600">
                                 <CheckCircle2
                                   size={
                                     10
@@ -2286,14 +2286,14 @@ const handleChangeProjectStatus = async () => {
                                   />
 
                                   <div className="min-w-0">
-                                    <p className="truncate text-[11px] font-semibold text-gray-700">
+                                    <p className="truncate text-[13px] font-semibold text-gray-700">
                                       {
                                         project.managerName ||
                                         manager.name
                                       }
                                     </p>
 
-                                    <p className="text-[9px] text-gray-400">
+                                    <p className="text-[11px] text-gray-400">
                                       Project Manager
                                     </p>
                                   </div>
@@ -2323,11 +2323,11 @@ const handleChangeProjectStatus = async () => {
                             </div>
 
                             <div className="text-right">
-                              <p className="text-[10px] text-gray-400">
+                              <p className="text-[13px] text-gray-400">
                                 Tasks
                               </p>
 
-                              <p className="text-xs font-semibold text-gray-700">
+                              <p className="text-lg font-semibold text-gray-700">
                                 {
                                   project.completedTasks
                                 }
@@ -2361,15 +2361,15 @@ const handleChangeProjectStatus = async () => {
                                   size={
                                     12
                                   }
-                                  className="text-gray-400"
+                                  className="text-gray-600"
                                 />
 
-                                <span className="text-[9px] font-medium uppercase tracking-wide text-gray-400">
+                                <span className="text-[10px] font-medium uppercase tracking-wide text-gray-600">
                                   Start
                                 </span>
                               </div>
 
-                              <p className="mt-1 text-[10px] font-medium text-gray-700">
+                              <p className="mt-1 text-[13px] font-medium text-gray-900">
                                 {formatDate (project.startDate) }
                               </p>
 
@@ -2382,15 +2382,15 @@ const handleChangeProjectStatus = async () => {
                                   size={
                                     12
                                   }
-                                  className="text-gray-400"
+                                  className="text-gray-600"
                                 />
 
-                                <span className="text-[9px] font-medium uppercase tracking-wide text-gray-400">
+                                <span className="text-[11px] font-medium uppercase tracking-wide text-gray-600">
                                   Deadline
                                 </span>
                               </div>
 
-                              <p className="mt-1 text-[10px] font-medium text-gray-700">
+                              <p className="mt-1 text-[13px] font-medium text-gray-900">
                                        {formatDate(project.deadline)}
                               </p>
 
@@ -4210,13 +4210,13 @@ const handleChangeProjectStatus = async () => {
 
                   <div className="min-w-0">
 
-                    <h2 className="truncate text-lg font-semibold text-gray-900">
+                    <h2 className="truncate text-xl font-semibold text-gray-900">
                       {
                         selectedProject.name
                       }
                     </h2>
 
-                    <p className="mt-0.5 truncate text-xs text-gray-400">
+                    <p className="mt-0.5 truncate text-sm text-gray-600">
                       {
                         selectedProject.domain
                       }
@@ -4257,12 +4257,12 @@ const handleChangeProjectStatus = async () => {
 
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
 
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                    <p className="text-[12px] font-medium uppercase tracking-wide text-gray-800">
                       Status
                     </p>
 
                     <span
-                      className={`mt-2 inline-flex rounded-md px-2.5 py-1 text-[10px] font-medium ${
+                      className={`mt-2 inline-flex rounded-md px-2.5 py-1 text-[13px] font-medium ${
                         statusStyles[
                           selectedProject.status
                         ]
@@ -4277,7 +4277,7 @@ const handleChangeProjectStatus = async () => {
 
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
 
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                    <p className="text-[12px] font-medium uppercase tracking-wide text-gray-800">
                       Priority
                     </p>
 
@@ -4287,10 +4287,10 @@ const handleChangeProjectStatus = async () => {
                         size={
                           13
                         }
-                        className="text-gray-400"
+                        className="text-gray-600"
                       />
 
-                      <p className="text-sm font-semibold text-gray-800">
+                      <p className="text-lg font-semibold text-gray-800">
                         {
                           selectedProject.priority
                         }
@@ -4302,11 +4302,11 @@ const handleChangeProjectStatus = async () => {
 
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
 
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                    <p className="text-[12px] font-medium uppercase tracking-wide text-gray-800">
                       Tasks
                     </p>
 
-                    <p className="mt-2 text-sm font-semibold text-gray-800">
+                    <p className="mt-2 text-lg font-semibold text-gray-800">
                       {
                         selectedProject.completedTasks
                       }
@@ -4321,11 +4321,11 @@ const handleChangeProjectStatus = async () => {
 
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
 
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                    <p className="text-[12px] font-medium uppercase tracking-wide text-gray-800">
                       Progress
                     </p>
 
-                    <p className="mt-2 text-sm font-semibold text-gray-800">
+                    <p className="mt-2 text-lg font-semibold text-gray-800">
                       {
                         selectedProject.progress
                       }
@@ -4344,7 +4344,7 @@ const handleChangeProjectStatus = async () => {
 
                     <div>
 
-                      <p className="text-xs font-semibold text-gray-800">
+                      <p className="text-lg font-semibold text-gray-800">
                         {
                           selectedProject.aboutTitle
                         }
@@ -4368,11 +4368,11 @@ const handleChangeProjectStatus = async () => {
                   <div className="mb-3 flex items-center justify-between">
 
                     <div>
-                      <p className="text-xs font-semibold text-gray-800">
+                      <p className="text-sm font-semibold text-gray-800">
                         Project Progress
                       </p>
 
-                      <p className="mt-1 text-[10px] text-gray-400">
+                      <p className="mt-1 text-[12px] text-gray-400">
                         Calculated from completed project tasks
                       </p>
                     </div>
@@ -4393,7 +4393,7 @@ const handleChangeProjectStatus = async () => {
                     large
                   />
 
-                  <div className="mt-3 flex justify-between text-[10px] text-gray-400">
+                  <div className="mt-3 flex justify-between text-[13px] text-gray-800">
 
                     <span>
                       {
@@ -4422,17 +4422,17 @@ const handleChangeProjectStatus = async () => {
                     <div className="flex items-center gap-2">
                       <Calendar
                         size={
-                          15
+                          18
                         }
-                        className="text-gray-400"
+                        className="text-gray-600"
                       />
 
-                      <p className="text-xs font-semibold text-gray-700">
+                      <p className="text-sm font-semibold text-gray-700">
                         Start Date
                       </p>
                     </div>
 
-                    <p className="mt-2 text-sm text-gray-500">
+                    <p className="mt-2 text-xm text-gray-500">
                       {
                         selectedProject.startDate ||
                         "No start date"
@@ -4446,12 +4446,12 @@ const handleChangeProjectStatus = async () => {
                     <div className="flex items-center gap-2">
                       <Calendar
                         size={
-                          15
+                          17
                         }
-                        className="text-gray-400"
+                        className="text-gray-600"
                       />
 
-                      <p className="text-xs font-semibold text-gray-700">
+                      <p className="text-sm font-semibold text-gray-700">
                         Deadline
                       </p>
                     </div>
@@ -4470,9 +4470,9 @@ const handleChangeProjectStatus = async () => {
                     <div className="flex items-center gap-2">
                       <Users
                         size={
-                          15
+                          17
                         }
-                        className="text-gray-400"
+                        className="text-gray-600"
                       />
 
                       <p className="text-xs font-semibold text-gray-700">
@@ -4503,24 +4503,24 @@ const handleChangeProjectStatus = async () => {
 
                         <ListTodo
                           size={
-                            16
+                            18
                           }
                           className="text-gray-500"
                         />
 
-                        <h3 className="text-sm font-semibold text-gray-900">
+                        <h3 className="text-lg font-semibold text-gray-900">
                           Project Tasks
                         </h3>
 
                       </div>
 
-                      <p className="mt-1 text-[10px] text-gray-400">
+                      <p className="mt-1 text-[13px] text-gray-600">
                         Tasks, assignees and completion status
                       </p>
 
                     </div>
 
-                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[10px] font-medium text-gray-500">
+                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[13px] font-medium text-gray-600">
                       {
                         selectedProject.totalTasks
                       }{" "}
@@ -4570,7 +4570,7 @@ const handleChangeProjectStatus = async () => {
 
                               <div className="flex min-w-0 flex-1 items-start gap-3">
 
-                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-[10px] font-semibold text-gray-500">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-[12px] font-semibold text-gray-500">
                                   {String(
                                     index +
                                       1
@@ -4582,14 +4582,14 @@ const handleChangeProjectStatus = async () => {
 
                                 <div className="min-w-0">
 
-                                  <p className="text-xs font-semibold text-gray-800">
+                                  <p className="text-lg font-semibold text-gray-800">
                                     {
                                       task.name
                                     }
                                   </p>
 
                                   {task.description && (
-                                    <p className="mt-1 line-clamp-1 text-[10px] text-gray-400">
+                                    <p className="mt-1 line-clamp-1 text-[13px] text-gray-500">
                                       {
                                         task.description
                                       }
@@ -4605,7 +4605,7 @@ const handleChangeProjectStatus = async () => {
                                     />
 
                                     {task.priority && (
-                                      <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                                      <span className="inline-flex items-center gap-1 text-[12px] text-gray-800">
                                         <Flag
                                           size={
                                             10
@@ -4618,7 +4618,7 @@ const handleChangeProjectStatus = async () => {
                                     )}
 
                                     {task.dueDate && (
-                                      <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                                      <span className="inline-flex items-center gap-1 text-[13px] text-gray-600">
                                         <Calendar
                                           size={
                                             10
@@ -4670,12 +4670,12 @@ const handleChangeProjectStatus = async () => {
 
                                 <div className="min-w-0">
 
-                                  <p className="truncate text-[10px] font-medium text-gray-700">
+                                  <p className="truncate text-[13px] font-medium text-gray-600">
                                     {task.assigneeName ||
                                       "Unassigned"}
                                   </p>
 
-                                  <p className="text-[9px] text-gray-400">
+                                  <p className="text-[11px] text-gray-400">
                                     Assignee
                                   </p>
 
