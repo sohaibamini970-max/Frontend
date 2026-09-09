@@ -219,44 +219,46 @@ async function fetchProjects(): Promise<Project[]> {
 ========================================================= */
 
 async function fetchTasks(projectList: Project[]): Promise<Task[]> {
-  const allTasks: Task[] = [];
+  if (projectList.length === 0) return [];
 
-  for (const project of projectList) {
-    try {
-      const response = await fetch(
-        `${API_BASE}/tasks/project/${project.id}`,
-        {
-          method: "GET",
-          headers: getAuthHeaders(),
-          cache: "no-store",
+  const headers = getAuthHeaders();
+
+  // IMPORTANT: never request project tasks sequentially.
+  // The old loop waited for project 1, then project 2, then project 3...
+  // With 10 projects that can easily become 10x the network latency.
+  const results = await Promise.all(
+    projectList.map(async (project) => {
+      try {
+        const response = await fetch(
+          `${API_BASE}/tasks/project/${project.id}`,
+          { method: "GET", headers, cache: "no-store" }
+        );
+
+        if (!response.ok) {
+          console.error(`Unable to load tasks for project ${project.id}`);
+          return [];
         }
-      );
 
-      if (!response.ok) {
-        console.error(`Unable to load tasks for project ${project.id}`);
-        continue;
+        const data = await response.json();
+        const rows = extractRows(data, "tasks");
+
+        return rows.map((task: any): Task => ({
+          id: String(task.id),
+          project_id: String(
+            task.project_id ?? task.projectId ?? task.project?.id ?? project.id
+          ),
+          name: task.name || task.title || task.task_name || "Untitled Task",
+          status: normalizeStatus(task.status || "To Do"),
+          assignee_id: task.assignee_id ?? task.assigneeId ?? task.assigned_to ?? null,
+        }));
+      } catch (error) {
+        console.error(`Failed to load tasks for project ${project.id}:`, error);
+        return [];
       }
+    })
+  );
 
-      const data = await response.json();
-      const rows = extractRows(data, "tasks");
-
-      const projectTasks: Task[] = rows.map((task: any) => ({
-        id: String(task.id),
-        project_id: String(
-          task.project_id ?? task.projectId ?? task.project?.id ?? project.id
-        ),
-        name: task.name || task.title || task.task_name || "Untitled Task",
-        status: normalizeStatus(task.status || "To Do"),
-        assignee_id: task.assignee_id ?? task.assigneeId ?? task.assigned_to ?? null,
-      }));
-
-      allTasks.push(...projectTasks);
-    } catch (error) {
-      console.error(`Failed to load tasks for project ${project.id}:`, error);
-    }
-  }
-
-  return allTasks;
+  return results.flat();
 }
 
 /* =========================================================
@@ -294,11 +296,21 @@ async function fetchAllUsers(): Promise<TeamMember[]> {
 ========================================================= */
 
 async function fetchTeamsWithMembers(): Promise<TeamWithMembers[]> {
-  const teamsResponse = await fetch(`${API_BASE}/teams`, {
-    method: "GET",
-    headers: getAuthHeaders(),
-    cache: "no-store",
-  });
+  const headers = getAuthHeaders();
+
+  // These requests do not depend on each other, so run them together.
+  const [teamsResponse, membersResponse] = await Promise.all([
+    fetch(`${API_BASE}/teams`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+    }),
+    fetch(`${API_BASE}/teams/members`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+    }),
+  ]);
 
   if (!teamsResponse.ok) {
     throw new Error(
@@ -306,20 +318,16 @@ async function fetchTeamsWithMembers(): Promise<TeamWithMembers[]> {
     );
   }
 
-  const membersResponse = await fetch(`${API_BASE}/teams/members`, {
-    method: "GET",
-    headers: getAuthHeaders(),
-    cache: "no-store",
-  });
-
   if (!membersResponse.ok) {
     throw new Error(
       await getErrorMessage(membersResponse, "Unable to load team members.")
     );
   }
 
-  const teamsData = await teamsResponse.json();
-  const membersData = await membersResponse.json();
+  const [teamsData, membersData] = await Promise.all([
+    teamsResponse.json(),
+    membersResponse.json(),
+  ]);
 
   const teamRows = extractRows(teamsData, "teams");
   const memberRows = extractRows(membersData, "members");
@@ -524,12 +532,6 @@ export default function Teams() {
       const userId = userData?.id ?? userData?.user_id ?? userData?.userId ?? parsed?.id ?? parsed?.user_id ?? parsed?.userId;
       const role = userData?.role ?? parsed?.role ?? "Member";
 
-      console.log("========== TEAMS AUTH ==========");
-      console.log("Stored user:", parsed);
-      console.log("Detected role:", role);
-      console.log("Detected user ID:", userId);
-      console.log("=================================");
-
       setCurrentUserRole(role);
       setCurrentUserId(userId !== undefined && userId !== null ? String(userId) : null);
     } catch (error) {
@@ -584,45 +586,52 @@ export default function Teams() {
       setRefreshing(true);
       setError("");
 
-      console.log("========== LOAD TEAMS DATA ==========");
-      console.log("Current role:", currentUserRole);
-      console.log("Current user ID:", currentUserId);
-      console.log("Can manage:", canManageTeams);
+      const isMember = currentUserRole === "Member";
+      const teamsPromise = fetchTeamsWithMembers();
 
-      const projectData = await fetchProjects();
-      setProjects(projectData);
-      setExpandedProjects(projectData.map((project) => project.id));
+      // Start every independent request immediately instead of creating a
+      // waterfall. The Teams UI can render as soon as its own data arrives.
+      const managementPromises = isMember
+        ? null
+        : {
+            projects: fetchProjects(),
+            users: fetchAllUsers(),
+            available: fetchUnassignedMembers(),
+          };
 
-      if (currentUserRole === "Member") {
-        const [taskData, teamsData] = await Promise.all([
-          fetchTasks(projectData),
-          fetchTeamsWithMembers(),
-        ]);
+      // Teams are needed for the first useful paint. Do not wait for tasks.
+      const teamsData = await teamsPromise;
+      setTeams(teamsData);
+      setLoading(false);
 
-        console.log("Member teams:", teamsData);
-        setTasks(taskData);
-        setTeams(teamsData);
+      if (isMember) {
+        setProjects([]);
+        setTasks([]);
         setAllMembers([]);
         setUnassignedMembers([]);
         return;
       }
 
-      const [taskData, allUsersData, teamsData, unassignedData] = await Promise.all([
-        fetchTasks(projectData),
-        fetchAllUsers(),
-        fetchTeamsWithMembers(),
-        fetchUnassignedMembers(),
+      // Projects/users/available members have already started above.
+      const [projectData, allUsersData, unassignedData] = await Promise.all([
+        managementPromises!.projects,
+        managementPromises!.users,
+        managementPromises!.available,
       ]);
 
-      setTasks(taskData);
+      setProjects(projectData);
+      setExpandedProjects(projectData.map((project) => project.id));
       setAllMembers(allUsersData);
-      setTeams(teamsData);
       setUnassignedMembers(unassignedData);
+
+      // fetchTasks() now requests all project task endpoints concurrently.
+      const taskData = await fetchTasks(projectData);
+      setTasks(taskData);
     } catch (err: any) {
       console.error("Teams workspace error:", err);
       setError(err?.message || "Unable to load workspace data.");
-    } finally {
       setLoading(false);
+    } finally {
       setRefreshing(false);
     }
   };
@@ -636,13 +645,37 @@ export default function Teams() {
      PROJECT FILTER
   ========================================================= */
 
+  const tasksByProject = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const task of tasks) {
+      const key = String(task.project_id);
+      const existing = map.get(key);
+      if (existing) existing.push(task);
+      else map.set(key, [task]);
+    }
+    return map;
+  }, [tasks]);
+
+  const tasksByMember = useMemo(() => {
+    const map = new Map<string, { total: number; done: number; pending: number; progress: number }>();
+    for (const task of tasks) {
+      if (!task.assignee_id) continue;
+      const key = String(task.assignee_id);
+      const stats = map.get(key) || { total: 0, done: 0, pending: 0, progress: 0 };
+      stats.total++;
+      if (task.status === "Done") stats.done++;
+      else stats.pending++;
+      if (task.status === "In Progress") stats.progress++;
+      map.set(key, stats);
+    }
+    return map;
+  }, [tasks]);
+
   const visibleProjects = useMemo(() => {
     const query = search.toLowerCase().trim();
 
     return projects.filter((project) => {
-      const projectTasks = tasks.filter(
-        (task) => String(task.project_id) === String(project.id)
-      );
+      const projectTasks = tasksByProject.get(String(project.id)) || [];
 
       const matchesSearch =
         !query ||
@@ -660,7 +693,7 @@ export default function Teams() {
       }
       return true;
     });
-  }, [search, projects, tasks, selectedFilter]);
+  }, [search, projects, tasksByProject, selectedFilter]);
 
   /* =========================================================
      PROJECT TOGGLE
@@ -1064,15 +1097,11 @@ export default function Teams() {
   ========================================================= */
 
   const getMemberStats = (memberId: string) => {
-    const memberTasks = tasks.filter(
-      (task) => String(task.assignee_id) === String(memberId)
-    );
-
-    return {
-      total: memberTasks.length,
-      done: memberTasks.filter((task) => task.status === "Done").length,
-      pending: memberTasks.filter((task) => task.status !== "Done").length,
-      progress: memberTasks.filter((task) => task.status === "In Progress").length,
+    return tasksByMember.get(String(memberId)) || {
+      total: 0,
+      done: 0,
+      pending: 0,
+      progress: 0,
     };
   };
 
@@ -1377,9 +1406,7 @@ export default function Teams() {
                     </div>
                   ) : (
                     visibleProjects.map((project) => {
-                      const projectTasks = tasks.filter(
-                        (task) => String(task.project_id) === String(project.id)
-                      );
+                      const projectTasks = tasksByProject.get(String(project.id)) || [];
 
                       const expanded = expandedProjects.includes(project.id);
 
