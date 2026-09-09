@@ -116,34 +116,42 @@ const PROJECT_OVERVIEW_COLORS = [
     {
         bar: "from-[#42b5e8] to-[#2d6dcc]",
         icon: "bg-[#172b3a] text-[#42b5e8]",
+        labelColor: "text-[#42b5e8]",
     },
     {
         bar: "from-[#69d19a] to-[#3ca67d]",
         icon: "bg-[#172b3a] text-[#69d19a]",
+        labelColor: "text-[#69d19a]",
     },
     {
         bar: "from-[#9670ed] to-[#493bc0]",
         icon: "bg-[#172b3a] text-[#9670ed]",
+        labelColor: "text-[#9670ed]",
     },
     {
         bar: "from-[#ffb25b] to-[#ed7440]",
         icon: "bg-[#172b3a] text-[#ffb25b]",
+        labelColor: "text-[#ffb25b]",
     },
     {
         bar: "from-[#4fc1c2] to-[#218a9b]",
         icon: "bg-[#172b3a] text-[#4fc1c2]",
+        labelColor: "text-[#4fc1c2]",
     },
     {
         bar: "from-[#ed5d91] to-[#bd2f70]",
         icon: "bg-[#172b3a] text-[#ed5d91]",
+        labelColor: "text-[#ed5d91]",
     },
     {
         bar: "from-[#315da5] to-[#172d61]",
         icon: "bg-[#172b3a] text-[#7fa8ff]",
+        labelColor: "text-[#7fa8ff]",
     },
     {
         bar: "from-[#f8d95c] to-[#d8aa2c]",
         icon: "bg-[#172b3a] text-[#f8d95c]",
+        labelColor: "text-[#f8d95c]",
     },
 ];
 
@@ -841,84 +849,6 @@ export default function Dashboard() {
     }, [visibleTasks]);
 
     /* =======================================================
-       TEAM ROLE OVERVIEW
-    ======================================================= */
-
-    // const teamRoleStats = useMemo(() => {
-    //   const developers =
-    //     teamMembers.filter(
-    //       (member) => {
-    //         const role =
-    //           member.role?.toLowerCase();
-
-    //         return (
-    //           role.includes("developer") ||
-    //           role.includes("software") ||
-    //           role.includes("engineer")
-    //         );
-    //       }
-    //     ).length;
-
-    //   const designers =
-    //     teamMembers.filter(
-    //       (member) => {
-    //         const role =
-    //           member.role?.toLowerCase();
-
-    //         return (
-    //           role.includes("designer") ||
-    //           role.includes("ui") ||
-    //           role.includes("ux")
-    //         );
-    //       }
-    //     ).length;
-
-    //   const managers =
-    //     teamMembers.filter(
-    //       (member) => {
-    //         const role =
-    //           member.role?.toLowerCase();
-
-    //         return role.includes("manager");
-    //       }
-    //     ).length;
-
-    //   const qa =
-    //     teamMembers.filter(
-    //       (member) => {
-    //         const role =
-    //           member.role?.toLowerCase();
-
-    //         return (
-    //           role.includes("qa") ||
-    //           role.includes("quality") ||
-    //           role.includes("tester")
-    //         );
-    //       }
-    //     ).length;
-
-    //   const known =
-    //     developers +
-    //     designers +
-    //     managers +
-    //     qa;
-
-    //   const other = Math.max(
-    //     teamMembers.length - known,
-    //     0
-    //   );
-
-    //   return {
-    //     developers,
-    //     designers,
-    //     managers,
-    //     qa,
-    //     other,
-    //     total: teamMembers.length,
-    //   };
-    // }, [teamMembers]);
-
-    /* =======================================================
        DOMAIN OVERVIEW
     ======================================================= */
 
@@ -1226,7 +1156,6 @@ export default function Dashboard() {
 
                                 {/* =====================================================
             ONLY BOTTOM BASELINE
-            No horizontal background/grid lines
         ===================================================== */}
                                 <div className="pointer-events-none absolute inset-x-0 bottom-[72px] h-px bg-[#6f7b87]" />
 
@@ -1266,7 +1195,7 @@ export default function Dashboard() {
                   ================================================= */}
                                                     <div className="mb-3 h-6">
 
-                                                        <span className="text-[15px] font-bold text-[#172633] transition group-hover:text-[#557bd2]">
+                                                        <span className="text-[17px] font-bold text-[#172633] transition group-hover:text-[#557bd2]">
                                                             {progress}%
                                                         </span>
 
@@ -1274,7 +1203,6 @@ export default function Dashboard() {
 
                                                     {/* =================================================
                       BAR AREA
-                      Same size / width as your current chart
                   ================================================= */}
                                                     <div className="relative flex h-[200px] w-full max-w-[42px] items-end justify-center">
 
@@ -1302,16 +1230,15 @@ export default function Dashboard() {
                                                     </div>
 
                                                     {/* =================================================
-                      PROJECT NAME
-                      No icon
+                      PROJECT NAME - MATCHING COLOR
                   ================================================= */}
                                                     <div className="mt-2 min-h-[52px] w-[125px] text-center">
 
-                                                        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#3D3A3A]">
+                                                        <p className={`mb-0.5 text-[13px] font-semibold uppercase tracking-wide ${color.labelColor}`}>
                                                             Project #{index + 1}
                                                         </p>
 
-                                                        <p className="text-[12px] font-bold uppercase leading-4 text-[#172633] transition group-hover:text-[#557bd2]">
+                                                        <p className="text-[13px] font-bold uppercase leading-4 text-[#172633] transition group-hover:text-[#557bd2]">
                                                             {project.name}
                                                         </p>
 
@@ -1434,7 +1361,7 @@ export default function Dashboard() {
                 </section>
 
                 {/* =================================================
-            ROW 3 — TEAM OVERVIEW
+            ROW 3 — TEAM OVERVIEW - ENLARGED FONTS
         ================================================= */}
 
                 <section className="mb-7 rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
@@ -1449,11 +1376,11 @@ export default function Dashboard() {
 
                             <div>
 
-                                <h2 className="text-[25px] font-bold text-[#172633]">
+                                <h2 className="text-[28px] font-bold text-[#172633]">
                                     Team Overview
                                 </h2>
 
-                                <p className="mt-1 text-[14px] text-[#8b96a3]">
+                                <p className="mt-1 text-[15px] text-[#8b96a3]">
                                     Team members, roles and project domains
                                 </p>
 
@@ -1475,17 +1402,16 @@ export default function Dashboard() {
 
                     <div className="grid gap-7 p-6 lg:grid-cols-[0.8fr_1.2fr] sm:p-7">
 
-                        {/* TEAM DISTRIBUTION */}
-
+                        {/* TEAM DISTRIBUTION - ENLARGED */}
                         <div className="rounded-2xl border border-[#edf0f3] bg-[#fafbfd] p-6">
 
                             <div className="mb-6">
 
-                                <p className="text-[14px] font-bold uppercase tracking-wider text-[#9aa4ae]">
+                                <p className="text-[16px] font-bold uppercase tracking-wider text-[#9aa4ae]">
                                     Team Distribution
                                 </p>
 
-                                <p className="mt-1.5 text-[12px] text-[#7f8a95]">
+                                <p className="mt-1.5 text-[14px] text-[#7f8a95]">
                                     Current workforce composition
                                 </p>
 
@@ -1493,7 +1419,8 @@ export default function Dashboard() {
 
                             <div className="flex items-center justify-center gap-9">
 
-                                <div className="relative h-[160px] w-[160px] shrink-0">
+                                {/* LARGER PIE CHART */}
+                                <div className="relative h-[180px] w-[180px] shrink-0">
 
                                     <div
                                         className="absolute inset-0 rounded-full"
@@ -1505,13 +1432,13 @@ export default function Dashboard() {
                                         }}
                                     />
 
-                                    <div className="absolute inset-[29px] flex flex-col items-center justify-center rounded-full bg-white shadow-sm">
+                                    <div className="absolute inset-[30px] flex flex-col items-center justify-center rounded-full bg-white shadow-sm">
 
-                                        <span className="text-[25px] font-bold text-[#172633]">
+                                        <span className="text-[28px] font-bold text-[#172633]">
                                             {teamRoleStats.total}
                                         </span>
 
-                                        <span className="mt-1 text-[12px] font-bold text-[#9aa4ae]">
+                                        <span className="mt-1 text-[13px] font-bold text-[#9aa4ae]">
                                             MEMBERS
                                         </span>
 
@@ -1519,7 +1446,8 @@ export default function Dashboard() {
 
                                 </div>
 
-                                <div className="space-y-3.5">
+                                {/* LARGER TEAM ITEMS */}
+                                <div className="space-y-4">
 
                                     <TeamItemNew
                                         color="bg-[#557bd2]"
@@ -1568,24 +1496,23 @@ export default function Dashboard() {
                         </div>
 
                         {/* DOMAINS */}
-
                         <div>
 
                             <div className="mb-5 flex items-center justify-between">
 
                                 <div>
 
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#9aa4ae]">
+                                    <p className="text-[13px] font-bold uppercase tracking-wider text-[#9aa4ae]">
                                         Project Domains
                                     </p>
 
-                                    <p className="mt-1.5 text-[12px] text-[#7f8a95]">
+                                    <p className="mt-1.5 text-[14px] text-[#7f8a95]">
                                         Distribution across active work
                                     </p>
 
                                 </div>
 
-                                <span className="rounded-full bg-[#f1f4f7] px-3 py-1.5 text-[9px] font-semibold text-[#697783]">
+                                <span className="rounded-full bg-[#f1f4f7] px-3 py-1.5 text-[11px] font-semibold text-[#697783]">
                                     {domainStats.length} domains
                                 </span>
 
@@ -1600,7 +1527,7 @@ export default function Dashboard() {
                                         className="mx-auto text-[#c5ccd3]"
                                     />
 
-                                    <p className="mt-3 text-[11px] font-medium text-[#8b96a3]">
+                                    <p className="mt-3 text-[13px] font-medium text-[#8b96a3]">
                                         No project domains available
                                     </p>
 
@@ -1626,7 +1553,7 @@ export default function Dashboard() {
                                                 <div className="flex min-w-0 items-center gap-3">
 
                                                     <span
-                                                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold text-white ${index % 4 === 0
+                                                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold text-white ${index % 4 === 0
                                                                 ? "bg-[#557bd2]"
                                                                 : index % 4 === 1
                                                                     ? "bg-[#438d5d]"
@@ -1640,13 +1567,13 @@ export default function Dashboard() {
                                                             .toUpperCase()}
                                                     </span>
 
-                                                    <span className="truncate text-[11px] font-semibold text-[#53616d]">
+                                                    <span className="truncate text-[13px] font-semibold text-[#53616d]">
                                                         {domain}
                                                     </span>
 
                                                 </div>
 
-                                                <span className="ml-2 shrink-0 rounded-full bg-[#f1f4f7] px-2.5 py-1.5 text-[9px] font-bold text-[#66737e]">
+                                                <span className="ml-2 shrink-0 rounded-full bg-[#f1f4f7] px-2.5 py-1.5 text-[11px] font-bold text-[#66737e]">
                                                     {count}
                                                 </span>
 
@@ -1668,13 +1595,13 @@ export default function Dashboard() {
                                             className="text-[#557bd2]"
                                         />
 
-                                        <span className="text-[9px] font-bold uppercase tracking-wide text-[#7c8793]">
+                                        <span className="text-[11px] font-bold uppercase tracking-wide text-[#7c8793]">
                                             Active Teams
                                         </span>
 
                                     </div>
 
-                                    <p className="mt-2 text-[25px] font-bold text-[#172633]">
+                                    <p className="mt-2 text-[28px] font-bold text-[#172633]">
                                         {teams.length}
                                     </p>
 
@@ -1689,13 +1616,13 @@ export default function Dashboard() {
                                             className="text-[#895a9d]"
                                         />
 
-                                        <span className="text-[9px] font-bold uppercase tracking-wide text-[#7c8793]">
+                                        <span className="text-[11px] font-bold uppercase tracking-wide text-[#7c8793]">
                                             Developers
                                         </span>
 
                                     </div>
 
-                                    <p className="mt-2 text-[25px] font-bold text-[#172633]">
+                                    <p className="mt-2 text-[28px] font-bold text-[#172633]">
                                         {
                                             teamRoleStats.developers
                                         }
@@ -2701,7 +2628,7 @@ function ProjectDetailItem({
 }
 
 /* =========================================================
-   TEAM ITEM
+   TEAM ITEM - ENLARGED
 ========================================================= */
 
 function TeamItemNew({
@@ -2714,21 +2641,21 @@ function TeamItemNew({
     value: number;
 }) {
     return (
-        <div className="flex min-w-[120px] items-center justify-between gap-5">
+        <div className="flex min-w-[140px] items-center justify-between gap-6">
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
 
                 <span
-                    className={`h-2.5 w-2.5 rounded-full ${color}`}
+                    className={`h-3 w-3 rounded-full ${color}`}
                 />
 
-                <span className="text-[10px] font-medium text-[#697783]">
+                <span className="text-[14px] font-semibold text-[#697783]">
                     {label}
                 </span>
 
             </div>
 
-            <span className="text-[11px] font-bold text-[#34424d]">
+            <span className="text-[15px] font-bold text-[#34424d]">
                 {value}
             </span>
 
