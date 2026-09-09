@@ -35,16 +35,27 @@ const API_BASE = "https://backend-five-swart-88.vercel.app";
    DATE FORMATTER
 ========================================================= */
 
-const formatDate = (dateString: string | null | undefined): string => {
+const formatDate = (dateString: string | number | null | undefined): string => {
   if (!dateString) return "Not set";
   
   try {
-    const date = new Date(dateString);
+    let date: Date;
     
-    // Check if date is valid
+    if (typeof dateString === 'number') {
+      date = new Date(dateString);
+    } else if (typeof dateString === 'string') {
+      // Check if it's a numeric string (timestamp)
+      if (!isNaN(Number(dateString)) && dateString.length > 8) {
+        date = new Date(Number(dateString));
+      } else {
+        date = new Date(dateString);
+      }
+    } else {
+      return "Not set";
+    }
+    
     if (isNaN(date.getTime())) return "Not set";
     
-    // Format as "Sep 14, 2026"
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -54,7 +65,6 @@ const formatDate = (dateString: string | null | undefined): string => {
     return "Not set";
   }
 };
-
 /* =========================================================
    TYPES
 ========================================================= */
@@ -100,8 +110,8 @@ type ProjectTask = {
   assigneeId?: string | null;
   assigneeName?: string | null;
   assigneeEmail?: string | null;
-  startDate?: string | null;
-  dueDate?: string | null;
+  startDate?: string | number | null;  
+  dueDate?: string | number | null;   
 };
 
 type Project = {
@@ -4433,10 +4443,7 @@ const handleChangeProjectStatus = async () => {
                     </div>
 
                     <p className="mt-2 text-xm text-gray-500">
-                      {
-                        selectedProject.startDate ||
-                        "No start date"
-                      }
+                      {formatDate(selectedProject.startDate)}
                     </p>
 
                   </div>
@@ -4457,10 +4464,7 @@ const handleChangeProjectStatus = async () => {
                     </div>
 
                     <p className="mt-2 text-sm text-gray-500">
-                      {
-                        selectedProject.deadline ||
-                        "No deadline"
-                      }
+                       {formatDate(selectedProject.deadline)}
                     </p>
 
                   </div>
@@ -4624,9 +4628,9 @@ const handleChangeProjectStatus = async () => {
                                             10
                                           }
                                         />
-                                        {
-                                          task.dueDate
-                                        }
+                                        
+                                            {formatDate(task.dueDate)}
+                                        
                                       </span>
                                     )}
 
