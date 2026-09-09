@@ -144,7 +144,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  // Close sidebar when maximized
+  // Close sidebar when maximized and when minimized
   useEffect(() => {
     if (isMaximized) {
       setIsSidebarOpen(false);
@@ -636,7 +636,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
           >
             {/* Welcome Message - Centered */}
             {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full text-center px-4">
+              <div className="flex flex-col items-center justify-center h-full text-center px-4 -mt-8">
                 <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4">
                   <Sparkles size={28} className="text-blue-600" />
                 </div>
@@ -644,7 +644,7 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                   Welcome, {user.firstName}
                 </h2>
                 <p className="text-sm text-gray-600 max-w-sm">
-                     How can I assist you today?
+                  How can I assist you today?
                 </p>
               </div>
             )}
