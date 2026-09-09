@@ -1307,8 +1307,8 @@ export default function Dashboard() {
                   ================================================= */}
                                                     <div className="mt-2 min-h-[52px] w-[125px] text-center">
 
-                                                        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a98a8]">
-                                                            Project {index + 1}
+                                                        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#3D3A3A]">
+                                                            Project #{index + 1}
                                                         </p>
 
                                                         <p className="text-[12px] font-bold uppercase leading-4 text-[#172633] transition group-hover:text-[#557bd2]">
