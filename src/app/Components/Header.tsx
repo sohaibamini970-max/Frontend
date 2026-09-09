@@ -739,13 +739,13 @@ export default function Header() {
       </div>
 
       {/* =====================================================
-          DASHBOARD HERO - EXACT MATCH TO IMAGE
+          DASHBOARD HERO - BLUE/BACKGROUND EXACT MATCH
       ===================================================== */}
-      <div className="bg-white border-t border-[#e8e6e6]">
-        <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">
+      <div className="bg-[#eef2f6] border-t border-[#d5d5d5]">
+        <div className="mx-auto max-w-[1440px] px-5 py-10 sm:px-8 lg:px-10">
           <div className="grid items-start gap-8 lg:grid-cols-[1fr_650px]">
 
-            {/* LEFT - Welcome Text - EXACT MATCH */}
+            {/* LEFT - Welcome Text */}
             <div className="max-w-[560px] pt-1">
               <h2 className="text-[32px] font-light tracking-[-0.5px] text-[#18212b] sm:text-[38px]">
                 WELCOME BACK,
@@ -768,7 +768,7 @@ export default function Header() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
 
               {dataLoading ? (
-                <div className="col-span-2 flex min-h-[140px] items-center justify-center rounded-2xl border border-[#d5d5d5] bg-white sm:col-span-4">
+                <div className="col-span-2 flex min-h-[145px] items-center justify-center rounded-2xl border border-[#d5d5d5] bg-white sm:col-span-4">
                   <Loader2 size={22} className="animate-spin text-[#b0b0b0]" />
                 </div>
               ) : (
