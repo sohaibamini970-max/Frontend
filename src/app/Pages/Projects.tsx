@@ -1686,7 +1686,7 @@ const handleChangeProjectStatus = async () => {
      PROGRAMS EARLY RETURN — replaces entire page content
   ========================================================= */
 
-  if (activeView === "programs" && isExecutiveManager) {
+  if (activeView === "programs" && canManageProjects) {
     return (
       <main className="min-h-[calc(100vh-72px)] bg-[#fafafa]">
         <Programs />
@@ -1844,7 +1844,7 @@ const handleChangeProjectStatus = async () => {
                 </button>
               )}
 
-              {isExecutiveManager && (
+              {canManageProjects && (
               <button
                 type="button"
                 onClick={() => setActiveView("programs")}
