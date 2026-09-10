@@ -1807,7 +1807,7 @@ const handleChangeProjectStatus = async () => {
                 onClick={() =>
                   setActiveView("table")
                 }
-                className={`relative pb-3 text-sm font-medium ${
+                className={`relative pb-3 text-lg font-medium ${
                   activeView === "table"
                     ? "text-gray-900"
                     : "text-gray-500 hover:text-gray-800"
@@ -1828,7 +1828,7 @@ const handleChangeProjectStatus = async () => {
                       "assignment"
                     )
                   }
-                  className={`relative pb-3 text-sm font-medium ${
+                  className={`relative pb-3 text-lg font-medium ${
                     activeView ===
                     "assignment"
                       ? "text-gray-900"
@@ -1848,7 +1848,7 @@ const handleChangeProjectStatus = async () => {
               <button
                 type="button"
                 onClick={() => setActiveView("programs")}
-                className={`relative pb-3 text-sm font-medium ${
+                className={`relative pb-3 text-lg font-medium ${
                   activeView === "programs"
                     ? "text-gray-900"
                     : "text-gray-500 hover:text-gray-800"
