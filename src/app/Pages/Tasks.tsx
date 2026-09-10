@@ -3709,10 +3709,10 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                                 <CheckCircle2 size={16} className="text-emerald-700" />
                             </div>
                             <div className="min-w-0">
-                                <h2 className="truncate text-base font-bold text-gray-950">
-                                    Work Submissions
+                                <h2 className="truncate text-xl font-bold text-gray-950">
+                                    Task Submissions
                                 </h2>
-                                <p className="truncate text-[11px] text-gray-500">
+                                <p className="truncate text-[14px] text-gray-500">
                                     {selectedTaskForSubmission?.name}
                                 </p>
                             </div>
@@ -3737,14 +3737,14 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
     <div>
         <div className="flex items-center justify-between">
             <div>
-                <h3 className="text-sm font-bold text-gray-950">
-                    Work Breakdown
+                <h3 className="text-lg font-bold text-gray-950">
+                    Task Breakdown
                 </h3>
-                <p className="mt-1 text-xs font-medium text-gray-600">
+                <p className="mt-1 text-sm font-medium text-gray-600">
                     Break down this task into parts. All parts are visible to managers for tracking.
                 </p>
             </div>
-            <span className="rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-700">
+            <span className="rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-[12px] font-bold text-slate-700">
                 {(workParts[selectedTaskForSubmission.id]?.length || 0)} Part
                 {(workParts[selectedTaskForSubmission.id]?.length || 0) !== 1 ? "s" : ""}
             </span>
@@ -3756,7 +3756,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                     <div className="text-center">
                         <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
                         <p className="mt-2 text-xs font-semibold text-gray-600">
-                            Loading work parts...
+                            Loading task steps...
                         </p>
                     </div>
                 </div>
@@ -3766,7 +3766,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                         <ListTodo size={18} />
                     </div>
                     <p className="mt-3 text-sm font-bold text-gray-950">
-                        No work parts yet
+                        No task parts yet
                     </p>
                     <p className="mt-1 text-xs font-medium text-gray-600">
                         Add at least one part below to describe what you did.
@@ -3873,7 +3873,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                     </div>
                     <div className="min-w-0 flex-1">
                         <h4 className="text-sm font-bold text-gray-950">
-                            Add a work part
+                            Add a task work 
                         </h4>
                         <p className="mt-1 text-xs font-medium leading-relaxed text-gray-700">
                             Break down the task into smaller pieces. Each part has its own status
@@ -3945,14 +3945,14 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
     <div className="mt-6">
         <div className="flex items-center justify-between">
             <div>
-                <h3 className="text-sm font-bold text-gray-950">
-                    Submitted Work
+                <h3 className="text-lg font-bold text-gray-950">
+                    Submitted Links
                 </h3>
-                <p className="mt-1 text-xs font-medium text-gray-600">
+                <p className="mt-1 text-sm font-medium text-gray-600">
                     Optional links and descriptions.
                 </p>
             </div>
-            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">
+            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[13px] font-bold text-emerald-800">
                 {submissions[selectedTaskForSubmission.id]?.length || 0} Submission
                 {(submissions[selectedTaskForSubmission.id]?.length || 0) !== 1 ? "s" : ""}
             </span>
@@ -3997,7 +3997,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                                                 href={submission.link}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline break-all"
+                                                className="text-lg font-bold text-blue-600 hover:text-blue-800 hover:underline break-all"
                                             >
                                                 {submission.link}
                                             </a>
@@ -4007,11 +4007,11 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                                             </p>
                                         )}
                                         {submission.description && (
-                                            <p className="mt-1.5 text-xs font-medium text-gray-700">
+                                            <p className="mt-1.5 text-sm font-medium text-gray-700">
                                                 {submission.description}
                                             </p>
                                         )}
-                                        <p className="mt-1.5 text-[10px] font-medium text-gray-500">
+                                        <p className="mt-1.5 text-[12px] font-medium text-gray-500">
                                             Submitted by {submission.submitter_name || "User"} • Version {submission.version} • {formatDate(submission.created_at)}
                                         </p>
                                     </div>
@@ -4049,10 +4049,10 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                     <CheckCircle2 size={16} />
                 </div>
                 <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-bold text-gray-950">
-                        Submit Your Work
+                    <h3 className="text-lg font-bold text-gray-950">
+                        Submit Your Links
                     </h3>
-                    <p className="mt-1 text-xs font-medium leading-relaxed text-gray-700">
+                    <p className="mt-1 text-sm font-medium leading-relaxed text-gray-700">
                         Add at least one work part above. Links below are optional but
                         helpful for managers to review your work.
                     </p>
