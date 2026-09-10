@@ -391,7 +391,7 @@ export default function Projects() {
     isExecutiveManager || isSystemAdministrator;
 
   const canManageProjects =
-    isExecutiveManager || isSystemAdministrator;
+    isExecutiveManager || isSystemAdministrator || isProjectManager;
 
   const canCreateProjects = isExecutiveManager;
 
