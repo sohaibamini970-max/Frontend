@@ -584,6 +584,42 @@ const canDeleteSubmission = (submission: TaskSubmission): boolean => {
     );
 };
 
+// =========================================================
+// Check whether a task has enough evidence to be completed/done
+// Rule: at least one work part exists AND
+//       (at least one work part is Done OR at least one link exists)
+// =========================================================
+const taskHasCompletionEvidence = (taskId: string): {
+    ok: boolean;
+    reason?: string;
+} => {
+    const parts = workParts[taskId] || [];
+    const subs = submissions[taskId] || [];
+
+    if (parts.length === 0) {
+        return {
+            ok: false,
+            reason:
+                "At least one work part must be added before this task can be completed.",
+        };
+    }
+
+    const hasDonePart = parts.some((p) => p.status === "Done");
+    const hasLink = subs.some(
+        (s) => s.link && String(s.link).trim() !== ""
+    );
+
+    if (!hasDonePart && !hasLink) {
+        return {
+            ok: false,
+            reason:
+                "At least one work part must be marked Done, or at least one work link must be submitted before this task can be completed.",
+        };
+    }
+
+    return { ok: true };
+};
+
 const hasSubmissions = (taskId: string): boolean => {
     return (submissions[taskId]?.length || 0) > 0;
 };
@@ -1916,109 +1952,152 @@ const handleDeleteWorkPart = async (workPartId: string, taskId: string) => {
 };
 
 const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
-  try {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
+    try {
+        const task = tasks.find((t) => t.id === taskId);
+        if (!task) return;
 
-    // =========================================================
-    // ROLE-BASED STATUS RULES
-    // =========================================================
+        // =========================================================
+        // ROLE-BASED STATUS RULES
+        // =========================================================
 
-    // MEMBER: can only change to "In Progress" or "Completed"
-    if (isMember) {
-      if (status === "Done") {
-        alert(
-          "Members cannot mark tasks as Done. Please mark the task as Completed and the Project Manager will review it."
-        );
-        return;
-      }
-      if (status === "To Do" && task.status === "Completed") {
-        alert(
-          "You cannot move a Completed task back to To Do. Please contact your Project Manager."
-        );
-        return;
-      }
-    }
+        // ---------------------------------------------------------
+        // MEMBER: can only set "In Progress" or "Completed"
+        // Cannot set "Done"
+        // Cannot move Completed back to To Do
+        // ---------------------------------------------------------
+        if (isMember) {
+            if (status === "Done") {
+                alert(
+                    "Members cannot mark tasks as Done. Please mark the task as Completed and the Project Manager will review it."
+                );
+                return;
+            }
 
-    // PROJECT MANAGER / ADMIN: cannot mark as "Done" unless task is "Completed"
-    if (isManagementRole) {
-      if (status === "Done" && task.status !== "Completed") {
-        alert(
-          "This task cannot be marked as Done yet. The assigned Member must first mark it as Completed."
-        );
-        return;
-      }
-    }
-
-    // =========================================================
-    // DONE → requires submission (existing logic)
-    // =========================================================
-    if (status === "Done") {
-      const submissionsForTask = submissions[taskId] || [];
-
-      if (submissionsForTask.length === 0) {
-        alert(
-          "Task cannot be marked as Done until the assignee has submitted at least one work link. Please ask the assignee to submit their work first."
-        );
-        return;
-      }
-
-      const response = await fetch(
-        `${API_BASE}/tasks/${taskId}/mark-done`,
-        {
-          method: "PATCH",
-          headers: {
-            ...authHeaders(),
-            "Content-Type": "application/json",
-          },
+            if (status === "To Do" && task.status === "Completed") {
+                alert(
+                    "You cannot move a Completed task back to To Do. Please contact your Project Manager."
+                );
+                return;
+            }
         }
-      );
 
-      const data = await response.json();
+        // ---------------------------------------------------------
+        // MANAGER: can set "Done" only if task is "Completed"
+        // ---------------------------------------------------------
+        if (isManagementRole) {
+            if (status === "Done" && task.status !== "Completed") {
+                alert(
+                    "This task cannot be marked as Done yet. The assigned Member must first mark it as Completed."
+                );
+                return;
+            }
+        }
 
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to mark task as Done");
-      }
+        // =========================================================
+        // COMPLETED → requires: ≥1 work part AND (a Done part OR a link)
+        // =========================================================
+        if (status === "Completed") {
+            // Ensure work parts + submissions are loaded for this task
+            if (
+                workParts[taskId] === undefined ||
+                submissions[taskId] === undefined
+            ) {
+                await Promise.all([
+                    fetchWorkParts(taskId),
+                    fetchTaskSubmissions(taskId),
+                ]);
+            }
 
-      await fetchProjectsAndTasks();
-      setOpenTaskMenu(null);
-      return;
+            const evidence = taskHasCompletionEvidence(taskId);
+            if (!evidence.ok) {
+                alert(evidence.reason || "Task cannot be marked as Completed yet.");
+                return;
+            }
+        }
+
+        // =========================================================
+        // DONE → goes through the dedicated /mark-done endpoint
+        // Backend enforces: task must be Completed, ≥1 work part,
+        // and (a Done part OR a link)
+        // =========================================================
+        if (status === "Done") {
+            // Ensure parts + submissions are loaded so we can pre-check locally
+            if (
+                workParts[taskId] === undefined ||
+                submissions[taskId] === undefined
+            ) {
+                await Promise.all([
+                    fetchWorkParts(taskId),
+                    fetchTaskSubmissions(taskId),
+                ]);
+            }
+
+            // Refresh the local evidence check using the latest loaded state
+            const evidence = taskHasCompletionEvidence(taskId);
+            if (!evidence.ok) {
+                alert(evidence.reason || "Task cannot be marked as Done yet.");
+                return;
+            }
+
+            const response = await fetch(
+                `${API_BASE}/tasks/${taskId}/mark-done`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        ...authHeaders(),
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error || data.message || "Failed to mark task as Done"
+                );
+            }
+
+            await fetchProjectsAndTasks();
+            setOpenTaskMenu(null);
+            return;
+        }
+
+        // =========================================================
+        // OTHER STATUS CHANGES (To Do, In Progress)
+        // =========================================================
+        const response = await fetch(
+            `${API_BASE}/tasks/${taskId}/status`,
+            {
+                method: "PATCH",
+                headers: {
+                    ...authHeaders(),
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ status }),
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error || data.message || "Failed to update status"
+            );
+        }
+
+        const updatedTask = normalizeTask(data.task || data);
+        setTasks((previous) =>
+            previous.map((t) =>
+                t.id === taskId ? { ...t, ...updatedTask } : t
+            )
+        );
+        setOpenTaskMenu(null);
+    } catch (error: any) {
+        console.error(error);
+        alert(error.message || "Failed to update task status");
     }
-
-    // =========================================================
-    // OTHER STATUS CHANGES
-    // =========================================================
-    const response = await fetch(
-      `${API_BASE}/tasks/${taskId}/status`,
-      {
-        method: "PATCH",
-        headers: {
-          ...authHeaders(),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to update status");
-    }
-
-    const updatedTask = normalizeTask(data);
-    setTasks((previous) =>
-      previous.map((task) =>
-        task.id === taskId ? { ...task, ...updatedTask } : task
-      )
-    );
-    setOpenTaskMenu(null);
-  } catch (error: any) {
-    console.error(error);
-    alert(error.message || "Failed to update task status");
-  }
 };
-
   const toggleTaskComplete = (
     taskId: string,
     currentStatus: TaskStatus
@@ -2517,40 +2596,43 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
     </button>
 
     {/* Work Submissions */}
-    {canViewSubmissions(task) ? (
-                   <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openSubmissionModal(task);
-                }}
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#1a4a3a] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#23634b]"
-                title={
-                  canSubmitWork(task)
-                    ? hasSubmissions(task.id)
-                      ? "You have submitted work — view or add another version"
-                      : "Submit your work"
-                    : "View work submissions"
-                }
-              >
-                <CheckCircle2 size={13} />
-                <span>
-                  {canSubmitWork(task)
-                    ? hasSubmissions(task.id)
-                      ? "Submitted Work"
-                      : "Submit Work"
-                    : "Work"}
-                </span>
-                {hasSubmissions(task.id) && (
-                  <span className="flex min-w-[17px] items-center justify-center rounded-full bg-emerald-300 px-1.5 py-0.5 text-[9px] font-bold text-emerald-950">
-                    {submissions[task.id]?.length || 0}
-                  </span>
-                )}
-              </button>
-    ) : (
-        <div />
-    )}
-
+  {canViewSubmissions(task) ? (
+    <button
+        type="button"
+        onClick={(event) => {
+            event.stopPropagation();
+            openSubmissionModal(task);
+        }}
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#1a4a3a] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#23634b]"
+        title={
+            canSubmitWork(task)
+                ? hasSubmissions(task.id) ||
+                  (workParts[task.id]?.length || 0) > 0
+                    ? "You have submitted work — view or add another version"
+                    : "Submit your work"
+                : "View work submissions"
+        }
+    >
+        <CheckCircle2 size={13} />
+        <span>
+            {canSubmitWork(task)
+                ? hasSubmissions(task.id) ||
+                  (workParts[task.id]?.length || 0) > 0
+                    ? "Submitted Work"
+                    : "Submit Work"
+                : "Work"}
+        </span>
+        {(hasSubmissions(task.id) ||
+            (workParts[task.id]?.length || 0) > 0) && (
+            <span className="flex min-w-[17px] items-center justify-center rounded-full bg-emerald-300 px-1.5 py-0.5 text-[9px] font-bold text-emerald-950">
+                {(submissions[task.id]?.length || 0) +
+                    (workParts[task.id]?.length || 0)}
+            </span>
+        )}
+    </button>
+) : (
+    <div />
+)}
     {/* Challenges */}
     {canReadChallenge(task) ? (
         <button
