@@ -485,11 +485,14 @@ export default function PerformancePage() {
             HEADER — dark navy
         ================================================= */}
 
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0f1f3a] via-[#132a4a] to-[#0f1f3a] px-6 py-8 shadow-2xl ring-1 ring-white/5 sm:px-10 sm:py-10">
-          <div className="absolute right-0 top-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl" />
-          <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="relative rounded-3xl bg-gradient-to-r from-[#0f1f3a] via-[#132a4a] to-[#0f1f3a] px-6 py-8 shadow-2xl ring-1 ring-white/5 sm:px-10 sm:py-10">
+          {/* Decorative blurs — clipped to header shape only */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+            <div className="absolute right-0 top-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl" />
+            <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
+          </div>
 
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-5">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 ring-1 ring-cyan-400/30">
                 <BarChart3 size={28} className="text-cyan-300" />
@@ -519,7 +522,7 @@ export default function PerformancePage() {
               </div>
             </div>
 
-            {/* ACTIONS: view toggle + member dropdown + refresh */}
+            {/* ACTIONS: view toggle + refresh */}
             <div className="flex flex-wrap items-center gap-3">
               {isManagerView && (
                 <div className="flex rounded-2xl bg-white/5 p-1.5 ring-1 ring-white/10">
@@ -552,8 +555,48 @@ export default function PerformancePage() {
                 </div>
               )}
 
-              {/* MEMBER DROPDOWN — inside header actions */}
-              {isManagerView && (
+              <button
+                type="button"
+                onClick={() =>
+                  loadData(undefined, true, selectedMemberId)
+                }
+                disabled={refreshing}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white/5 px-4 text-sm font-bold text-white ring-1 ring-white/10 transition hover:bg-white/10 disabled:opacity-50"
+              >
+                <RefreshCw
+                  size={15}
+                  className={refreshing ? "animate-spin" : ""}
+                />
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ERROR */}
+        {error && (
+          <div className="mt-6 rounded-2xl border-2 border-red-500/30 bg-red-500/10 px-6 py-4 text-base font-semibold text-red-300">
+            <div className="flex items-center gap-3">
+              <AlertTriangle size={20} />
+              {error}
+            </div>
+          </div>
+        )}
+
+        {/* =================================================
+            PERSONAL VIEW
+        ================================================= */}
+
+        {viewMode === "personal" && stats && (
+          <>
+            {/* SHOWING LABEL + MEMBER DROPDOWN — managers only */}
+            {isManagerView && (
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <div className="inline-flex items-center gap-2 text-sm font-bold text-slate-300">
+                  <UserCircle2 size={16} className="text-cyan-400" />
+                  Showing:
+                </div>
+
                 <div
                   className="relative"
                   onClick={(e) => e.stopPropagation()}
@@ -561,10 +604,9 @@ export default function PerformancePage() {
                   <button
                     type="button"
                     onClick={() => setMemberDropdownOpen((v) => !v)}
-                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-white/5 px-4 text-sm font-bold text-white ring-1 ring-white/10 transition hover:bg-white/10"
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-white/5 px-4 text-sm font-bold text-cyan-300 ring-1 ring-cyan-400/30 transition hover:bg-white/10"
                   >
-                    <UserCircle2 size={16} className="text-cyan-300" />
-                    <span className="max-w-[140px] truncate">
+                    <span className="max-w-[200px] truncate">
                       {dropdownLabel}
                     </span>
                     <ChevronDown
@@ -576,7 +618,7 @@ export default function PerformancePage() {
                   </button>
 
                   {memberDropdownOpen && (
-                    <div className="absolute right-0 top-12 z-50 max-h-80 w-72 overflow-y-auto rounded-2xl border border-white/10 bg-[#0f1f3a] p-1.5 shadow-2xl">
+                    <div className="absolute left-0 top-12 z-[100] max-h-80 w-72 overflow-y-auto rounded-2xl bg-[#0f1f3a] p-2 shadow-[0_20px_60px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
                       {/* All members option */}
                       <button
                         onClick={() => {
@@ -639,52 +681,6 @@ export default function PerformancePage() {
                     </div>
                   )}
                 </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() =>
-                  loadData(undefined, true, selectedMemberId)
-                }
-                disabled={refreshing}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white/5 px-4 text-sm font-bold text-white ring-1 ring-white/10 transition hover:bg-white/10 disabled:opacity-50"
-              >
-                <RefreshCw
-                  size={15}
-                  className={refreshing ? "animate-spin" : ""}
-                />
-                Refresh
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* ERROR */}
-        {error && (
-          <div className="mt-6 rounded-2xl border-2 border-red-500/30 bg-red-500/10 px-6 py-4 text-base font-semibold text-red-300">
-            <div className="flex items-center gap-3">
-              <AlertTriangle size={20} />
-              {error}
-            </div>
-          </div>
-        )}
-
-        {/* =================================================
-            PERSONAL VIEW
-        ================================================= */}
-
-        {viewMode === "personal" && stats && (
-          <>
-            {/* SHOWING LABEL — managers only */}
-            {isManagerView && (
-              <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-sm font-bold text-slate-300 ring-1 ring-white/10">
-                <UserCircle2 size={16} className="text-cyan-400" />
-                Showing:{" "}
-                <span className="text-cyan-300">
-                  {selectedMember
-                    ? `${selectedMember.full_name} · ${selectedMember.email}`
-                    : "All Members (aggregate)"}
-                </span>
               </div>
             )}
 
@@ -767,7 +763,7 @@ export default function PerformancePage() {
               </div>
             </div>
 
-            {/* ============ 4 WHITE CARDS (multi-color text) ============ */}
+            {/* ============ 4 WHITE CARDS ============ */}
             <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {/* Not Completed */}
               <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
