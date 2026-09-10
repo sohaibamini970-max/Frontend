@@ -576,7 +576,7 @@ export default function Programs() {
               <button
                 type="button"
                 onClick={() => setCreateProgramModalOpen(true)}
-                className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-medium text-white hover:bg-[#111c2c]"
+                className="inline-flex h-11 items-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-medium text-white hover:bg-[#111c2c]"
               >
                 <Plus size={17} />
                 Add program
