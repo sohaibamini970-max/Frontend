@@ -33,7 +33,7 @@ type ProjectStatus =
 
 type ProjectPriority = "Low" | "Medium" | "High";
 
-type TaskStatus = "To Do" | "In Progress" | "Done";
+type TaskStatus = "To Do" | "In Progress" | "Done" | "Completed";
 
 type TaskPriority = "Low" | "Medium" | "High";
 
@@ -309,12 +309,14 @@ function TaskStatusBadge({ status }: { status: TaskStatus }) {
   const styles: Record<TaskStatus, string> = {
     "To Do": "border border-gray-400 bg-gray-100 text-gray-900",
     "In Progress": "border border-blue-300 bg-blue-100 text-blue-800",
+    "Completed": "border border-amber-300 bg-amber-100 text-amber-800",
     Done: "border border-emerald-300 bg-emerald-100 text-emerald-800",
   };
 
   const icons: Record<TaskStatus, React.ReactNode> = {
     "To Do": <Circle size={10} />,
     "In Progress": <Clock3 size={10} />,
+    "Completed": <CheckCircle2 size={10} />,
     Done: <Check size={10} />,
   };
 
@@ -350,10 +352,13 @@ function StatusSummary({ tasks }: { tasks: Task[] }) {
   const progress = tasks.filter(
     (task) => task.status === "In Progress"
   ).length;
+  const completed = tasks.filter(
+    (task) => task.status === "Completed"
+  ).length;
   const done = tasks.filter((task) => task.status === "Done").length;
 
   return (
-    <div className="grid grid-cols-3 gap-2 border-t border-gray-300 pt-3">
+    <div className="grid grid-cols-4 gap-2 border-t border-gray-300 pt-3">
       <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2">
         <div className="flex items-center gap-1.5">
           <Circle size={11} className="text-gray-600" />
@@ -375,6 +380,18 @@ function StatusSummary({ tasks }: { tasks: Task[] }) {
         </div>
         <p className="mt-1 text-base font-bold text-blue-900">
           {progress}
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 size={11} className="text-amber-700" />
+          <span className="text-[10px] font-bold text-amber-800">
+            Completed
+          </span>
+        </div>
+        <p className="mt-1 text-base font-bold text-amber-900">
+          {completed}
         </p>
       </div>
 
@@ -1735,76 +1752,107 @@ const fetchTaskChallenges = async (task: Task) => {
   };
 
 const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
-    try {
-        // If trying to mark as Done, check for submissions
-        if (status === "Done") {
-            const task = tasks.find(t => t.id === taskId);
-            const submissionsForTask = submissions[taskId] || [];
-            
-            if (submissionsForTask.length === 0) {
-                alert(
-                    "Task cannot be marked as Done until the assignee has submitted at least one work link. Please ask the assignee to submit their work first."
-                );
-                return;
-            }
-            
-            // Use the special endpoint that checks for submissions
-            const response = await fetch(
-                `${API_BASE}/tasks/${taskId}/mark-done`,
-                {
-                    method: "PATCH",
-                    headers: {
-                        ...authHeaders(),
-                        "Content-Type": "application/json",
-                    }
-                }
-            );
-            
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.message || "Failed to mark task as Done");
-            }
-            
-            // Update task in UI
-            await fetchProjectsAndTasks();
-            setOpenTaskMenu(null);
-            return;
-        }
-        
-        // For other status changes, use the existing method
-        const response = await fetch(
-            `${API_BASE}/tasks/${taskId}/status`,
-            {
-                method: "PATCH",
-                headers: {
-                    ...authHeaders(),
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ status }),
-            }
+  try {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    // =========================================================
+    // ROLE-BASED STATUS RULES
+    // =========================================================
+
+    // MEMBER: can only change to "In Progress" or "Completed"
+    if (isMember) {
+      if (status === "Done") {
+        alert(
+          "Members cannot mark tasks as Done. Please mark the task as Completed and the Project Manager will review it."
         );
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.message || "Failed to update status");
-        }
-        
-        const updatedTask = normalizeTask(data);
-        setTasks(previous =>
-            previous.map(task =>
-                task.id === taskId
-                    ? { ...task, ...updatedTask }
-                    : task
-            )
+        return;
+      }
+      if (status === "To Do" && task.status === "Completed") {
+        alert(
+          "You cannot move a Completed task back to To Do. Please contact your Project Manager."
         );
-        setOpenTaskMenu(null);
-        
-    } catch (error: any) {
-        console.error(error);
-        alert(error.message || "Failed to update task status");
+        return;
+      }
     }
+
+    // PROJECT MANAGER / ADMIN: cannot mark as "Done" unless task is "Completed"
+    if (isManagementRole) {
+      if (status === "Done" && task.status !== "Completed") {
+        alert(
+          "This task cannot be marked as Done yet. The assigned Member must first mark it as Completed."
+        );
+        return;
+      }
+    }
+
+    // =========================================================
+    // DONE → requires submission (existing logic)
+    // =========================================================
+    if (status === "Done") {
+      const submissionsForTask = submissions[taskId] || [];
+
+      if (submissionsForTask.length === 0) {
+        alert(
+          "Task cannot be marked as Done until the assignee has submitted at least one work link. Please ask the assignee to submit their work first."
+        );
+        return;
+      }
+
+      const response = await fetch(
+        `${API_BASE}/tasks/${taskId}/mark-done`,
+        {
+          method: "PATCH",
+          headers: {
+            ...authHeaders(),
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to mark task as Done");
+      }
+
+      await fetchProjectsAndTasks();
+      setOpenTaskMenu(null);
+      return;
+    }
+
+    // =========================================================
+    // OTHER STATUS CHANGES
+    // =========================================================
+    const response = await fetch(
+      `${API_BASE}/tasks/${taskId}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          ...authHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to update status");
+    }
+
+    const updatedTask = normalizeTask(data);
+    setTasks((previous) =>
+      previous.map((task) =>
+        task.id === taskId ? { ...task, ...updatedTask } : task
+      )
+    );
+    setOpenTaskMenu(null);
+  } catch (error: any) {
+    console.error(error);
+    alert(error.message || "Failed to update task status");
+  }
 };
 
   const toggleTaskComplete = (
@@ -2149,23 +2197,27 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                               className="group/task cursor-pointer rounded-xl border border-[#e1e6eb] bg-white p-3.5 transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm"
                             >
                               <div className="flex items-start gap-3">
-                                <div
-                                  className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                                    task.status === "Done"
-                                      ? "bg-emerald-50 text-emerald-600"
-                                      : task.status === "In Progress"
-                                        ? "bg-blue-50 text-blue-600"
-                                        : "bg-slate-100 text-slate-600"
-                                  }`}
-                                >
-                                  {task.status === "Done" ? (
-                                    <Check size={15} />
-                                  ) : task.status === "In Progress" ? (
-                                    <Clock3 size={15} />
-                                  ) : (
-                                    <Circle size={15} />
-                                  )}
-                                </div>
+                              <div
+                              className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                                task.status === "Done"
+                                  ? "bg-emerald-50 text-emerald-600"
+                                  : task.status === "Completed"
+                                    ? "bg-amber-50 text-amber-600"
+                                    : task.status === "In Progress"
+                                      ? "bg-blue-50 text-blue-600"
+                                      : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {task.status === "Done" ? (
+                                <Check size={15} />
+                              ) : task.status === "Completed" ? (
+                                <CheckCircle2 size={15} />
+                              ) : task.status === "In Progress" ? (
+                                <Clock3 size={15} />
+                              ) : (
+                                <Circle size={15} />
+                              )}
+                            </div>
 
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-start justify-between gap-2">
@@ -2197,23 +2249,46 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                                           <p className="px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-400">
                                             Change status
                                           </p>
-                                          {["To Do", "In Progress", "Done"].map((status) => (
+                                        {/* Status options depend on role */}
+                                        {(() => {
+                                          // Members: To Do, In Progress, Completed
+                                          // Managers: To Do, In Progress, Completed, Done
+                                          const availableStatuses: TaskStatus[] = isMember
+                                            ? ["To Do", "In Progress", "Completed"]
+                                            : ["To Do", "In Progress", "Completed", "Done"];
+                                        
+                                          return availableStatuses.map((status) => (
                                             <button
                                               key={status}
                                               type="button"
                                               onClick={() =>
                                                 handleTaskStatusChange(task.id, status as TaskStatus)
                                               }
+                                              disabled={
+                                                // Managers can only pick "Done" if task is Completed
+                                                status === "Done" &&
+                                                isManagementRole &&
+                                                task.status !== "Completed"
+                                              }
                                               className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold ${
                                                 task.status === status
                                                   ? "bg-slate-100 text-slate-950"
                                                   : "text-slate-600 hover:bg-slate-50"
-                                              }`}
+                                              } disabled:cursor-not-allowed disabled:opacity-40`}
+                                              title={
+                                                status === "Done" &&
+                                                isManagementRole &&
+                                                task.status !== "Completed"
+                                                  ? "Waiting for Member to complete the task first"
+                                                  : ""
+                                              }
                                             >
                                               {status === "To Do" ? (
                                                 <Circle size={12} />
                                               ) : status === "In Progress" ? (
                                                 <Clock3 size={12} />
+                                              ) : status === "Completed" ? (
+                                                <CheckCircle2 size={12} />
                                               ) : (
                                                 <Check size={12} />
                                               )}
@@ -2222,7 +2297,8 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                                                 <Check size={12} className="ml-auto" />
                                               )}
                                             </button>
-                                          ))}
+                                          ));
+                                        })()}
 
                                           {isAdmin && (
                                             <>
@@ -2278,27 +2354,35 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
 
     {/* Work Submissions */}
     {canViewSubmissions(task) ? (
-        <button
-            type="button"
-            onClick={(event) => {
-                event.stopPropagation();
-                openSubmissionModal(task);
-            }}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#1a4a3a] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#23634b]"
-            title={
-                canSubmitWork(task)
-                    ? "Submit your work or view submissions"
+                   <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openSubmissionModal(task);
+                }}
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#1a4a3a] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#23634b]"
+                title={
+                  canSubmitWork(task)
+                    ? hasSubmissions(task.id)
+                      ? "You have submitted work — view or add another version"
+                      : "Submit your work"
                     : "View work submissions"
-            }
-        >
-            <CheckCircle2 size={13} />
-            <span>Work</span>
-            {(submissions[task.id]?.length || 0) > 0 && (
-                <span className="flex min-w-[17px] items-center justify-center rounded-full bg-emerald-300 px-1.5 py-0.5 text-[9px] font-bold text-emerald-950">
-                    {submissions[task.id]?.length || 0}
+                }
+              >
+                <CheckCircle2 size={13} />
+                <span>
+                  {canSubmitWork(task)
+                    ? hasSubmissions(task.id)
+                      ? "Submitted Work"
+                      : "Submit Work"
+                    : "Work"}
                 </span>
-            )}
-        </button>
+                {hasSubmissions(task.id) && (
+                  <span className="flex min-w-[17px] items-center justify-center rounded-full bg-emerald-300 px-1.5 py-0.5 text-[9px] font-bold text-emerald-950">
+                    {submissions[task.id]?.length || 0}
+                  </span>
+                )}
+              </button>
     ) : (
         <div />
     )}
