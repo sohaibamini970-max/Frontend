@@ -20,6 +20,8 @@ import {
   History,
   CalendarClock,
   ListChecks,
+  ChevronDown,
+  UserCircle2,
 } from "lucide-react";
 
 /* =========================================================
@@ -97,6 +99,12 @@ type MemberPerformance = {
   overdue_done_tasks: number;
   completion_rate: number;
   on_time_rate: number;
+};
+
+type SimpleMember = {
+  id: string;
+  full_name: string;
+  email: string;
 };
 
 /* =========================================================
@@ -200,6 +208,10 @@ export default function PerformancePage() {
   const [viewMode, setViewMode] = useState<"personal" | "team">("personal");
   const [historyLimit, setHistoryLimit] = useState(10);
 
+  const [membersList, setMembersList] = useState<SimpleMember[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
+
   const isManagerView = useMemo(
     () =>
       user?.role === "Executive Manager" ||
@@ -227,7 +239,7 @@ export default function PerformancePage() {
   ======================================================= */
 
   const loadData = useCallback(
-    async (signal?: AbortSignal, isRefresh = false) => {
+    async (signal?: AbortSignal, isRefresh = false, memberId?: string | null) => {
       const storedUser = getStoredUser();
       if (!storedUser?.id) {
         setLoading(false);
@@ -241,28 +253,50 @@ export default function PerformancePage() {
 
       try {
         const headers = getHeaders();
-
-        // Fire ALL requests at once — no waterfall
-        const personalReq = fetch(
-          `${API_BASE}/performance/member/${storedUser.id}`,
-          { headers, signal, cache: "no-store" }
-        );
-
-        const historyReq = fetch(
-          `${API_BASE}/performance/history?limit=50`,
-          { headers, signal, cache: "no-store" }
-        );
-
-        const teamReq =
+        const isManager =
           storedUser.role === "Executive Manager" ||
           storedUser.role === "System Administrator" ||
-          storedUser.role === "Project Manager"
-            ? fetch(`${API_BASE}/performance/team`, {
-                headers,
-                signal,
-                cache: "no-store",
-              })
-            : Promise.resolve(null);
+          storedUser.role === "Project Manager";
+
+        // Personal panel endpoint
+        let personalUrl: string;
+        if (isManager) {
+          if (memberId) {
+            personalUrl = `${API_BASE}/performance/member/${memberId}`;
+          } else {
+            personalUrl = `${API_BASE}/performance/all`;
+          }
+        } else {
+          personalUrl = `${API_BASE}/performance/member/${storedUser.id}`;
+        }
+
+        const personalReq = fetch(personalUrl, {
+          headers,
+          signal,
+          cache: "no-store",
+        });
+
+        // History endpoint
+        const historyUrl = isManager
+          ? memberId
+            ? `${API_BASE}/performance/history?limit=50&userId=${memberId}`
+            : `${API_BASE}/performance/history?limit=50`
+          : `${API_BASE}/performance/history?limit=50`;
+
+        const historyReq = fetch(historyUrl, {
+          headers,
+          signal,
+          cache: "no-store",
+        });
+
+        // Team leaderboard (managers only)
+        const teamReq = isManager
+          ? fetch(`${API_BASE}/performance/team`, {
+              headers,
+              signal,
+              cache: "no-store",
+            })
+          : Promise.resolve(null);
 
         const [personalRes, historyRes, teamRes] = await Promise.all([
           personalReq,
@@ -272,7 +306,6 @@ export default function PerformancePage() {
 
         if (signal?.aborted) return;
 
-        // Parse in parallel
         const [personalData, historyData, teamData] = await Promise.all([
           personalRes.ok ? personalRes.json() : null,
           historyRes.ok ? historyRes.json() : null,
@@ -313,16 +346,96 @@ export default function PerformancePage() {
     []
   );
 
+  /* =======================================================
+     LOAD MEMBERS LIST (managers only)
+  ======================================================= */
+
+  const loadMembersList = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch(`${API_BASE}/performance/members-list`, {
+        headers: getHeaders(),
+        signal,
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success) setMembersList(data.members || []);
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
+      console.error("Members list error:", err);
+    }
+  }, []);
+
+  /* =======================================================
+     MAIN LOAD EFFECT
+  ======================================================= */
+
   useEffect(() => {
     if (!user?.id) return;
     const controller = new AbortController();
-    loadData(controller.signal);
+
+    // Managers: also load the member list
+    if (
+      user.role === "Executive Manager" ||
+      user.role === "System Administrator" ||
+      user.role === "Project Manager"
+    ) {
+      loadMembersList(controller.signal);
+    }
+
+    loadData(controller.signal, false, selectedMemberId);
+
     return () => controller.abort();
-  }, [user?.id, loadData]);
+  }, [user?.id, selectedMemberId, loadData, loadMembersList]);
 
   /* =======================================================
-     FILTERS
+     RESET HISTORY LIMIT ON MEMBER CHANGE
   ======================================================= */
+
+  useEffect(() => {
+    setHistoryLimit(10);
+  }, [selectedMemberId]);
+
+  /* =======================================================
+     RESET SELECTION WHEN SWITCHING TO TEAM VIEW
+  ======================================================= */
+
+  useEffect(() => {
+    if (viewMode === "team") {
+      setSelectedMemberId(null);
+      setMemberDropdownOpen(false);
+    }
+  }, [viewMode]);
+
+  /* =======================================================
+     OUTSIDE-CLICK TO CLOSE MEMBER DROPDOWN
+  ======================================================= */
+
+  useEffect(() => {
+    if (!memberDropdownOpen) return;
+    const handler = () => setMemberDropdownOpen(false);
+    const t = setTimeout(() => {
+      window.addEventListener("click", handler);
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("click", handler);
+    };
+  }, [memberDropdownOpen]);
+
+  /* =======================================================
+     DERIVED
+  ======================================================= */
+
+  const selectedMember = useMemo(
+    () => membersList.find((m) => m.id === selectedMemberId) || null,
+    [membersList, selectedMemberId]
+  );
+
+  const dropdownLabel = useMemo(() => {
+    if (!selectedMemberId) return "All Members";
+    return selectedMember?.full_name || "Select Member";
+  }, [selectedMemberId, selectedMember]);
 
   const filteredTeamMembers = useMemo(() => {
     if (!search.trim()) return teamMembers;
@@ -406,6 +519,7 @@ export default function PerformancePage() {
               </div>
             </div>
 
+            {/* ACTIONS: view toggle + member dropdown + refresh */}
             <div className="flex flex-wrap items-center gap-3">
               {isManagerView && (
                 <div className="flex rounded-2xl bg-white/5 p-1.5 ring-1 ring-white/10">
@@ -438,9 +552,100 @@ export default function PerformancePage() {
                 </div>
               )}
 
+              {/* MEMBER DROPDOWN — inside header actions */}
+              {isManagerView && (
+                <div
+                  className="relative"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setMemberDropdownOpen((v) => !v)}
+                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-white/5 px-4 text-sm font-bold text-white ring-1 ring-white/10 transition hover:bg-white/10"
+                  >
+                    <UserCircle2 size={16} className="text-cyan-300" />
+                    <span className="max-w-[140px] truncate">
+                      {dropdownLabel}
+                    </span>
+                    <ChevronDown
+                      size={15}
+                      className={`transition-transform ${
+                        memberDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {memberDropdownOpen && (
+                    <div className="absolute right-0 top-12 z-50 max-h-80 w-72 overflow-y-auto rounded-2xl border border-white/10 bg-[#0f1f3a] p-1.5 shadow-2xl">
+                      {/* All members option */}
+                      <button
+                        onClick={() => {
+                          setSelectedMemberId(null);
+                          setMemberDropdownOpen(false);
+                        }}
+                        className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition ${
+                          selectedMemberId === null
+                            ? "bg-cyan-500/15 ring-1 ring-cyan-400/30"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-500/20 text-cyan-300">
+                          <Users size={14} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-white">
+                            All Members
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            Aggregate performance
+                          </p>
+                        </div>
+                      </button>
+
+                      <div className="my-1 border-t border-white/5" />
+
+                      {membersList.length === 0 ? (
+                        <p className="px-3 py-4 text-center text-xs text-slate-500">
+                          No members found
+                        </p>
+                      ) : (
+                        membersList.map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() => {
+                              setSelectedMemberId(m.id);
+                              setMemberDropdownOpen(false);
+                            }}
+                            className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition ${
+                              selectedMemberId === m.id
+                                ? "bg-cyan-500/15 ring-1 ring-cyan-400/30"
+                                : "hover:bg-white/5"
+                            }`}
+                          >
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-xs font-black text-white">
+                              {m.full_name?.charAt(0)?.toUpperCase() || "?"}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-white">
+                                {m.full_name}
+                              </p>
+                              <p className="truncate text-[11px] text-slate-400">
+                                {m.email}
+                              </p>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 type="button"
-                onClick={() => loadData(undefined, true)}
+                onClick={() =>
+                  loadData(undefined, true, selectedMemberId)
+                }
                 disabled={refreshing}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white/5 px-4 text-sm font-bold text-white ring-1 ring-white/10 transition hover:bg-white/10 disabled:opacity-50"
               >
@@ -470,6 +675,19 @@ export default function PerformancePage() {
 
         {viewMode === "personal" && stats && (
           <>
+            {/* SHOWING LABEL — managers only */}
+            {isManagerView && (
+              <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-sm font-bold text-slate-300 ring-1 ring-white/10">
+                <UserCircle2 size={16} className="text-cyan-400" />
+                Showing:{" "}
+                <span className="text-cyan-300">
+                  {selectedMember
+                    ? `${selectedMember.full_name} · ${selectedMember.email}`
+                    : "All Members (aggregate)"}
+                </span>
+              </div>
+            )}
+
             {/* ============ TOP 4 COLORFUL CARDS ============ */}
             <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
               {/* Total Tasks — Indigo */}
@@ -551,7 +769,7 @@ export default function PerformancePage() {
 
             {/* ============ 4 WHITE CARDS (multi-color text) ============ */}
             <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {/* Not Completed — violet numbers, indigo label, slate note */}
+              {/* Not Completed */}
               <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-violet-100 p-2.5">
@@ -571,7 +789,7 @@ export default function PerformancePage() {
                 </div>
               </div>
 
-              {/* Overdue Done — rose numbers, orange label */}
+              {/* Overdue Done */}
               <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-rose-100 p-2.5">
@@ -591,7 +809,7 @@ export default function PerformancePage() {
                 </div>
               </div>
 
-              {/* Projects — cyan numbers, blue label */}
+              {/* Projects */}
               <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-cyan-100 p-2.5">
@@ -611,7 +829,7 @@ export default function PerformancePage() {
                 </div>
               </div>
 
-              {/* Avg Days — emerald numbers, teal label */}
+              {/* Avg Days */}
               <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-teal-100 p-2.5">
@@ -634,7 +852,7 @@ export default function PerformancePage() {
 
             {/* ============ BREAKDOWN CHARTS ============ */}
             <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Status Breakdown — dark card */}
+              {/* Status Breakdown */}
               <div className="rounded-3xl bg-[#0f1f3a] p-6 shadow-xl ring-1 ring-white/10">
                 <h3 className="flex items-center gap-2 text-lg font-black text-white">
                   <Target size={20} className="text-purple-400" />
@@ -684,7 +902,7 @@ export default function PerformancePage() {
                 </div>
               </div>
 
-              {/* Priority Breakdown — dark card */}
+              {/* Priority Breakdown */}
               <div className="rounded-3xl bg-[#0f1f3a] p-6 shadow-xl ring-1 ring-white/10">
                 <h3 className="flex items-center gap-2 text-lg font-black text-white">
                   <Zap size={20} className="text-amber-400" />
@@ -747,7 +965,8 @@ export default function PerformancePage() {
                     const rate =
                       proj.total_tasks && proj.total_tasks > 0
                         ? Math.round(
-                            ((proj.completed_tasks || 0) / proj.total_tasks) * 100
+                            ((proj.completed_tasks || 0) / proj.total_tasks) *
+                              100
                           )
                         : 0;
 
@@ -793,7 +1012,7 @@ export default function PerformancePage() {
               </div>
             )}
 
-            {/* ============ HISTORY (was Recent Activity) ============ */}
+            {/* ============ HISTORY ============ */}
             <div className="mt-8 rounded-3xl bg-[#0f1f3a] p-6 shadow-xl ring-1 ring-white/10">
               <div className="flex items-center justify-between">
                 <h3 className="flex items-center gap-2 text-lg font-black text-white">
@@ -866,7 +1085,10 @@ export default function PerformancePage() {
 
                         <div className="flex shrink-0 items-center gap-3">
                           <span className="hidden items-center gap-1.5 text-xs font-bold text-slate-300 sm:inline-flex">
-                            <CalendarClock size={13} className="text-slate-500" />
+                            <CalendarClock
+                              size={13}
+                              className="text-slate-500"
+                            />
                             {formatDate(displayDate)}
                           </span>
                           <StatusPill status={task.status} />
