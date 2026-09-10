@@ -140,6 +140,7 @@ const navigation = [
   { name: "Tasks", href: "/tasks" },
   { name: "Reports", href: "/reports" },
   { name: "Schedule", href: "/schedule" },
+  {name:"Performance",href: "/performance"},
 ];
 
 export default function Header() {
