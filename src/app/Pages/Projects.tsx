@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Programs from "./Programs";
 import {
   Plus,
   Search,
@@ -286,9 +287,9 @@ export default function Projects() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
-  const [activeView, setActiveView] = useState<"table" | "assignment">(
-    "table"
-  );
+  const [activeView, setActiveView] = useState<"table" | "assignment" | "programs">(
+  "table"
+);
 
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -863,6 +864,12 @@ const syncProjectStatuses = async (projects: Project[]) => {
     setDateError("");
     setPriority("Medium");
   };
+
+  /* =========================================================
+   PROGRAMS EARLY RETURN — replaces entire page content
+========================================================= */
+
+    
 
   /* =========================================================
      CREATE PROJECT
@@ -1675,6 +1682,18 @@ const handleChangeProjectStatus = async () => {
      RETURN
   ========================================================= */
 
+    /* =========================================================
+     PROGRAMS EARLY RETURN — replaces entire page content
+  ========================================================= */
+
+  if (activeView === "programs" && isExecutiveManager) {
+    return (
+      <main className="min-h-[calc(100vh-72px)] bg-[#fafafa]">
+        <Programs />
+      </main>
+    );
+  }
+
   return (
     <>
       <main className="min-h-[calc(100vh-72px)] bg-[#fafafa] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
@@ -1823,6 +1842,24 @@ const handleChangeProjectStatus = async () => {
                     <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-gray-900" />
                   )}
                 </button>
+              )}
+
+              {isExecutiveManager && (
+              <button
+                type="button"
+                onClick={() => setActiveView("programs")}
+                className={`relative pb-3 text-sm font-medium ${
+                  activeView === "programs"
+                    ? "text-gray-900"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                Programs
+            
+                {activeView === "programs" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-gray-900" />
+                )}
+              </button>
               )}
 
             </div>
