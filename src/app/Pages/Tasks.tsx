@@ -118,6 +118,22 @@ type TaskSubmission = {
     submitter_email?: string;
 };
 
+type WorkPartStatus = "To Do" | "Pending" | "Done";
+
+type WorkPart = {
+    id: string;
+    task_id: string;
+    created_by: string;
+    title: string;
+    description?: string;
+    status: WorkPartStatus;
+    creator_name?: string;
+    creator_email?: string;
+    creator_role?: string;
+    created_at?: string;
+    updated_at?: string;
+};
+
 
 
 const API_BASE = "https://backend-five-swart-88.vercel.app/api";
@@ -524,6 +540,14 @@ const [savingSubmission, setSavingSubmission] = useState(false);
 const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 const [deletingSubmission, setDeletingSubmission] = useState<string | null>(null);
 
+const [workParts, setWorkParts] = useState<Record<string, WorkPart[]>>({});
+const [loadingWorkParts, setLoadingWorkParts] = useState(false);
+const [newPartTitle, setNewPartTitle] = useState("");
+const [newPartDescription, setNewPartDescription] = useState("");
+const [newPartStatus, setNewPartStatus] = useState<WorkPartStatus>("To Do");
+const [savingWorkPart, setSavingWorkPart] = useState(false);
+const [deletingWorkPart, setDeletingWorkPart] = useState<string | null>(null);
+
 
   const isManagementRole =
   currentUser?.role === "System Administrator" ||
@@ -598,14 +622,20 @@ const fetchTaskSubmissions = async (taskId: string) => {
 };
 
 const handleAddSubmission = async (taskId: string) => {
-    if (!submissionLink.trim()) {
-        alert("Please provide a work link.");
+    // =========================================================
+    // Require at least one work part (backend also enforces this)
+    // =========================================================
+    const parts = workParts[taskId] || [];
+    if (parts.length === 0) {
+        alert(
+            "Please add at least one work part before submitting. Work parts describe what you did."
+        );
         return;
     }
 
     try {
         setSavingSubmission(true);
-        
+
         const response = await fetch(
             `${API_BASE}/tasks/${taskId}/submissions`,
             {
@@ -615,29 +645,23 @@ const handleAddSubmission = async (taskId: string) => {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    link: submissionLink.trim(),
-                    description: submissionDescription.trim() || null
+                    link: submissionLink.trim() || null,
+                    description: submissionDescription.trim() || null,
                 }),
             }
         );
-        
+
         const data = await response.json();
-        
         if (!response.ok) {
-            throw new Error(data.message || "Failed to submit work");
+            throw new Error(data.error || data.message || "Failed to submit work");
         }
-        
-        // Refresh submissions
+
         await fetchTaskSubmissions(taskId);
-        
-        // Refresh tasks to update status
         await fetchProjectsAndTasks();
-        
+
         setSubmissionLink("");
         setSubmissionDescription("");
-        
         alert("Work submitted successfully!");
-        
     } catch (error) {
         console.error("Submit work error:", error);
         alert(error instanceof Error ? error.message : "Failed to submit work");
@@ -645,7 +669,7 @@ const handleAddSubmission = async (taskId: string) => {
         setSavingSubmission(false);
     }
 };
-
+  
 const handleDeleteSubmission = async (submissionId: string) => {
     const confirmed = window.confirm(
         "Are you sure you want to delete this submission?"
@@ -689,12 +713,19 @@ const openSubmissionModal = async (task: Task) => {
         alert("You are not authorized to view submissions for this task.");
         return;
     }
-    
+
     setSelectedTaskForSubmission(task);
     setSubmissionModalOpen(true);
     setSubmissionLink("");
     setSubmissionDescription("");
-    await fetchTaskSubmissions(task.id);
+    setNewPartTitle("");
+    setNewPartDescription("");
+    setNewPartStatus("To Do");
+
+    await Promise.all([
+        fetchTaskSubmissions(task.id),
+        fetchWorkParts(task.id),
+    ]);
 };
 
 const closeSubmissionModal = () => {
@@ -1750,6 +1781,139 @@ const fetchTaskChallenges = async (task: Task) => {
   const closeTaskDetails = () => {
     setSelectedTaskDetails(null);
   };
+
+  // ====================================
+// WORK PART API FUNCTIONS
+// ====================================
+const fetchWorkParts = async (taskId: string) => {
+    try {
+        setLoadingWorkParts(true);
+        const response = await fetch(
+            `${API_BASE}/tasks/${taskId}/work-parts`,
+            { headers: authHeaders() }
+        );
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || data.error || "Failed to load work parts");
+        }
+        setWorkParts(prev => ({
+            ...prev,
+            [taskId]: data.workParts || []
+        }));
+    } catch (error) {
+        console.error("Fetch work parts error:", error);
+        setWorkParts(prev => ({ ...prev, [taskId]: [] }));
+    } finally {
+        setLoadingWorkParts(false);
+    }
+};
+
+const handleAddWorkPart = async (taskId: string) => {
+    if (!newPartTitle.trim()) {
+        alert("Please provide a title for the work part.");
+        return;
+    }
+
+    try {
+        setSavingWorkPart(true);
+        const response = await fetch(
+            `${API_BASE}/tasks/${taskId}/work-parts`,
+            {
+                method: "POST",
+                headers: {
+                    ...authHeaders(),
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    title: newPartTitle.trim(),
+                    description: newPartDescription.trim() || null,
+                    status: newPartStatus,
+                }),
+            }
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || data.message || "Failed to create work part");
+        }
+
+        await fetchWorkParts(taskId);
+        setNewPartTitle("");
+        setNewPartDescription("");
+        setNewPartStatus("To Do");
+    } catch (error) {
+        console.error("Add work part error:", error);
+        alert(error instanceof Error ? error.message : "Failed to add work part");
+    } finally {
+        setSavingWorkPart(false);
+    }
+};
+
+const handleUpdateWorkPartStatus = async (
+    workPartId: string,
+    newStatus: WorkPartStatus,
+    taskId: string
+) => {
+    try {
+        const response = await fetch(
+            `${API_BASE}/work-parts/${workPartId}/status`,
+            {
+                method: "PATCH",
+                headers: {
+                    ...authHeaders(),
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ status: newStatus }),
+            }
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || data.message || "Failed to update status");
+        }
+
+        setWorkParts(prev => ({
+            ...prev,
+            [taskId]: (prev[taskId] || []).map(part =>
+                part.id === workPartId ? { ...part, status: newStatus } : part
+            )
+        }));
+    } catch (error) {
+        console.error("Update work part status error:", error);
+        alert(error instanceof Error ? error.message : "Failed to update status");
+    }
+};
+
+const handleDeleteWorkPart = async (workPartId: string, taskId: string) => {
+    const confirmed = window.confirm("Delete this work part?");
+    if (!confirmed) return;
+
+    try {
+        setDeletingWorkPart(workPartId);
+        const response = await fetch(
+            `${API_BASE}/work-parts/${workPartId}`,
+            {
+                method: "DELETE",
+                headers: authHeaders(),
+            }
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || data.message || "Failed to delete work part");
+        }
+
+        setWorkParts(prev => ({
+            ...prev,
+            [taskId]: (prev[taskId] || []).filter(p => p.id !== workPartId)
+        }));
+    } catch (error) {
+        console.error("Delete work part error:", error);
+        alert(error instanceof Error ? error.message : "Failed to delete work part");
+    } finally {
+        setDeletingWorkPart(null);
+    }
+};
 
 const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
   try {
@@ -3484,177 +3648,409 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="overflow-y-auto bg-[#eef1f4] px-6 py-6">
-                {/* Submissions List */}
-                <div>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-sm font-bold text-gray-950">
-                                Submitted Work
-                            </h3>
-                            <p className="mt-1 text-xs font-medium text-gray-600">
-                                Links to work submitted for this task.
-                            </p>
-                        </div>
-                        <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">
-                            {submissions[selectedTaskForSubmission.id]?.length || 0} Submission{(submissions[selectedTaskForSubmission.id]?.length || 0) !== 1 ? "s" : ""}
-                        </span>
-                    </div>
+           <div className="overflow-y-auto bg-[#eef1f4] px-6 py-6">
+    {/* ========================================================= */}
+    {/* WORK PARTS SECTION                                        */}
+    {/* ========================================================= */}
+    <div>
+        <div className="flex items-center justify-between">
+            <div>
+                <h3 className="text-sm font-bold text-gray-950">
+                    Work Breakdown
+                </h3>
+                <p className="mt-1 text-xs font-medium text-gray-600">
+                    Break down this task into parts. All parts are visible to managers for tracking.
+                </p>
+            </div>
+            <span className="rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-700">
+                {(workParts[selectedTaskForSubmission.id]?.length || 0)} Part
+                {(workParts[selectedTaskForSubmission.id]?.length || 0) !== 1 ? "s" : ""}
+            </span>
+        </div>
 
-                    <div className="mt-4 space-y-3">
-                        {loadingSubmissions ? (
-                            <div className="flex min-h-[130px] items-center justify-center rounded-xl border-2 border-gray-300 bg-white">
-                                <div className="text-center">
-                                    <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
-                                    <p className="mt-2 text-xs font-semibold text-gray-600">
-                                        Loading submissions...
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (submissions[selectedTaskForSubmission.id]?.length || 0) === 0 ? (
-                            <div className="rounded-xl border-2 border-dashed border-gray-400 bg-white px-5 py-10 text-center">
-                                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-600">
-                                    <CheckCircle2 size={18} />
-                                </div>
-                                <p className="mt-3 text-sm font-bold text-gray-950">
-                                    No submissions yet
-                                </p>
-                                <p className="mt-1 text-xs font-medium text-gray-600">
-                                    {canSubmitWork(selectedTaskForSubmission)
-                                        ? "Submit your work using the form below."
-                                        : "The assignee has not submitted any work yet."}
-                                </p>
-                            </div>
-                        ) : (
-                            (submissions[selectedTaskForSubmission.id] || []).map((submission, index) => (
-                                <div
-                                    key={submission.id}
-                                    className="rounded-xl border-2 border-gray-300 bg-white p-4 shadow-sm"
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold text-emerald-800">
-                                            #{index + 1}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0 flex-1">
-                                                    <a
-                                                        href={submission.link}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline break-all"
-                                                    >
-                                                        {submission.link}
-                                                    </a>
-                                                    {submission.description && (
-                                                        <p className="mt-1.5 text-xs font-medium text-gray-700">
-                                                            {submission.description}
-                                                        </p>
-                                                    )}
-                                                    <p className="mt-1.5 text-[10px] font-medium text-gray-500">
-                                                        Submitted by {submission.submitter_name || "User"} • Version {submission.version} • {formatDate(submission.created_at)}
-                                                    </p>
-                                                </div>
-                                                
-                                                {canDeleteSubmission(submission) && (
-                                                    <button
-                                                        onClick={() => handleDeleteSubmission(submission.id)}
-                                                        disabled={deletingSubmission === submission.id}
-                                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-                                                        title="Delete submission"
-                                                    >
-                                                        {deletingSubmission === submission.id ? (
-                                                            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-red-600" />
-                                                        ) : (
-                                                            <Trash2 size={14} />
-                                                        )}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
+        <div className="mt-4 space-y-3">
+            {loadingWorkParts ? (
+                <div className="flex min-h-[100px] items-center justify-center rounded-xl border-2 border-gray-300 bg-white">
+                    <div className="text-center">
+                        <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+                        <p className="mt-2 text-xs font-semibold text-gray-600">
+                            Loading work parts...
+                        </p>
                     </div>
                 </div>
-
-                {/* Submit Work Form - Only for assignee who is a Member */}
-                {canSubmitWork(selectedTaskForSubmission) && (
-                    <div className="mt-6 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4">
+            ) : (workParts[selectedTaskForSubmission.id]?.length || 0) === 0 ? (
+                <div className="rounded-xl border-2 border-dashed border-gray-400 bg-white px-5 py-8 text-center">
+                    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-600">
+                        <ListTodo size={18} />
+                    </div>
+                    <p className="mt-3 text-sm font-bold text-gray-950">
+                        No work parts yet
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-gray-600">
+                        Add at least one part below to describe what you did.
+                    </p>
+                </div>
+            ) : (
+                (workParts[selectedTaskForSubmission.id] || []).map((part, index) => (
+                    <div
+                        key={part.id}
+                        className="rounded-xl border-2 border-gray-300 bg-white p-4 shadow-sm"
+                    >
                         <div className="flex items-start gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-sm">
-                                <CheckCircle2 size={16} />
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-700">
+                                {index + 1}
                             </div>
                             <div className="min-w-0 flex-1">
-                                <h3 className="text-sm font-bold text-gray-950">
-                                    Submit Your Work
-                                </h3>
-                                <p className="mt-1 text-xs font-medium leading-relaxed text-gray-700">
-                                    Provide a link to your completed work (Google Drive, GitHub, Figma, etc.).
-                                    You can submit multiple versions if needed.
-                                </p>
-                                <div className="mt-4 space-y-3">
-                                    <input
-                                        type="url"
-                                        value={submissionLink}
-                                        onChange={(event) => setSubmissionLink(event.target.value)}
-                                        placeholder="https://drive.google.com/..."
-                                        className="h-11 w-full rounded-lg border-2 border-gray-400 bg-white px-3.5 text-sm font-semibold text-gray-950 outline-none placeholder:text-gray-500 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                                    />
-                                    <textarea
-                                        value={submissionDescription}
-                                        onChange={(event) => setSubmissionDescription(event.target.value)}
-                                        placeholder="Optional: Describe what was completed or provide additional context..."
-                                        rows={2}
-                                        className="w-full resize-none rounded-lg border-2 border-gray-400 bg-white px-3.5 py-3 text-sm font-medium text-gray-950 outline-none placeholder:text-gray-500 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                                    />
-                                    <div className="flex justify-end">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-bold text-gray-950">
+                                            {part.title}
+                                        </p>
+                                        {part.description && (
+                                            <p className="mt-1 text-xs font-medium text-gray-700 whitespace-pre-wrap">
+                                                {part.description}
+                                            </p>
+                                        )}
+                                        <p className="mt-1.5 text-[10px] font-medium text-gray-500">
+                                            By {part.creator_name || "User"}
+                                            {part.creator_role ? ` (${part.creator_role})` : ""}
+                                            {part.created_at ? ` • ${formatDate(part.created_at)}` : ""}
+                                        </p>
+                                    </div>
+
+                                    {(String(part.created_by) === String(currentUser?.id) ||
+                                        isManagementRole) && (
                                         <button
-                                            onClick={() => handleAddSubmission(selectedTaskForSubmission.id)}
-                                            disabled={savingSubmission || !submissionLink.trim()}
-                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                            onClick={() =>
+                                                handleDeleteWorkPart(part.id, selectedTaskForSubmission.id)
+                                            }
+                                            disabled={deletingWorkPart === part.id}
+                                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                                            title="Delete work part"
                                         >
-                                            {savingSubmission ? (
-                                                <>
-                                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                                                    Submitting...
-                                                </>
+                                            {deletingWorkPart === part.id ? (
+                                                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-red-600" />
                                             ) : (
-                                                <>
-                                                    <Plus size={15} />
-                                                    Submit Work
-                                                </>
+                                                <Trash2 size={14} />
                                             )}
                                         </button>
-                                    </div>
+                                    )}
+                                </div>
+
+                                {/* Status selector */}
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    {(["To Do", "Pending", "Done"] as WorkPartStatus[]).map((s) => {
+                                        const isActive = part.status === s;
+                                        const styleMap: Record<WorkPartStatus, string> = {
+                                            "To Do": isActive
+                                                ? "border-slate-500 bg-slate-900 text-white"
+                                                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+                                            "Pending": isActive
+                                                ? "border-amber-500 bg-amber-500 text-white"
+                                                : "border-amber-300 bg-white text-amber-700 hover:bg-amber-50",
+                                            "Done": isActive
+                                                ? "border-emerald-500 bg-emerald-500 text-white"
+                                                : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50",
+                                        };
+                                        const canEdit =
+                                            String(part.created_by) === String(currentUser?.id) ||
+                                            String(selectedTaskForSubmission.assignee_id) === String(currentUser?.id) ||
+                                            isManagementRole;
+                                        return (
+                                            <button
+                                                key={s}
+                                                type="button"
+                                                disabled={!canEdit}
+                                                onClick={() =>
+                                                    handleUpdateWorkPartStatus(
+                                                        part.id,
+                                                        s,
+                                                        selectedTaskForSubmission.id
+                                                    )
+                                                }
+                                                className={`rounded-md border px-2.5 py-1 text-[10px] font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${styleMap[s]}`}
+                                            >
+                                                {s}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>
                     </div>
-                )}
+                ))
+            )}
+        </div>
 
-                {/* Management Info */}
-                {isManagementRole && selectedTaskForSubmission && (
-                    <div className="mt-3 rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
-                        <div className="flex gap-3">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700">
-                                <Users size={15} />
-                            </div>
-                            <div>
-                                <p className="text-xs font-bold text-gray-950">
-                                    Management View
-                                </p>
-                                <p className="mt-1 text-[11px] font-medium leading-relaxed text-gray-700">
-                                    {selectedTaskForSubmission.assignee_name || "The assignee"} has submitted {(submissions[selectedTaskForSubmission.id]?.length || 0)} work item{(submissions[selectedTaskForSubmission.id]?.length || 0) !== 1 ? "s" : ""}. 
-                                    You can mark this task as Done once the work meets your requirements.
-                                </p>
+        {/* Add work part form */}
+        {(canSubmitWork(selectedTaskForSubmission) || isManagementRole) && (
+            <div className="mt-4 rounded-xl border-2 border-blue-200 bg-blue-50 p-4">
+                <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
+                        <Plus size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h4 className="text-sm font-bold text-gray-950">
+                            Add a work part
+                        </h4>
+                        <p className="mt-1 text-xs font-medium leading-relaxed text-gray-700">
+                            Break down the task into smaller pieces. Each part has its own status
+                            that can be tracked by managers.
+                        </p>
+                        <div className="mt-3 space-y-2">
+                            <input
+                                type="text"
+                                value={newPartTitle}
+                                onChange={(e) => setNewPartTitle(e.target.value)}
+                                placeholder="Part title (e.g., Implement login API)"
+                                className="h-10 w-full rounded-lg border-2 border-gray-400 bg-white px-3 text-sm font-semibold text-gray-950 outline-none placeholder:text-gray-500 focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                            />
+                            <textarea
+                                value={newPartDescription}
+                                onChange={(e) => setNewPartDescription(e.target.value)}
+                                placeholder="Optional: Describe this part..."
+                                rows={2}
+                                className="w-full resize-none rounded-lg border-2 border-gray-400 bg-white px-3 py-2 text-sm font-medium text-gray-950 outline-none placeholder:text-gray-500 focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                            />
+                            <div className="flex items-center gap-3">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-600">
+                                    Initial status:
+                                </label>
+                                <select
+                                    value={newPartStatus}
+                                    onChange={(e) =>
+                                        setNewPartStatus(e.target.value as WorkPartStatus)
+                                    }
+                                    className="h-9 rounded-lg border-2 border-gray-400 bg-white px-2 text-xs font-bold text-gray-950 outline-none focus:border-blue-600"
+                                >
+                                    <option value="To Do">To Do</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Done">Done</option>
+                                </select>
+                                <div className="ml-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            handleAddWorkPart(selectedTaskForSubmission.id)
+                                        }
+                                        disabled={savingWorkPart || !newPartTitle.trim()}
+                                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        {savingWorkPart ? (
+                                            <>
+                                                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                                Adding...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Plus size={13} />
+                                                Add part
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                )}
+                </div>
             </div>
+        )}
+    </div>
+
+    {/* ========================================================= */}
+    {/* SUBMISSIONS SECTION                                       */}
+    {/* ========================================================= */}
+    <div className="mt-6">
+        <div className="flex items-center justify-between">
+            <div>
+                <h3 className="text-sm font-bold text-gray-950">
+                    Submitted Work
+                </h3>
+                <p className="mt-1 text-xs font-medium text-gray-600">
+                    Optional links and descriptions.
+                </p>
+            </div>
+            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">
+                {submissions[selectedTaskForSubmission.id]?.length || 0} Submission
+                {(submissions[selectedTaskForSubmission.id]?.length || 0) !== 1 ? "s" : ""}
+            </span>
+        </div>
+
+        <div className="mt-4 space-y-3">
+            {loadingSubmissions ? (
+                <div className="flex min-h-[100px] items-center justify-center rounded-xl border-2 border-gray-300 bg-white">
+                    <div className="text-center">
+                        <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+                        <p className="mt-2 text-xs font-semibold text-gray-600">
+                            Loading submissions...
+                        </p>
+                    </div>
+                </div>
+            ) : (submissions[selectedTaskForSubmission.id]?.length || 0) === 0 ? (
+                <div className="rounded-xl border-2 border-dashed border-gray-400 bg-white px-5 py-6 text-center">
+                    <p className="text-sm font-bold text-gray-950">
+                        No submissions yet
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-gray-600">
+                        {canSubmitWork(selectedTaskForSubmission)
+                            ? "Add work parts above, then submit below."
+                            : "The assignee has not submitted work yet."}
+                    </p>
+                </div>
+            ) : (
+                (submissions[selectedTaskForSubmission.id] || []).map((submission, index) => (
+                    <div
+                        key={submission.id}
+                        className="rounded-xl border-2 border-gray-300 bg-white p-4 shadow-sm"
+                    >
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold text-emerald-800">
+                                #{index + 1}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        {submission.link ? (
+                                            <a
+                                                href={submission.link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline break-all"
+                                            >
+                                                {submission.link}
+                                            </a>
+                                        ) : (
+                                            <p className="text-xs font-medium italic text-gray-500">
+                                                No link provided — work parts above describe this submission.
+                                            </p>
+                                        )}
+                                        {submission.description && (
+                                            <p className="mt-1.5 text-xs font-medium text-gray-700">
+                                                {submission.description}
+                                            </p>
+                                        )}
+                                        <p className="mt-1.5 text-[10px] font-medium text-gray-500">
+                                            Submitted by {submission.submitter_name || "User"} • Version {submission.version} • {formatDate(submission.created_at)}
+                                        </p>
+                                    </div>
+
+                                    {canDeleteSubmission(submission) && (
+                                        <button
+                                            onClick={() => handleDeleteSubmission(submission.id)}
+                                            disabled={deletingSubmission === submission.id}
+                                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                                            title="Delete submission"
+                                        >
+                                            {deletingSubmission === submission.id ? (
+                                                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-red-600" />
+                                            ) : (
+                                                <Trash2 size={14} />
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))
+            )}
+        </div>
+    </div>
+
+    {/* ========================================================= */}
+    {/* SUBMIT FORM (assignee Member only)                        */}
+    {/* ========================================================= */}
+    {canSubmitWork(selectedTaskForSubmission) && (
+        <div className="mt-6 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4">
+            <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-sm">
+                    <CheckCircle2 size={16} />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-bold text-gray-950">
+                        Submit Your Work
+                    </h3>
+                    <p className="mt-1 text-xs font-medium leading-relaxed text-gray-700">
+                        Add at least one work part above. Links below are optional but
+                        helpful for managers to review your work.
+                    </p>
+
+                    {/* Warning if no work parts */}
+                    {(workParts[selectedTaskForSubmission.id]?.length || 0) === 0 && (
+                        <div className="mt-3 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2">
+                            <p className="text-[11px] font-bold text-amber-900">
+                                ⚠️ You must add at least one work part before submitting.
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="mt-4 space-y-3">
+                        <input
+                            type="url"
+                            value={submissionLink}
+                            onChange={(event) => setSubmissionLink(event.target.value)}
+                            placeholder="https://drive.google.com/... (optional)"
+                            className="h-11 w-full rounded-lg border-2 border-gray-400 bg-white px-3.5 text-sm font-semibold text-gray-950 outline-none placeholder:text-gray-500 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                        />
+                        <textarea
+                            value={submissionDescription}
+                            onChange={(event) => setSubmissionDescription(event.target.value)}
+                            placeholder="Optional: Describe what was completed or provide additional context..."
+                            rows={2}
+                            className="w-full resize-none rounded-lg border-2 border-gray-400 bg-white px-3.5 py-3 text-sm font-medium text-gray-950 outline-none placeholder:text-gray-500 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                        />
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => handleAddSubmission(selectedTaskForSubmission.id)}
+                                disabled={
+                                    savingSubmission ||
+                                    (workParts[selectedTaskForSubmission.id]?.length || 0) === 0
+                                }
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                {savingSubmission ? (
+                                    <>
+                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                        Submitting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus size={15} />
+                                        Submit Work
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )}
+
+    {/* Management Info */}
+    {isManagementRole && selectedTaskForSubmission && (
+        <div className="mt-3 rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
+            <div className="flex gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700">
+                    <Users size={15} />
+                </div>
+                <div>
+                    <p className="text-xs font-bold text-gray-950">
+                        Management View
+                    </p>
+                    <p className="mt-1 text-[11px] font-medium leading-relaxed text-gray-700">
+                        {selectedTaskForSubmission.assignee_name || "The assignee"} has added{" "}
+                        {(workParts[selectedTaskForSubmission.id]?.length || 0)} work part
+                        {(workParts[selectedTaskForSubmission.id]?.length || 0) !== 1 ? "s" : ""} and{" "}
+                        {(submissions[selectedTaskForSubmission.id]?.length || 0)} submission
+                        {(submissions[selectedTaskForSubmission.id]?.length || 0) !== 1 ? "s" : ""}.
+                        You can update any work part status and mark the task as Done once work meets requirements.
+                    </p>
+                </div>
+            </div>
+        </div>
+    )}
+</div>
 
             {/* Footer */}
             <div className="flex justify-end border-t-2 border-gray-300 bg-[#f5f6f8] px-6 py-4">
