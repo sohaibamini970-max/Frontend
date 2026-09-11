@@ -22,6 +22,8 @@ import {
   ListChecks,
   ChevronDown,
   UserCircle2,
+  TrendingUp,
+  Activity,
 } from "lucide-react";
 
 /* =========================================================
@@ -106,6 +108,27 @@ type SimpleMember = {
   full_name: string;
   email: string;
 };
+
+type ProjectOverview = {
+  id: string;
+  name: string;
+  description?: string | null;
+  status: string;
+  raw_status?: string | null;
+  created_at?: string | null;
+  due_date?: string | null;
+  project_manager_id?: string | null;
+  project_manager_name?: string | null;
+  total_tasks: number;
+  completed_tasks: number;
+  pending_tasks: number;
+  overdue_tasks: number;
+  member_count: number;
+  completion_rate: number;
+  is_completed: boolean;
+};
+
+type ViewMode = "personal" | "team" | "overall";
 
 /* =========================================================
    HELPERS
@@ -205,18 +228,33 @@ export default function PerformancePage() {
 
   const [teamMembers, setTeamMembers] = useState<MemberPerformance[]>([]);
   const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<"personal" | "team">("personal");
+  const [viewMode, setViewMode] = useState<ViewMode>("personal");
   const [historyLimit, setHistoryLimit] = useState(10);
 
   const [membersList, setMembersList] = useState<SimpleMember[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
 
+  // Overall view (Exec + Admin)
+  const [projects, setProjects] = useState<ProjectOverview[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [overallStats, setOverallStats] = useState<PerformanceStats | null>(null);
+  const [overallStatusBreakdown, setOverallStatusBreakdown] = useState<BreakdownItem[]>([]);
+  const [overallPriorityBreakdown, setOverallPriorityBreakdown] = useState<BreakdownItem[]>([]);
+
   const isManagerView = useMemo(
     () =>
       user?.role === "Executive Manager" ||
       user?.role === "System Administrator" ||
       user?.role === "Project Manager",
+    [user]
+  );
+
+  const isExecOrAdmin = useMemo(
+    () =>
+      user?.role === "Executive Manager" ||
+      user?.role === "System Administrator",
     [user]
   );
 
@@ -235,7 +273,7 @@ export default function PerformancePage() {
   }, []);
 
   /* =======================================================
-     LOAD EVERYTHING IN PARALLEL
+     LOAD PERSONAL / TEAM DATA
   ======================================================= */
 
   const loadData = useCallback(
@@ -258,7 +296,6 @@ export default function PerformancePage() {
           storedUser.role === "System Administrator" ||
           storedUser.role === "Project Manager";
 
-        // Personal panel endpoint
         let personalUrl: string;
         if (isManager) {
           if (memberId) {
@@ -276,7 +313,6 @@ export default function PerformancePage() {
           cache: "no-store",
         });
 
-        // History endpoint
         const historyUrl = isManager
           ? memberId
             ? `${API_BASE}/performance/history?limit=50&userId=${memberId}`
@@ -289,7 +325,6 @@ export default function PerformancePage() {
           cache: "no-store",
         });
 
-        // Team leaderboard (managers only)
         const teamReq = isManager
           ? fetch(`${API_BASE}/performance/team`, {
               headers,
@@ -367,6 +402,56 @@ export default function PerformancePage() {
   }, []);
 
   /* =======================================================
+     LOAD OVERALL DATA (Exec + Admin only)
+     - all members aggregate (already used for "All Members" personal view)
+     - all projects with rollups
+  ======================================================= */
+
+  const loadOverallData = useCallback(async (signal?: AbortSignal) => {
+    setProjectsLoading(true);
+    try {
+      const headers = getHeaders();
+
+      const [allRes, projRes] = await Promise.all([
+        fetch(`${API_BASE}/performance/all`, {
+          headers,
+          signal,
+          cache: "no-store",
+        }),
+        fetch(`${API_BASE}/performance/projects`, {
+          headers,
+          signal,
+          cache: "no-store",
+        }),
+      ]);
+
+      if (signal?.aborted) return;
+
+      const [allData, projData] = await Promise.all([
+        allRes.ok ? allRes.json() : null,
+        projRes.ok ? projRes.json() : null,
+      ]);
+
+      if (signal?.aborted) return;
+
+      if (allData?.success) {
+        setOverallStats(allData.stats || null);
+        setOverallStatusBreakdown(allData.statusBreakdown || []);
+        setOverallPriorityBreakdown(allData.priorityBreakdown || []);
+      }
+
+      if (projData?.success) {
+        setProjects(projData.projects || []);
+      }
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
+      console.error("Overall load error:", err);
+    } finally {
+      if (!signal?.aborted) setProjectsLoading(false);
+    }
+  }, []);
+
+  /* =======================================================
      MAIN LOAD EFFECT
   ======================================================= */
 
@@ -374,19 +459,32 @@ export default function PerformancePage() {
     if (!user?.id) return;
     const controller = new AbortController();
 
-    // Managers: also load the member list
-    if (
-      user.role === "Executive Manager" ||
-      user.role === "System Administrator" ||
-      user.role === "Project Manager"
-    ) {
+    const role = user.role;
+    const isManager =
+      role === "Executive Manager" ||
+      role === "System Administrator" ||
+      role === "Project Manager";
+    const isExecAdmin =
+      role === "Executive Manager" || role === "System Administrator";
+
+    if (isManager) {
       loadMembersList(controller.signal);
     }
 
     loadData(controller.signal, false, selectedMemberId);
 
+    if (isExecAdmin) {
+      loadOverallData(controller.signal);
+    }
+
     return () => controller.abort();
-  }, [user?.id, selectedMemberId, loadData, loadMembersList]);
+  }, [
+    user?.id,
+    selectedMemberId,
+    loadData,
+    loadMembersList,
+    loadOverallData,
+  ]);
 
   /* =======================================================
      RESET HISTORY LIMIT ON MEMBER CHANGE
@@ -397,11 +495,11 @@ export default function PerformancePage() {
   }, [selectedMemberId]);
 
   /* =======================================================
-     RESET SELECTION WHEN SWITCHING TO TEAM VIEW
+     RESET SELECTION WHEN SWITCHING VIEW
   ======================================================= */
 
   useEffect(() => {
-    if (viewMode === "team") {
+    if (viewMode === "team" || viewMode === "overall") {
       setSelectedMemberId(null);
       setMemberDropdownOpen(false);
     }
@@ -452,6 +550,36 @@ export default function PerformancePage() {
     [history, historyLimit]
   );
 
+  const filteredProjects = useMemo(() => {
+    if (!projectSearch.trim()) return projects;
+    const q = projectSearch.toLowerCase();
+    return projects.filter(
+      (p) =>
+        p.name?.toLowerCase().includes(q) ||
+        p.project_manager_name?.toLowerCase().includes(q)
+    );
+  }, [projects, projectSearch]);
+
+  // Top risk projects (highest overdue first)
+  const topRiskProjects = useMemo(
+    () =>
+      [...projects]
+        .filter((p) => !p.is_completed)
+        .sort((a, b) => b.overdue_tasks - a.overdue_tasks)
+        .slice(0, 5),
+    [projects]
+  );
+
+  // Top performers (highest completion rate first)
+  const topPerformers = useMemo(
+    () =>
+      [...teamMembers]
+        .filter((m) => m.total_tasks > 0)
+        .sort((a, b) => b.completion_rate - a.completion_rate)
+        .slice(0, 5),
+    [teamMembers]
+  );
+
   /* =======================================================
      LOADING
   ======================================================= */
@@ -482,11 +610,10 @@ export default function PerformancePage() {
     <main className="min-h-screen bg-[#0a1628] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <div className="mx-auto max-w-7xl">
         {/* =================================================
-            HEADER — dark navy
+            HEADER
         ================================================= */}
 
         <div className="relative rounded-3xl bg-gradient-to-r from-[#0f1f3a] via-[#132a4a] to-[#0f1f3a] px-6 py-8 shadow-2xl ring-1 ring-white/5 sm:px-10 sm:py-10">
-          {/* Decorative blurs — clipped to header shape only */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
             <div className="absolute right-0 top-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl" />
             <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
@@ -503,7 +630,9 @@ export default function PerformancePage() {
                   Performance Dashboard
                 </h1>
                 <p className="mt-1.5 text-sm font-medium text-slate-300 sm:text-base">
-                  {isManagerView
+                  {isExecOrAdmin
+                    ? "Overall tracking across all projects, tasks, and team members"
+                    : isManagerView
                     ? "Track your performance and team productivity"
                     : "Your personal task performance overview"}
                 </p>
@@ -522,10 +651,27 @@ export default function PerformancePage() {
               </div>
             </div>
 
-            {/* ACTIONS: view toggle + refresh */}
+            {/* ACTIONS */}
             <div className="flex flex-wrap items-center gap-3">
               {isManagerView && (
                 <div className="flex rounded-2xl bg-white/5 p-1.5 ring-1 ring-white/10">
+                  {/* Exec/Admin: Overall tab first as default */}
+                  {isExecOrAdmin && (
+                    <button
+                      onClick={() => setViewMode("overall")}
+                      className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+                        viewMode === "overall"
+                          ? "bg-cyan-500 text-white shadow-lg shadow-cyan-500/30"
+                          : "text-slate-300 hover:bg-white/5"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Activity size={15} />
+                        Overall
+                      </span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => setViewMode("personal")}
                     className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
@@ -536,9 +682,10 @@ export default function PerformancePage() {
                   >
                     <span className="flex items-center gap-2">
                       <Target size={15} />
-                      My Performance
+                      {isExecOrAdmin ? "Aggregate" : "My Performance"}
                     </span>
                   </button>
+
                   <button
                     onClick={() => setViewMode("team")}
                     className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
@@ -557,9 +704,10 @@ export default function PerformancePage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  loadData(undefined, true, selectedMemberId)
-                }
+                onClick={() => {
+                  loadData(undefined, true, selectedMemberId);
+                  if (isExecOrAdmin) loadOverallData(undefined);
+                }}
                 disabled={refreshing}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white/5 px-4 text-sm font-bold text-white ring-1 ring-white/10 transition hover:bg-white/10 disabled:opacity-50"
               >
@@ -581,6 +729,533 @@ export default function PerformancePage() {
               {error}
             </div>
           </div>
+        )}
+
+        {/* =================================================
+            OVERALL VIEW — Executive Manager / System Admin
+        ================================================= */}
+
+        {viewMode === "overall" && isExecOrAdmin && (
+          <section className="mt-8 space-y-8">
+            {/* ---- ROW 1: Global KPI cards ---- */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {/* Total Projects */}
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-500 to-blue-600 p-6 shadow-xl shadow-indigo-500/20 transition-all hover:-translate-y-1">
+                <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+                <div className="relative">
+                  <div className="inline-flex rounded-2xl bg-white/20 p-3 backdrop-blur-sm">
+                    <FolderKanban size={24} className="text-white" />
+                  </div>
+                  <p className="mt-5 text-5xl font-black text-white">
+                    {projects.length}
+                  </p>
+                  <p className="mt-1 text-base font-bold text-indigo-50">
+                    Total Projects
+                  </p>
+                  <p className="text-xs font-medium text-indigo-100/80">
+                    {projects.filter((p) => p.is_completed).length} completed ·{" "}
+                    {projects.filter((p) => !p.is_completed).length} active
+                  </p>
+                </div>
+              </div>
+
+              {/* Total Tasks */}
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-500 to-blue-600 p-6 shadow-xl shadow-cyan-500/20 transition-all hover:-translate-y-1">
+                <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+                <div className="relative">
+                  <div className="inline-flex rounded-2xl bg-white/20 p-3 backdrop-blur-sm">
+                    <ClipboardList size={24} className="text-white" />
+                  </div>
+                  <p className="mt-5 text-5xl font-black text-white">
+                    {overallStats?.totalTasks ?? 0}
+                  </p>
+                  <p className="mt-1 text-base font-bold text-cyan-50">
+                    Total Tasks
+                  </p>
+                  <p className="text-xs font-medium text-cyan-100/80">
+                    Across all members
+                  </p>
+                </div>
+              </div>
+
+              {/* Completed Tasks */}
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-green-600 p-6 shadow-xl shadow-emerald-500/20 transition-all hover:-translate-y-1">
+                <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+                <div className="relative">
+                  <div className="inline-flex rounded-2xl bg-white/20 p-3 backdrop-blur-sm">
+                    <CheckCircle2 size={24} className="text-white" />
+                  </div>
+                  <p className="mt-5 text-5xl font-black text-white">
+                    {overallStats?.completedTasks ?? 0}
+                  </p>
+                  <p className="mt-1 text-base font-bold text-emerald-50">
+                    Completed
+                  </p>
+                  <p className="text-xs font-medium text-emerald-100/80">
+                    {overallStats?.completionRate ?? 0}% completion rate
+                  </p>
+                </div>
+              </div>
+
+              {/* Overdue Tasks */}
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-500 to-rose-600 p-6 shadow-xl shadow-red-500/20 transition-all hover:-translate-y-1">
+                <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+                <div className="relative">
+                  <div className="inline-flex rounded-2xl bg-white/20 p-3 backdrop-blur-sm">
+                    <AlertTriangle size={24} className="text-white" />
+                  </div>
+                  <p className="mt-5 text-5xl font-black text-white">
+                    {overallStats?.overdueTasks ?? 0}
+                  </p>
+                  <p className="mt-1 text-base font-bold text-red-50">
+                    Overdue
+                  </p>
+                  <p className="text-xs font-medium text-red-100/80">
+                    Past due across all projects
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ---- ROW 2: Secondary KPI cards ---- */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-amber-100 p-2.5">
+                    <Clock3 size={20} className="text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-amber-500">
+                      Pending
+                    </p>
+                    <p className="text-3xl font-black text-amber-700">
+                      {overallStats?.pendingTasks ?? 0}
+                    </p>
+                    <p className="text-[11px] font-medium text-slate-500">
+                      In progress or to do
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-rose-100 p-2.5">
+                    <Flame size={20} className="text-rose-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-orange-500">
+                      Overdue Done
+                    </p>
+                    <p className="text-3xl font-black text-rose-700">
+                      {overallStats?.overdueDoneTasks ?? 0}
+                    </p>
+                    <p className="text-[11px] font-medium text-slate-500">
+                      Completed after deadline
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-emerald-100 p-2.5">
+                    <TrendingUp size={20} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-emerald-500">
+                      On-time Rate
+                    </p>
+                    <p className="text-3xl font-black text-emerald-700">
+                      {overallStats?.onTimeRate ?? 0}%
+                    </p>
+                    <p className="text-[11px] font-medium text-slate-500">
+                      Completed before due date
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-teal-100 p-2.5">
+                    <Timer size={20} className="text-teal-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-teal-500">
+                      Avg. Days
+                    </p>
+                    <p className="text-3xl font-black text-teal-700">
+                      {overallStats?.avgCompletionDays || "—"}
+                    </p>
+                    <p className="text-[11px] font-medium text-slate-500">
+                      Per completed task
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ---- ROW 3: Status + Priority breakdown ---- */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="rounded-3xl bg-[#0f1f3a] p-6 shadow-xl ring-1 ring-white/10">
+                <h3 className="flex items-center gap-2 text-lg font-black text-white">
+                  <Target size={20} className="text-purple-400" />
+                  Overall Status Breakdown
+                </h3>
+                <div className="mt-5 space-y-4">
+                  {overallStatusBreakdown.length === 0 ? (
+                    <p className="text-sm text-slate-400">No tasks yet.</p>
+                  ) : (
+                    overallStatusBreakdown.map((item) => {
+                      const total = overallStatusBreakdown.reduce(
+                        (s, i) => s + (i.count || 0),
+                        0
+                      );
+                      const percentage =
+                        total > 0
+                          ? Math.round(((item.count || 0) / total) * 100)
+                          : 0;
+
+                      const color =
+                        item.status === "Done"
+                          ? "bg-emerald-400"
+                          : item.status === "In Progress"
+                          ? "bg-blue-400"
+                          : "bg-slate-400";
+
+                      return (
+                        <div key={item.status}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold text-slate-200">
+                              {item.status}
+                            </span>
+                            <span className="text-sm font-black text-white">
+                              {item.count} ({percentage}%)
+                            </span>
+                          </div>
+                          <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-white/5">
+                            <div
+                              className={`h-full rounded-full ${color} transition-all`}
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-3xl bg-[#0f1f3a] p-6 shadow-xl ring-1 ring-white/10">
+                <h3 className="flex items-center gap-2 text-lg font-black text-white">
+                  <Zap size={20} className="text-amber-400" />
+                  Overall Priority Breakdown
+                </h3>
+                <div className="mt-5 space-y-4">
+                  {overallPriorityBreakdown.length === 0 ? (
+                    <p className="text-sm text-slate-400">No tasks yet.</p>
+                  ) : (
+                    overallPriorityBreakdown.map((item) => {
+                      const total = overallPriorityBreakdown.reduce(
+                        (s, i) => s + (i.count || 0),
+                        0
+                      );
+                      const percentage =
+                        total > 0
+                          ? Math.round(((item.count || 0) / total) * 100)
+                          : 0;
+
+                      const color =
+                        item.priority === "High"
+                          ? "bg-red-400"
+                          : item.priority === "Medium"
+                          ? "bg-amber-400"
+                          : "bg-slate-400";
+
+                      return (
+                        <div key={item.priority}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold text-slate-200">
+                              {item.priority}
+                            </span>
+                            <span className="text-sm font-black text-white">
+                              {item.count} ({percentage}%)
+                            </span>
+                          </div>
+                          <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-white/5">
+                            <div
+                              className={`h-full rounded-full ${color} transition-all`}
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ---- ROW 4: Top Risk Projects + Top Performers ---- */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {/* Top Risk Projects */}
+              <div className="rounded-3xl bg-[#0f1f3a] p-6 shadow-xl ring-1 ring-white/10">
+                <h3 className="flex items-center gap-2 text-lg font-black text-white">
+                  <AlertTriangle size={20} className="text-red-400" />
+                  Top Risk Projects
+                </h3>
+                <div className="mt-5 space-y-3">
+                  {topRiskProjects.length === 0 ? (
+                    <p className="text-sm text-slate-400">
+                      No active projects at risk. 🎉
+                    </p>
+                  ) : (
+                    topRiskProjects.map((p, i) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/15 text-sm font-black text-red-300 ring-1 ring-red-400/30">
+                          #{i + 1}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-white">
+                            {p.name}
+                          </p>
+                          <p className="truncate text-[11px] text-slate-400">
+                            PM: {p.project_manager_name || "Unassigned"}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-black text-red-300">
+                            {p.overdue_tasks}
+                          </p>
+                          <p className="text-[10px] font-bold uppercase text-slate-500">
+                            overdue
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Top Performers */}
+              <div className="rounded-3xl bg-[#0f1f3a] p-6 shadow-xl ring-1 ring-white/10">
+                <h3 className="flex items-center gap-2 text-lg font-black text-white">
+                  <TrendingUp size={20} className="text-emerald-400" />
+                  Top Performers
+                </h3>
+                <div className="mt-5 space-y-3">
+                  {topPerformers.length === 0 ? (
+                    <p className="text-sm text-slate-400">
+                      No member data yet.
+                    </p>
+                  ) : (
+                    topPerformers.map((m, i) => (
+                      <div
+                        key={m.id}
+                        className="flex items-center gap-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-xs font-black text-white">
+                          {m.full_name?.charAt(0)?.toUpperCase() || "?"}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-white">
+                            {m.full_name}
+                          </p>
+                          <p className="truncate text-[11px] text-slate-400">
+                            {m.completed_tasks}/{m.total_tasks} done ·{" "}
+                            {m.on_time_rate}% on-time
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-black text-emerald-300">
+                            {m.completion_rate}%
+                          </p>
+                          <p className="text-[10px] font-bold uppercase text-slate-500">
+                            rate
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ---- ROW 5: All projects grid ---- */}
+            <div className="rounded-3xl bg-[#0f1f3a] p-6 shadow-xl ring-1 ring-white/10">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h3 className="flex items-center gap-2 text-lg font-black text-white">
+                  <FolderKanban size={20} className="text-cyan-400" />
+                  All Projects
+                </h3>
+
+                <div className="relative w-full sm:max-w-xs">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                  />
+                  <input
+                    value={projectSearch}
+                    onChange={(e) => setProjectSearch(e.target.value)}
+                    placeholder="Search projects..."
+                    className="h-10 w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 text-sm font-medium text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+                  />
+                </div>
+              </div>
+
+              {projectsLoading ? (
+                <div className="mt-10 flex justify-center">
+                  <div className="relative h-10 w-10">
+                    <div className="absolute inset-0 rounded-full border-4 border-[#1e3a5f]" />
+                    <div className="absolute inset-0 animate-spin rounded-full border-4 border-t-cyan-400" />
+                  </div>
+                </div>
+              ) : filteredProjects.length === 0 ? (
+                <div className="mt-6 rounded-2xl border-2 border-dashed border-white/10 px-6 py-12 text-center">
+                  <FolderKanban size={36} className="mx-auto text-slate-600" />
+                  <p className="mt-3 text-sm font-bold text-slate-300">
+                    No projects found
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  {filteredProjects.map((proj) => {
+                    const rate = Math.round(proj.completion_rate || 0);
+                    const isDone = proj.is_completed;
+
+                    return (
+                      <div
+                        key={proj.id}
+                        className={`overflow-hidden rounded-2xl bg-white/5 ring-1 transition-all hover:bg-white/10 ${
+                          isDone
+                            ? "ring-emerald-400/30"
+                            : "ring-white/10"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3 border-b border-white/5 p-5">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <div
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                                isDone
+                                  ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30"
+                                  : "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-400/30"
+                              }`}
+                            >
+                              <FolderKanban size={18} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-black text-white">
+                                {proj.name}
+                              </p>
+                              <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                                PM: {proj.project_manager_name || "Unassigned"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ring-1 ${
+                              isDone
+                                ? "bg-emerald-500/15 text-emerald-300 ring-emerald-400/30"
+                                : proj.overdue_tasks > 0
+                                ? "bg-red-500/15 text-red-300 ring-red-400/30"
+                                : "bg-cyan-500/15 text-cyan-300 ring-cyan-400/30"
+                            }`}
+                          >
+                            {isDone
+                              ? "Completed"
+                              : proj.overdue_tasks > 0
+                              ? "At Risk"
+                              : "Active"}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2 p-5">
+                          <div className="rounded-xl bg-indigo-500/10 px-2 py-2 text-center ring-1 ring-indigo-400/20">
+                            <p className="text-[9px] font-bold uppercase text-indigo-300">
+                              Total
+                            </p>
+                            <p className="text-base font-black text-indigo-200">
+                              {proj.total_tasks}
+                            </p>
+                          </div>
+                          <div className="rounded-xl bg-emerald-500/10 px-2 py-2 text-center ring-1 ring-emerald-400/20">
+                            <p className="text-[9px] font-bold uppercase text-emerald-300">
+                              Done
+                            </p>
+                            <p className="text-base font-black text-emerald-200">
+                              {proj.completed_tasks}
+                            </p>
+                          </div>
+                          <div className="rounded-xl bg-amber-500/10 px-2 py-2 text-center ring-1 ring-amber-400/20">
+                            <p className="text-[9px] font-bold uppercase text-amber-300">
+                              Pending
+                            </p>
+                            <p className="text-base font-black text-amber-200">
+                              {proj.pending_tasks}
+                            </p>
+                          </div>
+                          <div className="rounded-xl bg-red-500/10 px-2 py-2 text-center ring-1 ring-red-400/20">
+                            <p className="text-[9px] font-bold uppercase text-red-300">
+                              Overdue
+                            </p>
+                            <p className="text-base font-black text-red-200">
+                              {proj.overdue_tasks}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-white/5 px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-bold uppercase text-slate-400">
+                              Progress
+                            </span>
+                            <div className="flex-1">
+                              <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+                                <div
+                                  className={`h-full rounded-full transition-all ${
+                                    isDone
+                                      ? "bg-gradient-to-r from-emerald-400 to-green-400"
+                                      : "bg-gradient-to-r from-cyan-400 to-blue-400"
+                                  }`}
+                                  style={{ width: `${rate}%` }}
+                                />
+                              </div>
+                            </div>
+                            <span
+                              className={`text-xs font-black ${
+                                isDone ? "text-emerald-300" : "text-cyan-300"
+                              }`}
+                            >
+                              {rate}%
+                            </span>
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] font-bold text-slate-400">
+                            <span className="inline-flex items-center gap-1">
+                              <Users size={11} />
+                              {proj.member_count} member
+                              {proj.member_count === 1 ? "" : "s"}
+                            </span>
+                            {proj.due_date && (
+                              <span className="inline-flex items-center gap-1">
+                                <CalendarClock size={11} />
+                                Due {formatDate(proj.due_date)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
         )}
 
         {/* =================================================
@@ -619,7 +1294,6 @@ export default function PerformancePage() {
 
                   {memberDropdownOpen && (
                     <div className="absolute left-0 top-12 z-[100] max-h-80 w-72 overflow-y-auto rounded-2xl bg-[#0f1f3a] p-2 shadow-[0_20px_60px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                      {/* All members option */}
                       <button
                         onClick={() => {
                           setSelectedMemberId(null);
@@ -686,7 +1360,6 @@ export default function PerformancePage() {
 
             {/* ============ TOP 4 COLORFUL CARDS ============ */}
             <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {/* Total Tasks — Indigo */}
               <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-500 to-blue-600 p-6 shadow-xl shadow-indigo-500/20 transition-all hover:-translate-y-1">
                 <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
                 <div className="relative">
@@ -700,12 +1373,11 @@ export default function PerformancePage() {
                     Total Tasks
                   </p>
                   <p className="text-xs font-medium text-indigo-100/80">
-                    Assigned to you
+                    Assigned
                   </p>
                 </div>
               </div>
 
-              {/* Completed — Emerald */}
               <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-green-600 p-6 shadow-xl shadow-emerald-500/20 transition-all hover:-translate-y-1">
                 <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
                 <div className="relative">
@@ -724,7 +1396,6 @@ export default function PerformancePage() {
                 </div>
               </div>
 
-              {/* Pending — Amber */}
               <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 p-6 shadow-xl shadow-amber-500/20 transition-all hover:-translate-y-1">
                 <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
                 <div className="relative">
@@ -743,7 +1414,6 @@ export default function PerformancePage() {
                 </div>
               </div>
 
-              {/* Overdue — Rose */}
               <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-500 to-rose-600 p-6 shadow-xl shadow-red-500/20 transition-all hover:-translate-y-1">
                 <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
                 <div className="relative">
@@ -765,7 +1435,6 @@ export default function PerformancePage() {
 
             {/* ============ 4 WHITE CARDS ============ */}
             <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {/* Not Completed */}
               <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-violet-100 p-2.5">
@@ -785,7 +1454,6 @@ export default function PerformancePage() {
                 </div>
               </div>
 
-              {/* Overdue Done */}
               <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-rose-100 p-2.5">
@@ -805,7 +1473,6 @@ export default function PerformancePage() {
                 </div>
               </div>
 
-              {/* Projects */}
               <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-cyan-100 p-2.5">
@@ -819,13 +1486,12 @@ export default function PerformancePage() {
                       {stats.projectCount}
                     </p>
                     <p className="text-[11px] font-medium text-slate-500">
-                      You've worked on
+                      Involved in
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Avg Days */}
               <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200/50">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-teal-100 p-2.5">
@@ -848,7 +1514,6 @@ export default function PerformancePage() {
 
             {/* ============ BREAKDOWN CHARTS ============ */}
             <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Status Breakdown */}
               <div className="rounded-3xl bg-[#0f1f3a] p-6 shadow-xl ring-1 ring-white/10">
                 <h3 className="flex items-center gap-2 text-lg font-black text-white">
                   <Target size={20} className="text-purple-400" />
@@ -898,7 +1563,6 @@ export default function PerformancePage() {
                 </div>
               </div>
 
-              {/* Priority Breakdown */}
               <div className="rounded-3xl bg-[#0f1f3a] p-6 shadow-xl ring-1 ring-white/10">
                 <h3 className="flex items-center gap-2 text-lg font-black text-white">
                   <Zap size={20} className="text-amber-400" />
@@ -1146,12 +1810,10 @@ export default function PerformancePage() {
                     className="overflow-hidden rounded-3xl bg-[#0f1f3a] shadow-lg ring-1 ring-white/10 transition-all hover:ring-cyan-400/30"
                   >
                     <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center">
-                      {/* RANK */}
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-base font-black text-slate-300 ring-1 ring-white/10">
                         #{index + 1}
                       </div>
 
-                      {/* AVATAR + NAME */}
                       <div className="flex min-w-0 flex-1 items-center gap-4">
                         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-xl font-black text-white shadow-lg shadow-cyan-500/20">
                           {member.full_name?.charAt(0)?.toUpperCase() || "?"}
@@ -1166,7 +1828,6 @@ export default function PerformancePage() {
                         </div>
                       </div>
 
-                      {/* STATS */}
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-3">
                         <div className="rounded-2xl bg-indigo-500/10 px-4 py-2.5 text-center ring-1 ring-indigo-400/20">
                           <p className="text-[10px] font-bold uppercase text-indigo-300">
@@ -1203,7 +1864,6 @@ export default function PerformancePage() {
                       </div>
                     </div>
 
-                    {/* PROGRESS BAR */}
                     <div className="border-t border-white/5 px-6 py-4">
                       <div className="flex items-center gap-4">
                         <span className="text-xs font-bold text-slate-400">
