@@ -1806,15 +1806,25 @@ export default function Tasks() {
     status: TaskStatus
   ) => {
     try {
-      const res = await fetch(`${PROGRAM_API}/${taskId}/status`, {
-        method: "PATCH",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to update status");
-      }
+     const res = await fetch(`${PROGRAM_API}/${taskId}/status`, {
+  method: "PATCH",
+  headers: { ...authHeaders(), "Content-Type": "application/json" },
+  body: JSON.stringify({ status }),
+});
+
+const data = await res.json();
+console.log("PATCH program status →", {
+  httpStatus: res.status,
+  ok: res.ok,
+  body: data,
+  url: `${PROGRAM_API}/${taskId}/status`,
+  tokenPresent: !!getToken(),
+  taskId,
+  status,
+});
+if (!res.ok) {
+  throw new Error(data.message || "Failed to update status");
+}
       setProgramTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, status } : t))
       );
