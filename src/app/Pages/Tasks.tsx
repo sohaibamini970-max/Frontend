@@ -595,14 +595,16 @@ const canSubmitWork = (task: Task): boolean => {
 const canViewSubmissions = (task: Task): boolean => {
     return (
         isManagementRole ||
-        String(task.assignee_id || "") === String(currentUser?.id || "")
+        (isMember &&
+            String(task.assignee_id || "") === String(currentUser?.id || ""))
     );
 };
 
 const canDeleteSubmission = (submission: TaskSubmission): boolean => {
     return (
         isManagementRole ||
-        String(submission.user_id) === String(currentUser?.id)
+        (isMember &&
+            String(submission.user_id) === String(currentUser?.id || ""))
     );
 };
 
@@ -799,7 +801,7 @@ const closeSubmissionModal = () => {
     String(task.assignee_id || "") ===
       String(currentUser?.id || "")
   );
-};
+};;
 
 const canReadChallenge = (task: Task) => {
   return (
