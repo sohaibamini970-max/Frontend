@@ -852,35 +852,80 @@ const fetchProjectsAndTasks = async () => {
     // ============================================================
     // PROGRAM TASKS — fetch in parallel, works for every role
     // ============================================================
-    const programPromise = (async (): Promise<ProgramTask[]> => {
-      try {
-        const url =
-          role === "Member"
-            ? `${PROGRAM_API}/my/tasks`
-            : `${PROGRAM_API}/all`;
+   // ============================================================
+// PROGRAM TASKS — for Members: own tasks + all tasks in their program projects
+// ============================================================
+const programPromise = (async (): Promise<ProgramTask[]> => {
+  try {
+    if (role === "Member") {
+      // 1) Tasks assigned directly to this member
+      const ownRes = await fetch(`${PROGRAM_API}/my/tasks`, {
+        headers: authHeaders(),
+      });
+      const ownData = ownRes.ok ? await ownRes.json() : { tasks: [] };
 
-        const res = await fetch(url, { headers: authHeaders() });
-        if (!res.ok) return [];
+      // 2) Program projects this member belongs to
+      const ppRes = await fetch(`${PROGRAM_API}/my/program-projects`, {
+        headers: authHeaders(),
+      });
+      const ppData = ppRes.ok ? await ppRes.json() : { programProjects: [] };
+      const myProgramProjects: any[] = ppData.programProjects || [];
 
-        const data = await res.json();
-        const list = data.tasks || [];
-        return list.map((t: any) => ({
-          ...normalizeTask(t),
-          program_project_id: String(t.program_project_id || ""),
-          program_project_name: t.program_project_name || "",
-          program_project_domain: t.program_project_domain || "",
-          program_project_manager_id: String(
-            t.program_project_manager_id || ""
-          ),
-          program_name: t.program_name || "",
-          objectives: t.objectives || "",
-        }));
-      } catch (e) {
-        console.error("Program tasks fetch error:", e);
-        return [];
-      }
-    })();
+      // 3) All tasks in each of those program projects
+      const taskLists = await Promise.all(
+        myProgramProjects.map(async (pp: any) => {
+          const r = await fetch(
+            `${PROGRAM_API}/my/program-project/${pp.id}/tasks`,
+            { headers: authHeaders() }
+          );
+          if (!r.ok) return [];
+          const d = await r.json();
+          return d.tasks || [];
+        })
+      );
 
+      // Merge + dedupe by id
+      const merged = new Map<string, any>();
+      [...(ownData.tasks || []), ...taskLists.flat()].forEach((t: any) => {
+        merged.set(String(t.id), t);
+      });
+
+      return Array.from(merged.values()).map((t: any) => ({
+        ...normalizeTask(t),
+        program_project_id: String(t.program_project_id || ""),
+        program_project_name: t.program_project_name || "",
+        program_project_domain: t.program_project_domain || "",
+        program_project_manager_id: String(
+          t.program_project_manager_id || ""
+        ),
+        program_name: t.program_name || "",
+        objectives: t.objectives || "",
+      }));
+    }
+
+    // Managers — unchanged
+    const res = await fetch(`${PROGRAM_API}/all`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const list = data.tasks || [];
+    return list.map((t: any) => ({
+      ...normalizeTask(t),
+      program_project_id: String(t.program_project_id || ""),
+      program_project_name: t.program_project_name || "",
+      program_project_domain: t.program_project_domain || "",
+      program_project_manager_id: String(
+        t.program_project_manager_id || ""
+      ),
+      program_name: t.program_name || "",
+      objectives: t.objectives || "",
+    }));
+  } catch (e) {
+    console.error("Program tasks fetch error:", e);
+    return [];
+  }
+})();
     // ============================================================
     // ROLE-SPECIFIC PROJECT + NORMAL TASK FETCH
     // ============================================================
