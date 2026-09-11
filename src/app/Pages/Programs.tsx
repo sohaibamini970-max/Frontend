@@ -28,6 +28,7 @@ import {
 
 const API_BASE = "https://backend-five-swart-88.vercel.app";
 const PROGRAM_TASK_API = `${API_BASE}/api/program-tasks`;
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -86,6 +87,8 @@ type ProgramProject = {
   created_by_name: string | null;
   created_at: string;
   updated_at: string;
+  task_count?: number;
+  completed_task_count?: number;
 };
 
 type AssignableUser = {
@@ -94,6 +97,25 @@ type AssignableUser = {
   email: string;
   role: string;
   job_title: string | null;
+};
+
+type ProgramTask = {
+  id: string;
+  name: string;
+  description: string | null;
+  objectives: string | null;
+  status: string;
+  priority: ProgramPriority;
+  assignee_id: string | null;
+  assignee_name: string | null;
+  assignee_email: string | null;
+  program_project_id: string;
+  program_project_name?: string;
+  program_name?: string;
+  start_date: string | null;
+  due_date: string | null;
+  completed_at: string | null;
+  created_at: string;
 };
 
 /* =========================================================
@@ -153,7 +175,7 @@ const programStatusStyles: Record<string, string> = {
 };
 
 /* =========================================================
-   PROGRESS BAR (same as projects.tsx)
+   PROGRESS BAR
 ========================================================= */
 
 function ProgressBar({
@@ -181,8 +203,15 @@ function ProgressBar({
         </span>
         <span className="text-xs font-semibold text-gray-700">{safeProgress}%</span>
       </div>
-      <div className={`w-full overflow-hidden rounded-full bg-gray-100 ${large ? "h-2.5" : "h-1.5"}`}>
-        <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${safeProgress}%` }} />
+      <div
+        className={`w-full overflow-hidden rounded-full bg-gray-100 ${
+          large ? "h-2.5" : "h-1.5"
+        }`}
+      >
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${color}`}
+          style={{ width: `${safeProgress}%` }}
+        />
       </div>
     </div>
   );
@@ -206,12 +235,23 @@ export default function Programs() {
   const [programProjects, setProgramProjects] = useState<ProgramProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
 
+  /* Program task counts (per program project) */
+  const [projectTaskCounts, setProjectTaskCounts] = useState<
+    Record<string, { total: number; done: number }>
+  >({});
+
+  /* Tasks shown inside the View Project modal */
+  const [projectTasks, setProjectTasks] = useState<ProgramTask[]>([]);
+  const [loadingProjectTasks, setLoadingProjectTasks] = useState(false);
+
   /* Modals */
   const [createProgramModalOpen, setCreateProgramModalOpen] = useState(false);
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [viewProjectModalOpen, setViewProjectModalOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<ProgramProject | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProgramProject | null>(
+    null
+  );
   const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null);
 
   /* Create program form */
@@ -235,19 +275,19 @@ export default function Programs() {
   const [savingProject, setSavingProject] = useState(false);
 
   /* Create Program Task form */
-const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
-const [taskProjectId, setTaskProjectId] = useState<string | null>(null);
-const [taskProjectName, setTaskProjectName] = useState("");
-const [tName, setTName] = useState("");
-const [tDescription, setTDescription] = useState("");
-const [tObjectives, setTObjectives] = useState("");
-const [tPriority, setTPriority] = useState<ProgramPriority>("Medium");
-const [tAssignee, setTAssignee] = useState<string>("");
-const [tStartDate, setTStartDate] = useState("");
-const [tDueDate, setTDueDate] = useState("");
-const [tInstructionFile, setTInstructionFile] = useState<File | null>(null);
-const [savingTask, setSavingTask] = useState(false);
-const [successMessage, setSuccessMessage] = useState("");
+  const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
+  const [taskProjectId, setTaskProjectId] = useState<string | null>(null);
+  const [taskProjectName, setTaskProjectName] = useState("");
+  const [tName, setTName] = useState("");
+  const [tDescription, setTDescription] = useState("");
+  const [tObjectives, setTObjectives] = useState("");
+  const [tPriority, setTPriority] = useState<ProgramPriority>("Medium");
+  const [tAssignee, setTAssignee] = useState<string>("");
+  const [tStartDate, setTStartDate] = useState("");
+  const [tDueDate, setTDueDate] = useState("");
+  const [tInstructionFile, setTInstructionFile] = useState<File | null>(null);
+  const [savingTask, setSavingTask] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   /* Assign modal */
   const [assignProjectId, setAssignProjectId] = useState<string | null>(null);
@@ -262,13 +302,13 @@ const [successMessage, setSuccessMessage] = useState("");
     [currentUser]
   );
 
- const membersOnly = useMemo(
-  () =>
-    assignableUsers.filter(
-      (u) => String(u.role).trim().toLowerCase() === "member"
-    ),
-  [assignableUsers]
-);
+  const membersOnly = useMemo(
+    () =>
+      assignableUsers.filter(
+        (u) => String(u.role).trim().toLowerCase() === "member"
+      ),
+    [assignableUsers]
+  );
 
   /* =======================================================
      AUTH
@@ -310,46 +350,42 @@ const [successMessage, setSuccessMessage] = useState("");
     }
   };
 
-const fetchAssignableUsers = async () => {
-  try {
-    // 1st choice: programs-scoped endpoint
-    let res = await fetch(`${API_BASE}/api/programs/assignable-users`, {
-      headers: getAuthHeaders(),
-    });
-
-    // Fallback to the general users endpoint if the programs route isn't deployed
-    if (!res.ok) {
-      res = await fetch(`${API_BASE}/api/users`, {
+  const fetchAssignableUsers = async () => {
+    try {
+      let res = await fetch(`${API_BASE}/api/programs/assignable-users`, {
         headers: getAuthHeaders(),
       });
+
+      if (!res.ok) {
+        res = await fetch(`${API_BASE}/api/users`, {
+          headers: getAuthHeaders(),
+        });
+      }
+
+      if (!res.ok) {
+        console.error("Assignable users failed:", res.status);
+        return;
+      }
+
+      const data = await res.json();
+      const rawUsers: any[] =
+        data.users || data.data || (Array.isArray(data) ? data : []);
+
+      const normalized: AssignableUser[] = rawUsers
+        .map((u: any) => ({
+          id: String(u.id ?? u.user_id ?? ""),
+          full_name: u.full_name ?? u.fullName ?? u.name ?? "Unknown",
+          email: u.email ?? "",
+          role: u.role ?? "",
+          job_title: u.job_title ?? u.jobTitle ?? null,
+        }))
+        .filter((u: AssignableUser) => u.id !== "");
+
+      setAssignableUsers(normalized);
+    } catch (err) {
+      console.error("Failed to load assignable users:", err);
     }
-
-    if (!res.ok) {
-      console.error("Assignable users failed:", res.status);
-      return;
-    }
-
-    const data = await res.json();
-    const rawUsers =
-      data.users ||
-      data.data ||
-      (Array.isArray(data) ? data : []);
-
-    const normalized: AssignableUser[] = rawUsers
-      .map((u: any) => ({
-        id: String(u.id ?? u.user_id ?? ""),
-        full_name: u.full_name ?? u.fullName ?? u.name ?? "Unknown",
-        email: u.email ?? "",
-        role: u.role ?? "",
-        job_title: u.job_title ?? u.jobTitle ?? null,
-      }))
-      .filter((u) => u.id !== "");
-
-    setAssignableUsers(normalized);
-  } catch (err) {
-    console.error("Failed to load assignable users:", err);
-  }
-};
+  };
 
   const fetchProgramDetails = async (programId: string) => {
     try {
@@ -361,7 +397,11 @@ const fetchAssignableUsers = async () => {
       if (!res.ok) throw new Error(data.message || "Failed to load program");
 
       setActiveProgram(data.program);
-      setProgramProjects(data.projects || []);
+      const projects: ProgramProject[] = data.projects || [];
+      setProgramProjects(projects);
+
+      // Fire-and-forget: fetch task counts for every project
+      fetchAllProgramProjectTaskCounts(projects);
     } catch (err: any) {
       setError(err.message || "Unable to load program details.");
     } finally {
@@ -369,28 +409,62 @@ const fetchAssignableUsers = async () => {
     }
   };
 
-  const fetchProjectTasks = async (programProjectId: string) => {
-  try {
-    setLoadingProjectTasks(true);
-    const res = await fetch(
-      `${PROGRAM_TASK_API}/program-project/${programProjectId}`,
-      { headers: getAuthHeaders() }
+  /* Per-project task counts used on the card */
+  const fetchAllProgramProjectTaskCounts = async (
+    projects: ProgramProject[]
+  ) => {
+    const results: Record<string, { total: number; done: number }> = {};
+
+    await Promise.all(
+      projects.map(async (project) => {
+        try {
+          const res = await fetch(
+            `${PROGRAM_TASK_API}/program-project/${project.id}`,
+            { headers: getAuthHeaders() }
+          );
+          if (!res.ok) {
+            results[project.id] = { total: 0, done: 0 };
+            return;
+          }
+          const data = await res.json();
+          const tasks: ProgramTask[] = data.tasks || [];
+          results[project.id] = {
+            total: tasks.length,
+            done: tasks.filter((t) => t.status === "Done").length,
+          };
+        } catch {
+          results[project.id] = { total: 0, done: 0 };
+        }
+      })
     );
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Failed to load tasks");
-    setProjectTasks(data.tasks || []);
-  } catch (err: any) {
-    console.error("Fetch project tasks error:", err);
-    setProjectTasks([]);
-  } finally {
-    setLoadingProjectTasks(false);
-  }
-};
+
+    setProjectTaskCounts(results);
+  };
+
+  /* Tasks for the View Project modal */
+  const fetchProjectTasks = async (programProjectId: string) => {
+    try {
+      setLoadingProjectTasks(true);
+      const res = await fetch(
+        `${PROGRAM_TASK_API}/program-project/${programProjectId}`,
+        { headers: getAuthHeaders() }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to load tasks");
+      setProjectTasks(data.tasks || []);
+    } catch (err: any) {
+      console.error("Fetch project tasks error:", err);
+      setProjectTasks([]);
+    } finally {
+      setLoadingProjectTasks(false);
+    }
+  };
 
   useEffect(() => {
     if (!currentUser || !isAdminOrManager) return;
     fetchPrograms();
     fetchAssignableUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, isAdminOrManager]);
 
   /* =======================================================
@@ -408,6 +482,7 @@ const fetchAssignableUsers = async () => {
     setActiveProgram(null);
     setProgramProjects([]);
     setSearch("");
+    setProjectTaskCounts({});
   };
 
   /* =======================================================
@@ -508,7 +583,10 @@ const fetchAssignableUsers = async () => {
      ASSIGN PROJECT
   ======================================================= */
 
-  const openAssignModal = (projectId: string, currentAssignee: string | null) => {
+  const openAssignModal = (
+    projectId: string,
+    currentAssignee: string | null
+  ) => {
     setAssignProjectId(projectId);
     setAssignUserId(currentAssignee);
     setAssignModalOpen(true);
@@ -542,130 +620,13 @@ const fetchAssignableUsers = async () => {
     }
   };
 
-  /* ==========================================================
-      Createe Tasks
-  =============================================================*/
+  /* =======================================================
+     CREATE PROGRAM TASK
+  ======================================================= */
 
-  /* ========================================================
-   CREATE PROGRAM TASK
-======================================================== */
-
-const openCreateTaskModal = async (project: ProgramProject) => {
-  setTaskProjectId(project.id);
-  setTaskProjectName(project.name);
-  setTName("");
-  setTDescription("");
-  setTObjectives("");
-  setTPriority("Medium");
-  setTAssignee("");
-  setTStartDate("");
-  setTDueDate("");
-  setTInstructionFile(null);
-  setOpenProjectMenu(null);
-  setSuccessMessage("");
-  setError("");
-  setCreateTaskModalOpen(true);
-
-  // Guarantee the member list is populated before the user interacts
-  if (assignableUsers.length === 0) {
-    await fetchAssignableUsers();
-  }
-};
-
-const closeCreateTaskModal = () => {
-  if (savingTask) return;
-  setCreateTaskModalOpen(false);
-  setTaskProjectId(null);
-  setTaskProjectName("");
-  setTName("");
-  setTDescription("");
-  setTObjectives("");
-  setTPriority("Medium");
-  setTAssignee("");
-  setTStartDate("");
-  setTDueDate("");
-  setTInstructionFile(null);
-};
-
-const handleCreateProgramTask = async () => {
-  if (!taskProjectId) return;
-  if (!tName.trim()) {
-    setError("Task name is required.");
-    return;
-  }
-
-  try {
-    setSavingTask(true);
-    setError("");
-    setSuccessMessage("");
-
-    /* --- 1. Create the task --- */
-    const createRes = await fetch(
-      `${PROGRAM_TASK_API}/program-project/${taskProjectId}`,
-      {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          name: tName.trim(),
-          description: tDescription.trim() || null,
-          objectives: tObjectives.trim() || null,
-          priority: tPriority,
-          status: "To Do",
-          assigneeId: tAssignee || null,
-          startDate: tStartDate || null,
-          dueDate: tDueDate || null,
-        }),
-      }
-    );
-
-    const createData = await createRes.json();
-    if (!createRes.ok) {
-      throw new Error(createData.message || "Failed to create task");
-    }
-
-    const createdTaskId: string | undefined = createData?.task?.id;
-    if (!createdTaskId) {
-      throw new Error("Task created but no id was returned.");
-    }
-
-    /* --- 2. Upload instruction file if provided --- */
-    if (tInstructionFile) {
-      const fd = new FormData();
-      fd.append("file", tInstructionFile);
-
-      const upRes = await fetch(
-        `${PROGRAM_TASK_API}/${createdTaskId}/instructions`,
-        {
-          method: "POST",
-          // NOTE: do not set Content-Type — browser adds the multipart boundary
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-          },
-          body: fd,
-        }
-      );
-
-      if (!upRes.ok) {
-        const upData = await upRes.json().catch(() => ({}));
-        console.error("Instruction upload failed:", upData);
-        setError(
-          upData.message ||
-            "Task created, but the instruction file failed to upload."
-        );
-      }
-    }
-
-    setSuccessMessage(
-      `Task "${tName.trim()}" created${
-        tAssignee
-          ? ` and assigned to ${
-              membersOnly.find((m) => m.id === tAssignee)?.full_name || "the member"
-            }`
-          : ""
-      }.`
-    );
-
-    // Reset the modal but keep it visible so the manager sees the success
+  const openCreateTaskModal = async (project: ProgramProject) => {
+    setTaskProjectId(project.id);
+    setTaskProjectName(project.name);
     setTName("");
     setTDescription("");
     setTObjectives("");
@@ -674,22 +635,152 @@ const handleCreateProgramTask = async () => {
     setTStartDate("");
     setTDueDate("");
     setTInstructionFile(null);
+    setOpenProjectMenu(null);
+    setSuccessMessage("");
+    setError("");
+    setCreateTaskModalOpen(true);
 
-    // Close after a short delay so the message is visible
-    setTimeout(() => {
-      setCreateTaskModalOpen(false);
-      setTaskProjectId(null);
-      setTaskProjectName("");
+    if (assignableUsers.length === 0) {
+      await fetchAssignableUsers();
+    }
+  };
+
+  const closeCreateTaskModal = () => {
+    if (savingTask) return;
+    setCreateTaskModalOpen(false);
+    setTaskProjectId(null);
+    setTaskProjectName("");
+    setTName("");
+    setTDescription("");
+    setTObjectives("");
+    setTPriority("Medium");
+    setTAssignee("");
+    setTStartDate("");
+    setTDueDate("");
+    setTInstructionFile(null);
+  };
+
+  const handleCreateProgramTask = async () => {
+    if (!taskProjectId) return;
+    if (!tName.trim()) {
+      setError("Task name is required.");
+      return;
+    }
+
+    try {
+      setSavingTask(true);
+      setError("");
       setSuccessMessage("");
-    }, 1400);
-  } catch (err: any) {
-    console.error("Create program task error:", err);
-    setError(err.message || "Failed to create task");
-  } finally {
-    setSavingTask(false);
-  }
-};
-  
+
+      const createRes = await fetch(
+        `${PROGRAM_TASK_API}/program-project/${taskProjectId}`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            name: tName.trim(),
+            description: tDescription.trim() || null,
+            objectives: tObjectives.trim() || null,
+            priority: tPriority,
+            status: "To Do",
+            assigneeId: tAssignee || null,
+            startDate: tStartDate || null,
+            dueDate: tDueDate || null,
+          }),
+        }
+      );
+
+      const createData = await createRes.json();
+      if (!createRes.ok) {
+        throw new Error(createData.message || "Failed to create task");
+      }
+
+      const createdTaskId: string | undefined = createData?.task?.id;
+      if (!createdTaskId) {
+        throw new Error("Task created but no id was returned.");
+      }
+
+      if (tInstructionFile) {
+        const fd = new FormData();
+        fd.append("file", tInstructionFile);
+
+        const upRes = await fetch(
+          `${PROGRAM_TASK_API}/${createdTaskId}/instructions`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+            },
+            body: fd,
+          }
+        );
+
+        if (!upRes.ok) {
+          const upData = await upRes.json().catch(() => ({}));
+          console.error("Instruction upload failed:", upData);
+          setError(
+            upData.message ||
+              "Task created, but the instruction file failed to upload."
+          );
+        }
+      }
+
+      setSuccessMessage(
+        `Task "${tName.trim()}" created${
+          tAssignee
+            ? ` and assigned to ${
+                membersOnly.find((m) => m.id === tAssignee)?.full_name ||
+                "the member"
+              }`
+            : ""
+        }.`
+      );
+
+      // Reset form but keep the modal visible for a moment
+      setTName("");
+      setTDescription("");
+      setTObjectives("");
+      setTPriority("Medium");
+      setTAssignee("");
+      setTStartDate("");
+      setTDueDate("");
+      setTInstructionFile(null);
+
+      // Refresh task counts for the currently open program
+      if (programProjects.length > 0) {
+        fetchAllProgramProjectTaskCounts(programProjects);
+      }
+
+      setTimeout(() => {
+        setCreateTaskModalOpen(false);
+        setTaskProjectId(null);
+        setTaskProjectName("");
+        setSuccessMessage("");
+      }, 1400);
+    } catch (err: any) {
+      console.error("Create program task error:", err);
+      setError(err.message || "Failed to create task");
+    } finally {
+      setSavingTask(false);
+    }
+  };
+
+  /* =======================================================
+     VIEW PROJECT MODAL
+  ======================================================= */
+
+  const openViewProjectModal = async (project: ProgramProject) => {
+    setSelectedProject(project);
+    setProjectTasks([]);
+    setViewProjectModalOpen(true);
+    await fetchProjectTasks(project.id);
+  };
+
+  const closeViewProjectModal = () => {
+    setViewProjectModalOpen(false);
+    setSelectedProject(null);
+    setProjectTasks([]);
+  };
 
   /* =======================================================
      FILTERS
@@ -727,9 +818,12 @@ const handleCreateProgramTask = async () => {
       <main className="min-h-[calc(100vh-72px)] bg-white px-4 py-10">
         <div className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-white p-8 text-center">
           <ShieldCheck size={32} className="mx-auto text-gray-400" />
-          <h2 className="mt-3 text-lg font-semibold text-gray-900">Access Restricted</h2>
+          <h2 className="mt-3 text-lg font-semibold text-gray-900">
+            Access Restricted
+          </h2>
           <p className="mt-1 text-sm text-gray-500">
-            Programs are only accessible to Project Managers, Executive Managers, and System Administrators.
+            Programs are only accessible to Project Managers, Executive Managers,
+            and System Administrators.
           </p>
         </div>
       </main>
@@ -743,7 +837,6 @@ const handleCreateProgramTask = async () => {
   return (
     <main className="min-h-[calc(100vh-72px)] bg-white px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
       <div className="mx-auto max-w-[1440px]">
-
         {/* ===============================================
             HEADER
         =============================================== */}
@@ -756,7 +849,11 @@ const handleCreateProgramTask = async () => {
               </h1>
 
               {activeProgram ? (
-                <span className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-medium ${programStatusStyles[activeProgram.status]}`}>
+                <span
+                  className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-medium ${
+                    programStatusStyles[activeProgram.status]
+                  }`}
+                >
                   {activeProgram.status}
                 </span>
               ) : (
@@ -771,7 +868,8 @@ const handleCreateProgramTask = async () => {
 
             <p className="mt-1 text-sm text-gray-500">
               {activeProgram
-                ? activeProgram.description || "Projects grouped under this program."
+                ? activeProgram.description ||
+                  "Projects grouped under this program."
                 : "Group projects under long-running programs like Mentorship or Summer Internship."}
             </p>
           </div>
@@ -873,7 +971,11 @@ const handleCreateProgramTask = async () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={activeProgram ? "Search projects in this program" : "Search programs"}
+              placeholder={
+                activeProgram
+                  ? "Search projects in this program"
+                  : "Search programs"
+              }
               className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 text-sm text-black outline-none placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-100"
             />
           </div>
@@ -888,12 +990,16 @@ const handleCreateProgramTask = async () => {
             {loading ? (
               <div className="mt-8 flex min-h-[400px] flex-col items-center justify-center">
                 <RefreshCw size={24} className="animate-spin text-gray-400" />
-                <p className="mt-3 text-sm font-medium text-gray-600">Loading programs...</p>
+                <p className="mt-3 text-sm font-medium text-gray-600">
+                  Loading programs...
+                </p>
               </div>
             ) : filteredPrograms.length === 0 ? (
               <div className="mt-8 rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-20 text-center">
                 <Layers size={40} className="mx-auto text-gray-300" />
-                <h3 className="mt-4 text-sm font-semibold text-gray-900">No programs yet</h3>
+                <h3 className="mt-4 text-sm font-semibold text-gray-900">
+                  No programs yet
+                </h3>
                 <p className="mx-auto mt-1 max-w-md text-sm text-gray-500">
                   Create your first program to group related projects.
                 </p>
@@ -903,7 +1009,9 @@ const handleCreateProgramTask = async () => {
                 {filteredPrograms.map((program) => {
                   const progress =
                     program.project_count > 0
-                      ? Math.round((program.completed_count / program.project_count) * 100)
+                      ? Math.round(
+                          (program.completed_count / program.project_count) * 100
+                        )
                       : 0;
 
                   return (
@@ -913,7 +1021,6 @@ const handleCreateProgramTask = async () => {
                       onClick={() => openProgram(program)}
                       className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 text-left transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_8px_25px_rgba(16,185,129,0.12)]"
                     >
-                      {/* Colored top bar for programs */}
                       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
 
                       <div className="flex items-start gap-3">
@@ -928,12 +1035,6 @@ const handleCreateProgramTask = async () => {
                           <p className="mt-0.5 truncate text-[13px] text-gray-400">
                             {program.domain || "No domain"}
                           </p>
-
-                          <p className="mt-1 text-[11px] font-medium text-emerald-700">
-                            {project.task_count ?? 0} task{(project.task_count ?? 0) === 1 ? "" : "s"}
-                            {" · "}
-                            {project.completed_task_count ?? 0} done
-                          </p>
                         </div>
                       </div>
 
@@ -942,7 +1043,11 @@ const handleCreateProgramTask = async () => {
                       </p>
 
                       <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex rounded-md px-2.5 py-1 text-[12px] font-medium ${programStatusStyles[program.status]}`}>
+                        <span
+                          className={`inline-flex rounded-md px-2.5 py-1 text-[12px] font-medium ${
+                            programStatusStyles[program.status]
+                          }`}
+                        >
                           {program.status}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[12px] font-medium text-gray-500">
@@ -1008,12 +1113,16 @@ const handleCreateProgramTask = async () => {
             {loadingProjects ? (
               <div className="mt-8 flex min-h-[400px] flex-col items-center justify-center">
                 <RefreshCw size={24} className="animate-spin text-gray-400" />
-                <p className="mt-3 text-sm font-medium text-gray-600">Loading projects...</p>
+                <p className="mt-3 text-sm font-medium text-gray-600">
+                  Loading projects...
+                </p>
               </div>
             ) : filteredProgramProjects.length === 0 ? (
               <div className="mt-8 rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-20 text-center">
                 <FolderKanban size={40} className="mx-auto text-gray-300" />
-                <h3 className="mt-4 text-sm font-semibold text-gray-900">No projects yet</h3>
+                <h3 className="mt-4 text-sm font-semibold text-gray-900">
+                  No projects yet
+                </h3>
                 <p className="mx-auto mt-1 max-w-md text-sm text-gray-500">
                   Add the first project to this program.
                 </p>
@@ -1022,14 +1131,23 @@ const handleCreateProgramTask = async () => {
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredProgramProjects.map((project) => {
                   const progress =
-                    project.status === "Done" ? 100 : project.status === "In Progress" ? 50 : 0;
+                    project.status === "Done"
+                      ? 100
+                      : project.status === "In Progress"
+                      ? 50
+                      : 0;
+
+                  const counts = projectTaskCounts[project.id] || {
+                    total: project.task_count ?? 0,
+                    done: project.completed_task_count ?? 0,
+                  };
 
                   return (
                     <div
                       key={project.id}
                       className="group relative rounded-2xl border border-gray-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_8px_25px_rgba(16,185,129,0.12)]"
                     >
-                      {/* Colored program name tag */}
+                      {/* Program name tag */}
                       <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
                         <Layers size={11} />
                         {activeProgram.name}
@@ -1050,16 +1168,26 @@ const handleCreateProgramTask = async () => {
                               <p className="mt-0.5 truncate text-[14px] text-gray-400">
                                 {project.domain || "No domain"}
                               </p>
+
+                              {/* Task count line */}
+                              <p className="mt-1 text-[11px] font-medium text-emerald-700">
+                                {counts.total} task
+                                {counts.total === 1 ? "" : "s"}
+                                {" · "}
+                                {counts.done} done
+                              </p>
                             </div>
 
-                            {/* Menu */}
+                            {/* Kebab menu */}
                             <div className="absolute right-3 top-3">
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setOpenProjectMenu(
-                                    openProjectMenu === project.id ? null : project.id
+                                    openProjectMenu === project.id
+                                      ? null
+                                      : project.id
                                   );
                                 }}
                                 className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
@@ -1074,10 +1202,9 @@ const handleCreateProgramTask = async () => {
                                 >
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      setSelectedProject(project);
+                                    onClick={async () => {
                                       setOpenProjectMenu(null);
-                                      setViewProjectModalOpen(true);
+                                      await openViewProjectModal(project);
                                     }}
                                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
                                   >
@@ -1087,20 +1214,31 @@ const handleCreateProgramTask = async () => {
 
                                   <button
                                     type="button"
-                                    onClick={() => openAssignModal(project.id, project.assigned_to)}
+                                    onClick={() =>
+                                      openAssignModal(
+                                        project.id,
+                                        project.assigned_to
+                                      )
+                                    }
                                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
                                   >
-                                    <UserPlus size={16} className="text-gray-500" />
+                                    <UserPlus
+                                      size={16}
+                                      className="text-gray-500"
+                                    />
                                     {project.assigned_to ? "Reassign" : "Assign"}
                                   </button>
 
                                   <button
-                                  type="button"
-                                  onClick={() => openCreateTaskModal(project)}
-                                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-emerald-50"
-                                >
-                                  <ListTodo size={16} className="text-emerald-600" />
-                                  Create Task
+                                    type="button"
+                                    onClick={() => openCreateTaskModal(project)}
+                                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-emerald-50"
+                                  >
+                                    <ListTodo
+                                      size={16}
+                                      className="text-emerald-600"
+                                    />
+                                    Create Task
                                   </button>
                                 </div>
                               )}
@@ -1121,7 +1259,11 @@ const handleCreateProgramTask = async () => {
 
                       {/* Status / Priority */}
                       <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex rounded-md px-2.5 py-1 text-[12px] font-medium ${projectStatusStyles[project.status]}`}>
+                        <span
+                          className={`inline-flex rounded-md px-2.5 py-1 text-[12px] font-medium ${
+                            projectStatusStyles[project.status]
+                          }`}
+                        >
                           {project.status}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[12px] font-medium text-gray-500">
@@ -1153,8 +1295,12 @@ const handleCreateProgramTask = async () => {
                                 <User size={14} />
                               </div>
                               <div>
-                                <p className="text-[11px] font-semibold text-gray-600">Unassigned</p>
-                                <p className="text-[9px] text-gray-400">No assignee</p>
+                                <p className="text-[11px] font-semibold text-gray-600">
+                                  Unassigned
+                                </p>
+                                <p className="text-[9px] text-gray-400">
+                                  No assignee
+                                </p>
                               </div>
                             </div>
                           )}
@@ -1162,7 +1308,9 @@ const handleCreateProgramTask = async () => {
 
                         <button
                           type="button"
-                          onClick={() => openAssignModal(project.id, project.assigned_to)}
+                          onClick={() =>
+                            openAssignModal(project.id, project.assigned_to)
+                          }
                           className="text-[11px] font-medium text-emerald-600 hover:text-emerald-700"
                         >
                           {project.assigned_to ? "Reassign" : "Assign"}
@@ -1202,10 +1350,7 @@ const handleCreateProgramTask = async () => {
 
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedProject(project);
-                          setViewProjectModalOpen(true);
-                        }}
+                        onClick={() => openViewProjectModal(project)}
                         className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 text-xs font-medium text-white transition hover:bg-emerald-700"
                       >
                         <Eye size={14} />
@@ -1232,7 +1377,9 @@ const handleCreateProgramTask = async () => {
                 <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white">
                   <Layers size={19} />
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900">Create a new program</h2>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Create a new program
+                </h2>
                 <p className="mt-1 text-xs text-gray-500">
                   Group related projects under one program.
                 </p>
@@ -1281,7 +1428,9 @@ const handleCreateProgramTask = async () => {
                   </label>
                   <select
                     value={pPriority}
-                    onChange={(e) => setPPriority(e.target.value as ProgramPriority)}
+                    onChange={(e) =>
+                      setPPriority(e.target.value as ProgramPriority)
+                    }
                     className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500"
                   >
                     <option value="Low">Low</option>
@@ -1375,9 +1524,14 @@ const handleCreateProgramTask = async () => {
                 <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white">
                   <FolderKanban size={19} />
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900">Add project to program</h2>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Add project to program
+                </h2>
                 <p className="mt-1 text-xs text-gray-500">
-                  Under <span className="font-semibold text-emerald-700">{activeProgram.name}</span>
+                  Under{" "}
+                  <span className="font-semibold text-emerald-700">
+                    {activeProgram.name}
+                  </span>
                 </p>
               </div>
               <button
@@ -1407,7 +1561,9 @@ const handleCreateProgramTask = async () => {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-gray-700">Domain</label>
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Domain
+                  </label>
                   <input
                     value={prDomain}
                     onChange={(e) => setPrDomain(e.target.value)}
@@ -1417,10 +1573,14 @@ const handleCreateProgramTask = async () => {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-gray-700">Priority</label>
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Priority
+                  </label>
                   <select
                     value={prPriority}
-                    onChange={(e) => setPrPriority(e.target.value as ProgramPriority)}
+                    onChange={(e) =>
+                      setPrPriority(e.target.value as ProgramPriority)
+                    }
                     className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-gray-500"
                   >
                     <option value="Low">Low</option>
@@ -1544,7 +1704,9 @@ const handleCreateProgramTask = async () => {
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white">
                   <UserPlus size={18} />
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900">Assign project</h2>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Assign project
+                </h2>
                 <p className="mt-1 text-xs text-gray-500">
                   Choose a Project Manager or admin to assign this project to.
                 </p>
@@ -1560,7 +1722,9 @@ const handleCreateProgramTask = async () => {
 
             <div className="max-h-[420px] space-y-2 overflow-y-auto px-6 py-5">
               {assignableUsers.length === 0 ? (
-                <p className="text-center text-sm text-gray-400">No assignable users found.</p>
+                <p className="text-center text-sm text-gray-400">
+                  No assignable users found.
+                </p>
               ) : (
                 assignableUsers.map((u) => {
                   const selected = assignUserId === u.id;
@@ -1629,235 +1793,228 @@ const handleCreateProgramTask = async () => {
         </div>
       )}
 
-      {/*=============================================
-      Craete Tasks Modal
-      ================================================*/}
-
       {/* =====================================================
-    CREATE PROGRAM TASK MODAL
-===================================================== */}
+          CREATE PROGRAM TASK MODAL
+      ===================================================== */}
 
-{createTaskModalOpen && taskProjectId && (
-  <div
-    className="fixed inset-0 z-[75] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]"
-    onMouseDown={(e) => {
-      if (e.target === e.currentTarget) closeCreateTaskModal();
-    }}
-  >
-    <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-      {/* ---------- Header ---------- */}
-      <div className="flex items-start justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 text-white">
-        <div>
-          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
-            <ListTodo size={19} />
-          </div>
-          <h2 className="text-lg font-semibold">Create a program task</h2>
-          <p className="mt-1 text-xs text-emerald-50">
-            Under{" "}
-            <span className="font-semibold text-white">
-              {activeProgram?.name || "Program"}
-            </span>{" "}
-            → <span className="font-semibold text-white">{taskProjectName}</span>
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={closeCreateTaskModal}
-          disabled={savingTask}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/20 disabled:opacity-50"
+      {createTaskModalOpen && taskProjectId && (
+        <div
+          className="fixed inset-0 z-[75] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeCreateTaskModal();
+          }}
         >
-          <X size={19} />
-        </button>
-      </div>
-
-      {/* ---------- Body ---------- */}
-      <div className="overflow-y-auto bg-white px-6 py-6">
-        <div className="grid gap-5 sm:grid-cols-2">
-
-          {/* Task name */}
-          <div className="sm:col-span-2">
-            <label className="mb-2 block text-xs font-semibold text-gray-700">
-              Task name <span className="text-red-600">*</span>
-            </label>
-            <input
-              value={tName}
-              onChange={(e) => setTName(e.target.value)}
-              placeholder="e.g. Build recommendation engine"
-              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-            />
-          </div>
-
-          {/* Description */}
-          <div className="sm:col-span-2">
-            <label className="mb-2 block text-xs font-semibold text-gray-700">
-              Description
-            </label>
-            <textarea
-              value={tDescription}
-              onChange={(e) => setTDescription(e.target.value)}
-              rows={3}
-              placeholder="Describe what needs to be completed..."
-              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-            />
-          </div>
-
-          {/* Objectives */}
-          <div className="sm:col-span-2">
-            <label className="mb-2 block text-xs font-semibold text-gray-700">
-              Objectives
-            </label>
-            <textarea
-              value={tObjectives}
-              onChange={(e) => setTObjectives(e.target.value)}
-              rows={3}
-              placeholder="What should this task achieve?"
-              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-            />
-          </div>
-
-          {/* Instruction file */}
-          <div className="sm:col-span-2">
-            <label className="mb-2 block text-xs font-semibold text-gray-700">
-              Instruction file (optional)
-            </label>
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx,.txt"
-              onChange={(e) =>
-                setTInstructionFile(e.target.files?.[0] || null)
-              }
-              className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-700"
-            />
-            {tInstructionFile && (
-              <p className="mt-2 text-xs text-gray-500">
-                Selected: {tInstructionFile.name} (
-                {formatFileSize(tInstructionFile.size)})
-              </p>
-            )}
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label className="mb-2 block text-xs font-semibold text-gray-700">
-              Priority
-            </label>
-            <select
-              value={tPriority}
-              onChange={(e) => setTPriority(e.target.value as ProgramPriority)}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
-            >
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-            </select>
-          </div>
-
-          {/* Assignee — Members only */}
-          <div>
-            <label className="mb-2 block text-xs font-semibold text-gray-700">
-              Assignee (Member)
-            </label>
-            <select
-              value={tAssignee}
-              onChange={(e) => setTAssignee(e.target.value)}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
-            >
-              <option value="">— Unassigned —</option>
-              {membersOnly.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.full_name}
-                  {u.job_title ? ` · ${u.job_title}` : ""}
-                </option>
-              ))}
-            </select>
-            {membersOnly.length === 0 && (
-              <p className="mt-2 text-xs text-amber-700">
-                No Members found. Add a user with role &quot;Member&quot; first.
-              </p>
-            )}
-          </div>
-
-          {/* Start date */}
-          <div>
-            <label className="mb-2 block text-xs font-semibold text-gray-700">
-              Start date
-            </label>
-            <input
-              type="date"
-              value={tStartDate}
-              onChange={(e) => setTStartDate(e.target.value)}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          {/* Due date */}
-          <div>
-            <label className="mb-2 block text-xs font-semibold text-gray-700">
-              Due date
-            </label>
-            <input
-              type="date"
-              value={tDueDate}
-              min={tStartDate || undefined}
-              onChange={(e) => setTDueDate(e.target.value)}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
-            />
-          </div>
-        </div>
-
-        {/* Info note */}
-        <div className="mt-6 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
-          <div className="flex gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-sm">
-              <AlertCircle size={15} />
+          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 text-white">
+              <div>
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
+                  <ListTodo size={19} />
+                </div>
+                <h2 className="text-lg font-semibold">Create a program task</h2>
+                <p className="mt-1 text-xs text-emerald-50">
+                  Under{" "}
+                  <span className="font-semibold text-white">
+                    {activeProgram?.name || "Program"}
+                  </span>{" "}
+                  →{" "}
+                  <span className="font-semibold text-white">
+                    {taskProjectName}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeCreateTaskModal}
+                disabled={savingTask}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/20 disabled:opacity-50"
+              >
+                <X size={19} />
+              </button>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-900">
-                How this task is delivered
-              </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-gray-700">
-                It will appear in the &quot;Program Project Tasks&quot; section of the
-                assignee&apos;s Tasks page, with a green card header showing the program
-                name. The member can add work parts, submit links, report challenges,
-                and upload files. You can mark it Done once evidence is provided.
-              </p>
+
+            {/* Body */}
+            <div className="overflow-y-auto bg-white px-6 py-6">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Task name <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    value={tName}
+                    onChange={(e) => setTName(e.target.value)}
+                    placeholder="e.g. Build recommendation engine"
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Description
+                  </label>
+                  <textarea
+                    value={tDescription}
+                    onChange={(e) => setTDescription(e.target.value)}
+                    rows={3}
+                    placeholder="Describe what needs to be completed..."
+                    className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Objectives
+                  </label>
+                  <textarea
+                    value={tObjectives}
+                    onChange={(e) => setTObjectives(e.target.value)}
+                    rows={3}
+                    placeholder="What should this task achieve?"
+                    className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Instruction file (optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt"
+                    onChange={(e) =>
+                      setTInstructionFile(e.target.files?.[0] || null)
+                    }
+                    className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-700"
+                  />
+                  {tInstructionFile && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Selected: {tInstructionFile.name} (
+                      {formatFileSize(tInstructionFile.size)})
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Priority
+                  </label>
+                  <select
+                    value={tPriority}
+                    onChange={(e) =>
+                      setTPriority(e.target.value as ProgramPriority)
+                    }
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Assignee (Member)
+                  </label>
+                  <select
+                    value={tAssignee}
+                    onChange={(e) => setTAssignee(e.target.value)}
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+                  >
+                    <option value="">— Unassigned —</option>
+                    {membersOnly.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.full_name}
+                        {u.job_title ? ` · ${u.job_title}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {membersOnly.length === 0 && (
+                    <p className="mt-2 text-xs text-amber-700">
+                      No Members found. Add a user with role &quot;Member&quot;
+                      first.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Start date
+                  </label>
+                  <input
+                    type="date"
+                    value={tStartDate}
+                    onChange={(e) => setTStartDate(e.target.value)}
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Due date
+                  </label>
+                  <input
+                    type="date"
+                    value={tDueDate}
+                    min={tStartDate || undefined}
+                    onChange={(e) => setTDueDate(e.target.value)}
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-sm">
+                    <AlertCircle size={15} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-900">
+                      How this task is delivered
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-gray-700">
+                      It will appear in the &quot;Program Project Tasks&quot;
+                      section of the assignee&apos;s Tasks page, with a green
+                      card header showing the program name. The member can add
+                      work parts, submit links, report challenges, and upload
+                      files. You can mark it Done once evidence is provided.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeCreateTaskModal}
+                disabled={savingTask}
+                className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateProgramTask}
+                disabled={savingTask || !tName.trim()}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-green-700 px-5 text-sm font-medium text-white hover:from-emerald-700 hover:to-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {savingTask ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={15} />
+                    Create task
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* ---------- Footer ---------- */}
-      <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:flex-row sm:justify-end">
-        <button
-          type="button"
-          onClick={closeCreateTaskModal}
-          disabled={savingTask}
-          className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleCreateProgramTask}
-          disabled={savingTask || !tName.trim()}
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-green-700 px-5 text-sm font-medium text-white hover:from-emerald-700 hover:to-green-800 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {savingTask ? (
-            <>
-              <RefreshCw size={14} className="animate-spin" />
-              Creating...
-            </>
-          ) : (
-            <>
-              <Plus size={15} />
-              Create task
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       {/* =====================================================
           VIEW PROJECT MODAL
@@ -1882,10 +2039,7 @@ const handleCreateProgramTask = async () => {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setViewProjectModalOpen(false);
-                  setSelectedProject(null);
-                }}
+                onClick={closeViewProjectModal}
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"
               >
                 <X size={19} />
@@ -1903,7 +2057,11 @@ const handleCreateProgramTask = async () => {
                   <p className="text-[12px] font-medium uppercase tracking-wide text-gray-800">
                     Status
                   </p>
-                  <span className={`mt-2 inline-flex rounded-md px-2.5 py-1 text-[13px] font-medium ${projectStatusStyles[selectedProject.status]}`}>
+                  <span
+                    className={`mt-2 inline-flex rounded-md px-2.5 py-1 text-[13px] font-medium ${
+                      projectStatusStyles[selectedProject.status]
+                    }`}
+                  >
                     {selectedProject.status}
                   </span>
                 </div>
@@ -1944,7 +2102,8 @@ const handleCreateProgramTask = async () => {
                   {selectedProject.about_title || "Project"}
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-gray-500">
-                  {selectedProject.about_description || "No description provided."}
+                  {selectedProject.about_description ||
+                    "No description provided."}
                 </p>
               </div>
 
@@ -1952,7 +2111,9 @@ const handleCreateProgramTask = async () => {
                 <div className="rounded-xl border border-gray-200 p-4">
                   <div className="flex items-center gap-2">
                     <Calendar size={16} className="text-gray-600" />
-                    <p className="text-sm font-semibold text-gray-700">Start Date</p>
+                    <p className="text-sm font-semibold text-gray-700">
+                      Start Date
+                    </p>
                   </div>
                   <p className="mt-2 text-sm text-gray-500">
                     {formatDate(selectedProject.start_date)}
@@ -1961,7 +2122,9 @@ const handleCreateProgramTask = async () => {
                 <div className="rounded-xl border border-gray-200 p-4">
                   <div className="flex items-center gap-2">
                     <Calendar size={16} className="text-gray-600" />
-                    <p className="text-sm font-semibold text-gray-700">Deadline</p>
+                    <p className="text-sm font-semibold text-gray-700">
+                      Deadline
+                    </p>
                   </div>
                   <p className="mt-2 text-sm text-gray-500">
                     {formatDate(selectedProject.deadline)}
@@ -1969,130 +2132,131 @@ const handleCreateProgramTask = async () => {
                 </div>
               </div>
 
-              {/* ============= PROGRAM TASKS SECTION ============= */}
-<div className="mt-5 rounded-xl border border-gray-200 bg-white p-5">
-  <div className="flex items-center justify-between">
-    <div className="flex items-center gap-2">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-        <ListTodo size={15} />
-      </div>
-      <div>
-        <h3 className="text-sm font-bold text-gray-900">Program tasks</h3>
-        <p className="text-[10px] font-medium text-gray-500">
-          Tasks under this program project
-        </p>
-      </div>
-    </div>
-    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-      {projectTasks.length} task{projectTasks.length === 1 ? "" : "s"}
-    </span>
-  </div>
-
-  <div className="mt-4 space-y-2">
-    {loadingProjectTasks ? (
-      <div className="flex min-h-[80px] items-center justify-center rounded-lg border border-gray-200 bg-white">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-emerald-700" />
-      </div>
-    ) : projectTasks.length === 0 ? (
-      <div className="rounded-lg border-2 border-dashed border-emerald-200 bg-emerald-50/40 px-4 py-6 text-center">
-        <p className="text-xs font-bold text-emerald-900">No tasks yet</p>
-        <p className="mt-1 text-[11px] font-medium text-emerald-700/80">
-          Use the kebab menu → Create Task to add the first task.
-        </p>
-      </div>
-    ) : (
-      projectTasks.map((task: any) => {
-        const statusColor =
-          task.status === "Done"
-            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-            : task.status === "Completed"
-            ? "border-amber-300 bg-amber-50 text-amber-700"
-            : task.status === "In Progress"
-            ? "border-blue-300 bg-blue-50 text-blue-700"
-            : "border-gray-300 bg-gray-50 text-gray-700";
-
-        const priorityColor =
-          task.priority === "High"
-            ? "text-red-700"
-            : task.priority === "Medium"
-            ? "text-amber-700"
-            : "text-gray-600";
-
-        return (
-          <div
-            key={task.id}
-            className="rounded-lg border border-emerald-100 bg-white p-3"
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                  task.status === "Done"
-                    ? "bg-emerald-600 text-white"
-                    : task.status === "Completed"
-                    ? "bg-amber-100 text-amber-700"
-                    : task.status === "In Progress"
-                    ? "bg-blue-100 text-blue-700"
-                    : "bg-gray-100 text-gray-700"
-                }`}
-              >
-                {task.status === "Done" ? (
-                  <Check size={14} />
-                ) : task.status === "Completed" ? (
-                  <CheckCircle2 size={14} />
-                ) : task.status === "In Progress" ? (
-                  <Clock3 size={14} />
-                ) : (
-                  <Circle size={14} />
-                )}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-gray-900">
-                  {task.name}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${statusColor}`}
-                  >
-                    {task.status}
+              {/* ============ PROGRAM TASKS SECTION ============ */}
+              <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <ListTodo size={15} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">
+                        Program tasks
+                      </h3>
+                      <p className="text-[10px] font-medium text-gray-500">
+                        Tasks under this program project
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                    {projectTasks.length} task
+                    {projectTasks.length === 1 ? "" : "s"}
                   </span>
-                  <span
-                    className={`inline-flex items-center gap-1 text-[10px] font-semibold ${priorityColor}`}
-                  >
-                    <Flag size={10} />
-                    {task.priority}
-                  </span>
-                  {task.assignee_name && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
-                      <Users size={10} />
-                      {task.assignee_name}
-                    </span>
-                  )}
-                  {task.due_date && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
-                      <Calendar size={10} />
-                      {formatDate(task.due_date)}
-                    </span>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {loadingProjectTasks ? (
+                    <div className="flex min-h-[80px] items-center justify-center rounded-lg border border-gray-200 bg-white">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-emerald-700" />
+                    </div>
+                  ) : projectTasks.length === 0 ? (
+                    <div className="rounded-lg border-2 border-dashed border-emerald-200 bg-emerald-50/40 px-4 py-6 text-center">
+                      <p className="text-xs font-bold text-emerald-900">
+                        No tasks yet
+                      </p>
+                      <p className="mt-1 text-[11px] font-medium text-emerald-700/80">
+                        Use the kebab menu → Create Task to add the first task.
+                      </p>
+                    </div>
+                  ) : (
+                    projectTasks.map((task) => {
+                      const statusColor =
+                        task.status === "Done"
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                          : task.status === "Completed"
+                          ? "border-amber-300 bg-amber-50 text-amber-700"
+                          : task.status === "In Progress"
+                          ? "border-blue-300 bg-blue-50 text-blue-700"
+                          : "border-gray-300 bg-gray-50 text-gray-700";
+
+                      const priorityColor =
+                        task.priority === "High"
+                          ? "text-red-700"
+                          : task.priority === "Medium"
+                          ? "text-amber-700"
+                          : "text-gray-600";
+
+                      return (
+                        <div
+                          key={task.id}
+                          className="rounded-lg border border-emerald-100 bg-white p-3"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                                task.status === "Done"
+                                  ? "bg-emerald-600 text-white"
+                                  : task.status === "Completed"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : task.status === "In Progress"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}
+                            >
+                              {task.status === "Done" ? (
+                                <Check size={14} />
+                              ) : task.status === "Completed" ? (
+                                <CheckCircle2 size={14} />
+                              ) : task.status === "In Progress" ? (
+                                <Clock3 size={14} />
+                              ) : (
+                                <Circle size={14} />
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-bold text-gray-900">
+                                {task.name}
+                              </p>
+                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${statusColor}`}
+                                >
+                                  {task.status}
+                                </span>
+                                <span
+                                  className={`inline-flex items-center gap-1 text-[10px] font-semibold ${priorityColor}`}
+                                >
+                                  <Flag size={10} />
+                                  {task.priority}
+                                </span>
+                                {task.assignee_name && (
+                                  <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                                    <Users size={10} />
+                                    {task.assignee_name}
+                                  </span>
+                                )}
+                                {task.due_date && (
+                                  <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                                    <Calendar size={10} />
+                                    {formatDate(task.due_date)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-        );
-      })
-    )}
-  </div>
-</div>
-              
             </div>
 
             <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
               <button
                 type="button"
-                onClick={() => {
-                  setViewProjectModalOpen(false);
-                  setSelectedProject(null);
-                }}
+                onClick={closeViewProjectModal}
                 className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Close
@@ -2101,7 +2265,10 @@ const handleCreateProgramTask = async () => {
                 type="button"
                 onClick={() => {
                   setViewProjectModalOpen(false);
-                  openAssignModal(selectedProject.id, selectedProject.assigned_to);
+                  openAssignModal(
+                    selectedProject.id,
+                    selectedProject.assigned_to
+                  );
                 }}
                 className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-medium text-white hover:bg-emerald-700"
               >
