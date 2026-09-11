@@ -522,6 +522,7 @@ const [deletingChallenge, setDeletingChallenge] =
 
 const [challengeCounts, setChallengeCounts] =
   useState<Record<string, number>>({});
+const [challengeBasePath, setChallengeBasePath] = useState<string>(API_BASE);
 
 // ====================================
 // FILE ATTACHMENT STATE
@@ -566,7 +567,10 @@ const [instructionPreview, setInstructionPreview] = useState<{
   file: any | null;
 } | null>(null);
 
-
+const [guideModalOpen, setGuideModalOpen] = useState(false);
+const [guideTask, setGuideTask] = useState<ProgramTask | null>(null);
+const [submissionBasePath, setSubmissionBasePath] = useState<string>(API_BASE);
+  
   const isManagementRole =
   currentUser?.role === "System Administrator" ||
   currentUser?.role === "Executive Manager" ||
@@ -763,23 +767,23 @@ const handleDeleteSubmission = async (submissionId: string) => {
 };
 
 const openSubmissionModal = async (task: Task) => {
-    if (!canViewSubmissions(task)) {
-        alert("You are not authorized to view submissions for this task.");
-        return;
-    }
+  if (!canViewSubmissions(task)) {
+    alert("You are not authorized to view submissions for this task.");
+    return;
+  }
+  setSubmissionBasePath(API_BASE);
+  setSelectedTaskForSubmission(task);
+  setSubmissionModalOpen(true);
+  setSubmissionLink("");
+  setSubmissionDescription("");
+  setNewPartTitle("");
+  setNewPartDescription("");
+  setNewPartStatus("To Do");
 
-    setSelectedTaskForSubmission(task);
-    setSubmissionModalOpen(true);
-    setSubmissionLink("");
-    setSubmissionDescription("");
-    setNewPartTitle("");
-    setNewPartDescription("");
-    setNewPartStatus("To Do");
-
-    await Promise.all([
-        fetchTaskSubmissions(task.id),
-        fetchWorkParts(task.id),
-    ]);
+  await Promise.all([
+    fetchTaskSubmissions(task.id),
+    fetchWorkParts(task.id),
+  ]);
 };
 
 const closeSubmissionModal = () => {
@@ -1812,17 +1816,21 @@ const handleDeleteProgramTask = async (taskId: string) => {
 };
 
 const openProgramTaskInstructions = async (task: ProgramTask) => {
+  setGuideTask(task);
+  setGuideModalOpen(true);
   await fetchProgramTaskInstructions(task.id);
-  setSelectedTaskForAttachment(task as any); // reuse the modal shell
-  setAttachmentModalOpen(true);
 };
 
 /* ---- Challenges ---- */
 
 const openProgramChallenges = async (task: ProgramTask) => {
+  setChallengeBasePath(PROGRAM_API);   // ← new state
   setSelectedChallengeTask(task as any);
+  setChallengeText("");
+  setChallenges([]);
   setChallengeModalOpen(true);
-  // Adjust to program endpoint
+  setOpenTaskMenu(null);
+
   try {
     setLoadingChallenges(true);
     const res = await fetch(`${PROGRAM_API}/${task.id}/challenges`, {
@@ -1834,7 +1842,6 @@ const openProgramChallenges = async (task: ProgramTask) => {
     setLoadingChallenges(false);
   }
 };
-
 /* ---- Files ---- */
 
 const openProgramAttachmentModal = async (task: ProgramTask) => {
@@ -1858,16 +1865,13 @@ const openProgramAttachmentModal = async (task: ProgramTask) => {
 /* ---- Submissions ---- */
 
 const openProgramSubmissionModal = async (task: ProgramTask) => {
+  setSubmissionBasePath(PROGRAM_API);   // ← key line
   setSelectedTaskForSubmission(task as any);
   setSubmissionModalOpen(true);
   try {
     const [subsRes, partsRes] = await Promise.all([
-      fetch(`${PROGRAM_API}/${task.id}/submissions`, {
-        headers: authHeaders(),
-      }),
-      fetch(`${PROGRAM_API}/${task.id}/work-parts`, {
-        headers: authHeaders(),
-      }),
+      fetch(`${PROGRAM_API}/${task.id}/submissions`, { headers: authHeaders() }),
+      fetch(`${PROGRAM_API}/${task.id}/work-parts`,  { headers: authHeaders() }),
     ]);
     const subs = await subsRes.json();
     const parts = await partsRes.json();
@@ -1877,7 +1881,7 @@ const openProgramSubmissionModal = async (task: ProgramTask) => {
     console.error(e);
   }
 };
-
+  
 const fetchTaskChallenges = async (task: Task) => {
   try {
     setLoadingChallenges(true);
@@ -1953,13 +1957,11 @@ const fetchTaskChallenges = async (task: Task) => {
   setChallengeText("");
 };
 
-  const handleAddChallenge = async () => {
+const handleAddChallenge = async (basePath: string = API_BASE) => {
   if (!selectedChallengeTask) return;
 
   if (!canWriteChallenge(selectedChallengeTask)) {
-    alert(
-      "Only the Member assigned to this task can add challenges."
-    );
+    alert("Only the Member assigned to this task can add challenges.");
     return;
   }
 
@@ -1971,59 +1973,58 @@ const fetchTaskChallenges = async (task: Task) => {
   try {
     setSavingChallenge(true);
 
-    const response = await fetch(
-      `${API_BASE}/challenges/task/${selectedChallengeTask.id}`,
-      {
-        method: "POST",
-        headers: {
-          ...authHeaders(),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          challenge: challengeText.trim(),
-        }),
-      }
-    );
+    const url =
+      basePath === PROGRAM_API
+        ? `${PROGRAM_API}/${selectedChallengeTask.id}/challenges`
+        : `${API_BASE}/challenges/task/${selectedChallengeTask.id}`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        ...authHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        challenge: challengeText.trim(),
+      }),
+    });
 
     const data = await response.json();
 
     if (!response.ok) {
       throw new Error(
-        data.error ||
-        data.message ||
-        "Failed to add challenge"
+        data.error || data.message || "Failed to add challenge"
       );
     }
 
     if (data.challenge) {
-      setChallenges((previous) => [
-        ...previous,
-        data.challenge,
-      ]);
+      setChallenges((previous) => [...previous, data.challenge]);
     } else {
-      await fetchTaskChallenges(
-        selectedChallengeTask
-      );
+      // Refetch to get the authoritative list
+      if (basePath === PROGRAM_API) {
+        const r = await fetch(
+          `${PROGRAM_API}/${selectedChallengeTask.id}/challenges`,
+          { headers: authHeaders() }
+        );
+        const d = await r.json();
+        setChallenges(d.challenges || []);
+      } else {
+        await fetchTaskChallenges(selectedChallengeTask);
+      }
     }
 
     setChallengeText("");
   } catch (error: any) {
-    console.error(
-      "Add challenge error:",
-      error
-    );
-
-    alert(
-      error.message ||
-      "Failed to add challenge"
-    );
+    console.error("Add challenge error:", error);
+    alert(error.message || "Failed to add challenge");
   } finally {
     setSavingChallenge(false);
   }
 };
 
-  const handleDeleteChallenge = async (
-  challengeId: string
+const handleDeleteChallenge = async (
+  challengeId: string,
+  basePath: string = API_BASE
 ) => {
   const confirmed = window.confirm(
     "Are you sure you want to delete this challenge?"
@@ -2034,40 +2035,30 @@ const fetchTaskChallenges = async (task: Task) => {
   try {
     setDeletingChallenge(challengeId);
 
-    const response = await fetch(
-      `${API_BASE}/challenges/${challengeId}`,
-      {
-        method: "DELETE",
-        headers: authHeaders(),
-      }
-    );
+    const url =
+      basePath === PROGRAM_API
+        ? `${PROGRAM_API}/challenges/${challengeId}`
+        : `${API_BASE}/challenges/${challengeId}`;
+
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
 
     const data = await response.json();
 
     if (!response.ok) {
       throw new Error(
-        data.error ||
-        data.message ||
-        "Failed to delete challenge"
+        data.error || data.message || "Failed to delete challenge"
       );
     }
 
     setChallenges((previous) =>
-      previous.filter(
-        (challenge) =>
-          challenge.id !== challengeId
-      )
+      previous.filter((challenge) => challenge.id !== challengeId)
     );
   } catch (error: any) {
-    console.error(
-      "Delete challenge error:",
-      error
-    );
-
-    alert(
-      error.message ||
-      "Failed to delete challenge"
-    );
+    console.error("Delete challenge error:", error);
+    alert(error.message || "Failed to delete challenge");
   } finally {
     setDeletingChallenge(null);
   }
@@ -2147,85 +2138,85 @@ const handleAddWorkPart = async (taskId: string, basePath = API_BASE) => {
 };
 
 const handleUpdateWorkPartStatus = async (
-    workPartId: string,
-    newStatus: WorkPartStatus,
-    taskId: string
+  workPartId: string,
+  newStatus: WorkPartStatus,
+  taskId: string,
+  basePath: string = API_BASE
 ) => {
-    try {
-        const response = await fetch(
-            `${API_BASE}/work-parts/${workPartId}/status`,
-            {
-                method: "PATCH",
-                headers: {
-                    ...authHeaders(),
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ status: newStatus }),
-            }
-        );
+  try {
+    const url =
+      basePath === PROGRAM_API
+        ? `${PROGRAM_API}/work-parts/${workPartId}/status`
+        : `${API_BASE}/work-parts/${workPartId}/status`;
 
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || data.message || "Failed to update status");
-        }
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        ...authHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status: newStatus }),
+    });
 
-        setWorkParts(prev => ({
-            ...prev,
-            [taskId]: (prev[taskId] || []).map(part =>
-                part.id === workPartId ? { ...part, status: newStatus } : part
-            )
-        }));
-    } catch (error) {
-        console.error("Update work part status error:", error);
-        alert(error instanceof Error ? error.message : "Failed to update status");
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || data.message || "Failed to update status");
     }
+
+    setWorkParts((prev) => ({
+      ...prev,
+      [taskId]: (prev[taskId] || []).map((part) =>
+        part.id === workPartId ? { ...part, status: newStatus } : part
+      ),
+    }));
+  } catch (error) {
+    console.error("Update work part status error:", error);
+    alert(error instanceof Error ? error.message : "Failed to update status");
+  }
 };
 
-const handleDeleteWorkPart = async (workPartId: string, taskId: string) => {
-    const confirmed = window.confirm("Delete this work part?");
-    if (!confirmed) return;
+const handleDeleteWorkPart = async (
+  workPartId: string,
+  taskId: string,
+  basePath: string = API_BASE
+) => {
+  const confirmed = window.confirm("Delete this work part?");
+  if (!confirmed) return;
 
-    try {
-        setDeletingWorkPart(workPartId);
-        const response = await fetch(
-            `${API_BASE}/work-parts/${workPartId}`,
-            {
-                method: "DELETE",
-                headers: authHeaders(),
-            }
-        );
+  try {
+    setDeletingWorkPart(workPartId);
 
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || data.message || "Failed to delete work part");
-        }
+    const url =
+      basePath === PROGRAM_API
+        ? `${PROGRAM_API}/work-parts/${workPartId}`
+        : `${API_BASE}/work-parts/${workPartId}`;
 
-        setWorkParts(prev => ({
-            ...prev,
-            [taskId]: (prev[taskId] || []).filter(p => p.id !== workPartId)
-        }));
-    } catch (error) {
-        console.error("Delete work part error:", error);
-        alert(error instanceof Error ? error.message : "Failed to delete work part");
-    } finally {
-        setDeletingWorkPart(null);
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || data.message || "Failed to delete work part");
     }
+
+    setWorkParts((prev) => ({
+      ...prev,
+      [taskId]: (prev[taskId] || []).filter((p) => p.id !== workPartId),
+    }));
+  } catch (error) {
+    console.error("Delete work part error:", error);
+    alert(error instanceof Error ? error.message : "Failed to delete work part");
+  } finally {
+    setDeletingWorkPart(null);
+  }
 };
 
 const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
     try {
         const task = tasks.find((t) => t.id === taskId);
         if (!task) return;
-
-        // =========================================================
-        // ROLE-BASED STATUS RULES
-        // =========================================================
-
-        // ---------------------------------------------------------
-        // MEMBER: can only set "In Progress" or "Completed"
-        // Cannot set "Done"
-        // Cannot move Completed back to To Do
-        // ---------------------------------------------------------
         if (isMember) {
             if (status === "Done") {
                 alert(
@@ -5315,6 +5306,139 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
           </div>
         </div>
       )}
+
+      {/* =========================================================
+    PROGRAM TASK GUIDE MODAL — list instruction files
+========================================================= */}
+{guideModalOpen && guideTask && (
+  <div
+    className="fixed inset-0 z-[95] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
+    onMouseDown={(e) => {
+      if (e.target === e.currentTarget) {
+        setGuideModalOpen(false);
+        setGuideTask(null);
+      }
+    }}
+  >
+    <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-2xl">
+      {/* Header */}
+      <div className="flex items-start justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-4 text-white">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <FileText size={18} />
+            <h2 className="truncate text-base font-bold">
+              Task Guide
+            </h2>
+          </div>
+          <p className="mt-0.5 truncate text-[11px] text-emerald-50">
+            {guideTask.name}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setGuideModalOpen(false);
+            setGuideTask(null);
+          }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/20"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="overflow-y-auto bg-white p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-gray-950">
+              Instruction files
+            </h3>
+            <p className="mt-1 text-xs font-medium text-gray-600">
+              Uploaded by the manager when the task was created.
+            </p>
+          </div>
+          <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
+            {(programTaskInstructions[guideTask.id] || []).length} file
+            {(programTaskInstructions[guideTask.id] || []).length === 1
+              ? ""
+              : "s"}
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          {loadingInstructions ? (
+            <div className="flex min-h-[120px] items-center justify-center rounded-xl border-2 border-gray-300 bg-white">
+              <div className="h-7 w-7 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+            </div>
+          ) : (programTaskInstructions[guideTask.id] || []).length === 0 ? (
+            <div className="rounded-xl border-2 border-dashed border-gray-400 bg-white px-5 py-12 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-600">
+                <FileText size={20} />
+              </div>
+              <p className="mt-3 text-sm font-bold text-gray-950">
+                No guide files attached
+              </p>
+              <p className="mt-1 text-xs font-medium text-gray-600">
+                The manager hasn't uploaded any reference material yet.
+              </p>
+            </div>
+          ) : (
+            (programTaskInstructions[guideTask.id] || []).map((ins: any) => (
+              <div
+                key={ins.id}
+                className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white p-4"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                  {getFileIcon(ins.file_type || "")}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-gray-950">
+                    {ins.file_name}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-medium text-gray-500">
+                    {formatFileSize(ins.file_size || 0)}
+                    {ins.created_at
+                      ? ` • ${formatDate(ins.created_at)}`
+                      : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => handlePreviewInstruction(ins)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    title="Preview"
+                  >
+                    <FileText size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleDownloadInstruction(ins)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                    title="Download"
+                  >
+                    <Download size={14} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex justify-end border-t border-emerald-100 bg-gray-50/70 px-6 py-4">
+        <button
+          onClick={() => {
+            setGuideModalOpen(false);
+            setGuideTask(null);
+          }}
+          className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-800 hover:bg-gray-100"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+      
     </>
   );
 }
