@@ -262,11 +262,13 @@ const [successMessage, setSuccessMessage] = useState("");
     [currentUser]
   );
 
-  const membersOnly = useMemo(
-  () => assignableUsers.filter((u) => u.role === "Member"),
+ const membersOnly = useMemo(
+  () =>
+    assignableUsers.filter(
+      (u) => String(u.role).trim().toLowerCase() === "member"
+    ),
   [assignableUsers]
 );
-
 
   /* =======================================================
      AUTH
@@ -308,17 +310,46 @@ const [successMessage, setSuccessMessage] = useState("");
     }
   };
 
-  const fetchAssignableUsers = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/programs/assignable-users`, {
+const fetchAssignableUsers = async () => {
+  try {
+    // 1st choice: programs-scoped endpoint
+    let res = await fetch(`${API_BASE}/api/programs/assignable-users`, {
+      headers: getAuthHeaders(),
+    });
+
+    // Fallback to the general users endpoint if the programs route isn't deployed
+    if (!res.ok) {
+      res = await fetch(`${API_BASE}/api/users`, {
         headers: getAuthHeaders(),
       });
-      const data = await res.json();
-      if (res.ok) setAssignableUsers(data.users || []);
-    } catch (err) {
-      console.error("Failed to load assignable users:", err);
     }
-  };
+
+    if (!res.ok) {
+      console.error("Assignable users failed:", res.status);
+      return;
+    }
+
+    const data = await res.json();
+    const rawUsers =
+      data.users ||
+      data.data ||
+      (Array.isArray(data) ? data : []);
+
+    const normalized: AssignableUser[] = rawUsers
+      .map((u: any) => ({
+        id: String(u.id ?? u.user_id ?? ""),
+        full_name: u.full_name ?? u.fullName ?? u.name ?? "Unknown",
+        email: u.email ?? "",
+        role: u.role ?? "",
+        job_title: u.job_title ?? u.jobTitle ?? null,
+      }))
+      .filter((u) => u.id !== "");
+
+    setAssignableUsers(normalized);
+  } catch (err) {
+    console.error("Failed to load assignable users:", err);
+  }
+};
 
   const fetchProgramDetails = async (programId: string) => {
     try {
@@ -337,6 +368,24 @@ const [successMessage, setSuccessMessage] = useState("");
       setLoadingProjects(false);
     }
   };
+
+  const fetchProjectTasks = async (programProjectId: string) => {
+  try {
+    setLoadingProjectTasks(true);
+    const res = await fetch(
+      `${PROGRAM_TASK_API}/program-project/${programProjectId}`,
+      { headers: getAuthHeaders() }
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Failed to load tasks");
+    setProjectTasks(data.tasks || []);
+  } catch (err: any) {
+    console.error("Fetch project tasks error:", err);
+    setProjectTasks([]);
+  } finally {
+    setLoadingProjectTasks(false);
+  }
+};
 
   useEffect(() => {
     if (!currentUser || !isAdminOrManager) return;
@@ -501,7 +550,7 @@ const [successMessage, setSuccessMessage] = useState("");
    CREATE PROGRAM TASK
 ======================================================== */
 
-const openCreateTaskModal = (project: ProgramProject) => {
+const openCreateTaskModal = async (project: ProgramProject) => {
   setTaskProjectId(project.id);
   setTaskProjectName(project.name);
   setTName("");
@@ -516,6 +565,11 @@ const openCreateTaskModal = (project: ProgramProject) => {
   setSuccessMessage("");
   setError("");
   setCreateTaskModalOpen(true);
+
+  // Guarantee the member list is populated before the user interacts
+  if (assignableUsers.length === 0) {
+    await fetchAssignableUsers();
+  }
 };
 
 const closeCreateTaskModal = () => {
@@ -873,6 +927,12 @@ const handleCreateProgramTask = async () => {
                           </h3>
                           <p className="mt-0.5 truncate text-[13px] text-gray-400">
                             {program.domain || "No domain"}
+                          </p>
+
+                          <p className="mt-1 text-[11px] font-medium text-emerald-700">
+                            {project.task_count ?? 0} task{(project.task_count ?? 0) === 1 ? "" : "s"}
+                            {" · "}
+                            {project.completed_task_count ?? 0} done
                           </p>
                         </div>
                       </div>
@@ -1908,6 +1968,122 @@ const handleCreateProgramTask = async () => {
                   </p>
                 </div>
               </div>
+
+              {/* ============= PROGRAM TASKS SECTION ============= */}
+<div className="mt-5 rounded-xl border border-gray-200 bg-white p-5">
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+        <ListTodo size={15} />
+      </div>
+      <div>
+        <h3 className="text-sm font-bold text-gray-900">Program tasks</h3>
+        <p className="text-[10px] font-medium text-gray-500">
+          Tasks under this program project
+        </p>
+      </div>
+    </div>
+    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+      {projectTasks.length} task{projectTasks.length === 1 ? "" : "s"}
+    </span>
+  </div>
+
+  <div className="mt-4 space-y-2">
+    {loadingProjectTasks ? (
+      <div className="flex min-h-[80px] items-center justify-center rounded-lg border border-gray-200 bg-white">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-emerald-700" />
+      </div>
+    ) : projectTasks.length === 0 ? (
+      <div className="rounded-lg border-2 border-dashed border-emerald-200 bg-emerald-50/40 px-4 py-6 text-center">
+        <p className="text-xs font-bold text-emerald-900">No tasks yet</p>
+        <p className="mt-1 text-[11px] font-medium text-emerald-700/80">
+          Use the kebab menu → Create Task to add the first task.
+        </p>
+      </div>
+    ) : (
+      projectTasks.map((task: any) => {
+        const statusColor =
+          task.status === "Done"
+            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+            : task.status === "Completed"
+            ? "border-amber-300 bg-amber-50 text-amber-700"
+            : task.status === "In Progress"
+            ? "border-blue-300 bg-blue-50 text-blue-700"
+            : "border-gray-300 bg-gray-50 text-gray-700";
+
+        const priorityColor =
+          task.priority === "High"
+            ? "text-red-700"
+            : task.priority === "Medium"
+            ? "text-amber-700"
+            : "text-gray-600";
+
+        return (
+          <div
+            key={task.id}
+            className="rounded-lg border border-emerald-100 bg-white p-3"
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                  task.status === "Done"
+                    ? "bg-emerald-600 text-white"
+                    : task.status === "Completed"
+                    ? "bg-amber-100 text-amber-700"
+                    : task.status === "In Progress"
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-gray-100 text-gray-700"
+                }`}
+              >
+                {task.status === "Done" ? (
+                  <Check size={14} />
+                ) : task.status === "Completed" ? (
+                  <CheckCircle2 size={14} />
+                ) : task.status === "In Progress" ? (
+                  <Clock3 size={14} />
+                ) : (
+                  <Circle size={14} />
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-gray-900">
+                  {task.name}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${statusColor}`}
+                  >
+                    {task.status}
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold ${priorityColor}`}
+                  >
+                    <Flag size={10} />
+                    {task.priority}
+                  </span>
+                  {task.assignee_name && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                      <Users size={10} />
+                      {task.assignee_name}
+                    </span>
+                  )}
+                  {task.due_date && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                      <Calendar size={10} />
+                      {formatDate(task.due_date)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })
+    )}
+  </div>
+</div>
+              
             </div>
 
             <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
