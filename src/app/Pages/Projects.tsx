@@ -1852,8 +1852,8 @@ export default function Projects() {
                                     setActiveView("table")
                                 }
                                 className={`relative pb-3 text-lg font-medium ${activeView === "table"
-                                        ? "text-gray-900"
-                                        : "text-gray-500 hover:text-gray-800"
+                                    ? "text-gray-900"
+                                    : "text-gray-500 hover:text-gray-800"
                                     }`}
                             >
                                 Table View
@@ -1872,9 +1872,9 @@ export default function Projects() {
                                         )
                                     }
                                     className={`relative pb-3 text-lg font-medium ${activeView ===
-                                            "assignment"
-                                            ? "text-gray-900"
-                                            : "text-gray-500 hover:text-gray-800"
+                                        "assignment"
+                                        ? "text-gray-900"
+                                        : "text-gray-500 hover:text-gray-800"
                                         }`}
                                 >
                                     Assignment Board
@@ -1891,8 +1891,8 @@ export default function Projects() {
                                     type="button"
                                     onClick={() => setActiveView("programs")}
                                     className={`relative pb-3 text-lg font-medium ${activeView === "programs"
-                                            ? "text-gray-900"
-                                            : "text-gray-500 hover:text-gray-800"
+                                        ? "text-gray-900"
+                                        : "text-gray-500 hover:text-gray-800"
                                         }`}
                                 >
                                     Programs
@@ -1981,9 +1981,9 @@ export default function Projects() {
                                                     );
                                                 }}
                                                 className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-sm ${selectedStatus ===
-                                                        status
-                                                        ? "bg-gray-100 font-medium text-gray-900"
-                                                        : "text-gray-600 hover:bg-gray-50"
+                                                    status
+                                                    ? "bg-gray-100 font-medium text-gray-900"
+                                                    : "text-gray-600 hover:bg-gray-50"
                                                     }`}
                                             >
                                                 {status}
@@ -2047,6 +2047,171 @@ export default function Projects() {
 
                                 </div>
                             </div>
+
+                            {/* =========================================================
+    PROGRAM PROJECT MEMBERSHIPS (Member only)
+========================================================= */}
+                            {isMember && memberProgramProjects.length > 0 && (
+                                <div className="border-t border-emerald-100 bg-emerald-50/40 px-4 py-6 sm:px-6">
+                                    <div className="mb-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                                                <ListTodo size={16} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-bold text-gray-900">
+                                                    Program project memberships
+                                                </h3>
+                                                <p className="mt-0.5 text-[11px] text-gray-600">
+                                                    Program projects you are a member of. Tasks inside them appear on your Tasks page.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className="rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                                            {memberProgramProjects.length} program project
+                                            {memberProgramProjects.length === 1 ? "" : "s"}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                                        {memberProgramProjects.map((pp) => {
+                                            const progress =
+                                                pp.task_count > 0
+                                                    ? Math.round((pp.completed_task_count / pp.task_count) * 100)
+                                                    : 0;
+
+                                            return (
+                                                <div
+                                                    key={pp.id}
+                                                    className="rounded-2xl border border-emerald-200 bg-white shadow-[0_4px_16px_rgba(16,185,129,0.08)] transition hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-[0_10px_28px_rgba(16,185,129,0.16)]"
+                                                >
+                                                    {/* GREEN HEADER */}
+                                                    <div className="rounded-t-2xl bg-gradient-to-r from-emerald-600 to-green-700 px-4 py-3 text-white">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                                                                <FolderKanban size={15} />
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                                                                        Program
+                                                                    </span>
+                                                                    <span className="truncate text-[10px] font-bold text-emerald-50">
+                                                                        {pp.program_name || "Program"}
+                                                                    </span>
+                                                                </div>
+                                                                <h4 className="mt-0.5 truncate text-sm font-bold">
+                                                                    {pp.name}
+                                                                </h4>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* BODY */}
+                                                    <div className="p-4">
+                                                        <p className="truncate text-[12px] text-gray-500">
+                                                            {pp.domain || "No domain"}
+                                                        </p>
+
+                                                        <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-gray-600">
+                                                            {pp.about_description || "No description provided."}
+                                                        </p>
+
+                                                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                                                            <span
+                                                                className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold ${pp.status === "Done"
+                                                                    ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                                                    : pp.status === "In Progress"
+                                                                        ? "border-blue-300 bg-blue-50 text-blue-700"
+                                                                        : pp.status === "Paused"
+                                                                            ? "border-orange-300 bg-orange-50 text-orange-700"
+                                                                            : "border-gray-300 bg-gray-50 text-gray-700"
+                                                                    }`}
+                                                            >
+                                                                {pp.status}
+                                                            </span>
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500">
+                                                                <Flag size={10} />
+                                                                {pp.priority}
+                                                            </span>
+                                                            {pp.assigned_to_name && (
+                                                                <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                                                                    <User size={10} />
+                                                                    PM: {pp.assigned_to_name}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Progress bar */}
+                                                        <div className="mt-3">
+                                                            <div className="mb-1 flex items-center justify-between">
+                                                                <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400">
+                                                                    Progress
+                                                                </span>
+                                                                <span className="text-[10px] font-bold text-gray-700">
+                                                                    {progress}%
+                                                                </span>
+                                                            </div>
+                                                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                                                                <div
+                                                                    className="h-full rounded-full bg-emerald-600 transition-all"
+                                                                    style={{ width: `${progress}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Stat tiles */}
+                                                        <div className="mt-3 grid grid-cols-2 gap-2">
+                                                            <div className="rounded-lg border border-gray-100 bg-gray-50 p-2 text-center">
+                                                                <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
+                                                                    All tasks
+                                                                </p>
+                                                                <p className="mt-0.5 text-sm font-bold text-gray-800">
+                                                                    {pp.completed_task_count}/{pp.task_count}
+                                                                </p>
+                                                            </div>
+                                                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-center">
+                                                                <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-600">
+                                                                    My tasks
+                                                                </p>
+                                                                <p className="mt-0.5 text-sm font-bold text-emerald-800">
+                                                                    {pp.my_completed_task_count}/{pp.my_task_count}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Dates */}
+                                                        {(pp.start_date || pp.deadline) && (
+                                                            <div className="mt-3 grid grid-cols-2 gap-2">
+                                                                {pp.start_date && (
+                                                                    <div className="rounded-lg border border-gray-100 bg-white p-2">
+                                                                        <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
+                                                                            Start
+                                                                        </p>
+                                                                        <p className="mt-0.5 text-[11px] font-bold text-gray-800">
+                                                                            {formatDate(pp.start_date)}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                                {pp.deadline && (
+                                                                    <div className="rounded-lg border border-gray-100 bg-white p-2">
+                                                                        <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
+                                                                            Deadline
+                                                                        </p>
+                                                                        <p className="mt-0.5 text-[11px] font-bold text-gray-800">
+                                                                            {formatDate(pp.deadline)}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* LOADING */}
 
@@ -2325,7 +2490,7 @@ export default function Projects() {
                                                         <span
                                                             className={`inline-flex rounded-md px-2.5 py-1 text-[12px] font-medium ${statusStyles[
                                                                 project.status
-                                                                ]
+                                                            ]
                                                                 }`}
                                                         >
                                                             {
@@ -2508,171 +2673,6 @@ export default function Projects() {
                                         }
                                     )}
 
-                                </div>
-                            )}
-
-                            {/* =========================================================
-    PROGRAM PROJECT MEMBERSHIPS (Member only)
-========================================================= */}
-                            {isMember && memberProgramProjects.length > 0 && (
-                                <div className="border-t border-emerald-100 bg-emerald-50/40 px-4 py-6 sm:px-6">
-                                    <div className="mb-4 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
-                                                <ListTodo size={16} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-bold text-gray-900">
-                                                    Program project memberships
-                                                </h3>
-                                                <p className="mt-0.5 text-[11px] text-gray-600">
-                                                    Program projects you are a member of. Tasks inside them appear on your Tasks page.
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <span className="rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-700">
-                                            {memberProgramProjects.length} program project
-                                            {memberProgramProjects.length === 1 ? "" : "s"}
-                                        </span>
-                                    </div>
-
-                                    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                                        {memberProgramProjects.map((pp) => {
-                                            const progress =
-                                                pp.task_count > 0
-                                                    ? Math.round((pp.completed_task_count / pp.task_count) * 100)
-                                                    : 0;
-
-                                            return (
-                                                <div
-                                                    key={pp.id}
-                                                    className="rounded-2xl border border-emerald-200 bg-white shadow-[0_4px_16px_rgba(16,185,129,0.08)] transition hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-[0_10px_28px_rgba(16,185,129,0.16)]"
-                                                >
-                                                    {/* GREEN HEADER */}
-                                                    <div className="rounded-t-2xl bg-gradient-to-r from-emerald-600 to-green-700 px-4 py-3 text-white">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                                                                <FolderKanban size={15} />
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                    <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider">
-                                                                        Program
-                                                                    </span>
-                                                                    <span className="truncate text-[10px] font-bold text-emerald-50">
-                                                                        {pp.program_name || "Program"}
-                                                                    </span>
-                                                                </div>
-                                                                <h4 className="mt-0.5 truncate text-sm font-bold">
-                                                                    {pp.name}
-                                                                </h4>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* BODY */}
-                                                    <div className="p-4">
-                                                        <p className="truncate text-[12px] text-gray-500">
-                                                            {pp.domain || "No domain"}
-                                                        </p>
-
-                                                        <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-gray-600">
-                                                            {pp.about_description || "No description provided."}
-                                                        </p>
-
-                                                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                                                            <span
-                                                                className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold ${pp.status === "Done"
-                                                                        ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                                                                        : pp.status === "In Progress"
-                                                                            ? "border-blue-300 bg-blue-50 text-blue-700"
-                                                                            : pp.status === "Paused"
-                                                                                ? "border-orange-300 bg-orange-50 text-orange-700"
-                                                                                : "border-gray-300 bg-gray-50 text-gray-700"
-                                                                    }`}
-                                                            >
-                                                                {pp.status}
-                                                            </span>
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500">
-                                                                <Flag size={10} />
-                                                                {pp.priority}
-                                                            </span>
-                                                            {pp.assigned_to_name && (
-                                                                <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
-                                                                    <User size={10} />
-                                                                    PM: {pp.assigned_to_name}
-                                                                </span>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Progress bar */}
-                                                        <div className="mt-3">
-                                                            <div className="mb-1 flex items-center justify-between">
-                                                                <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400">
-                                                                    Progress
-                                                                </span>
-                                                                <span className="text-[10px] font-bold text-gray-700">
-                                                                    {progress}%
-                                                                </span>
-                                                            </div>
-                                                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                                                                <div
-                                                                    className="h-full rounded-full bg-emerald-600 transition-all"
-                                                                    style={{ width: `${progress}%` }}
-                                                                />
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Stat tiles */}
-                                                        <div className="mt-3 grid grid-cols-2 gap-2">
-                                                            <div className="rounded-lg border border-gray-100 bg-gray-50 p-2 text-center">
-                                                                <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
-                                                                    All tasks
-                                                                </p>
-                                                                <p className="mt-0.5 text-sm font-bold text-gray-800">
-                                                                    {pp.completed_task_count}/{pp.task_count}
-                                                                </p>
-                                                            </div>
-                                                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-center">
-                                                                <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-600">
-                                                                    My tasks
-                                                                </p>
-                                                                <p className="mt-0.5 text-sm font-bold text-emerald-800">
-                                                                    {pp.my_completed_task_count}/{pp.my_task_count}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Dates */}
-                                                        {(pp.start_date || pp.deadline) && (
-                                                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                                                {pp.start_date && (
-                                                                    <div className="rounded-lg border border-gray-100 bg-white p-2">
-                                                                        <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
-                                                                            Start
-                                                                        </p>
-                                                                        <p className="mt-0.5 text-[11px] font-bold text-gray-800">
-                                                                            {formatDate(pp.start_date)}
-                                                                        </p>
-                                                                    </div>
-                                                                )}
-                                                                {pp.deadline && (
-                                                                    <div className="rounded-lg border border-gray-100 bg-white p-2">
-                                                                        <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
-                                                                            Deadline
-                                                                        </p>
-                                                                        <p className="mt-0.5 text-[11px] font-bold text-gray-800">
-                                                                            {formatDate(pp.deadline)}
-                                                                        </p>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
                                 </div>
                             )}
 
@@ -3057,8 +3057,8 @@ export default function Projects() {
                                                                         )
                                                                     }
                                                                     className={`min-h-[280px] rounded-xl border-2 bg-[#f7f7f8] p-3 transition ${isDragOver
-                                                                            ? "border-gray-900 bg-gray-50"
-                                                                            : "border-gray-200"
+                                                                        ? "border-gray-900 bg-gray-50"
+                                                                        : "border-gray-200"
                                                                         }`}
                                                                 >
 
@@ -3184,7 +3184,7 @@ export default function Projects() {
                                                                                             <span
                                                                                                 className={`inline-flex rounded-md px-2 py-1 text-[9px] font-medium ${statusStyles[
                                                                                                     project.status
-                                                                                                    ]
+                                                                                                ]
                                                                                                     }`}
                                                                                             >
                                                                                                 {
@@ -4129,9 +4129,9 @@ export default function Projects() {
                                             )
                                         }
                                         className={`rounded-xl border p-4 text-left transition ${selectedNewStatus ===
-                                                "Backlog"
-                                                ? "border-gray-900 bg-gray-50"
-                                                : "border-gray-200 hover:bg-gray-50"
+                                            "Backlog"
+                                            ? "border-gray-900 bg-gray-50"
+                                            : "border-gray-200 hover:bg-gray-50"
                                             }`}
                                     >
 
@@ -4164,9 +4164,9 @@ export default function Projects() {
                                             )
                                         }
                                         className={`rounded-xl border p-4 text-left transition ${selectedNewStatus ===
-                                                "Done"
-                                                ? "border-emerald-500 bg-emerald-50"
-                                                : "border-gray-200 hover:bg-gray-50"
+                                            "Done"
+                                            ? "border-emerald-500 bg-emerald-50"
+                                            : "border-gray-200 hover:bg-gray-50"
                                             }`}
                                     >
 
@@ -4511,7 +4511,7 @@ export default function Projects() {
                                         <span
                                             className={`mt-2 inline-flex rounded-md px-2.5 py-1 text-[13px] font-medium ${statusStyles[
                                                 selectedProject.status
-                                                ]
+                                            ]
                                                 }`}
                                         >
                                             {
@@ -5031,8 +5031,8 @@ export default function Projects() {
                                                     )
                                                 }
                                                 className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${selected
-                                                        ? "border-gray-900 bg-gray-50"
-                                                        : "border-gray-200 hover:bg-gray-50"
+                                                    ? "border-gray-900 bg-gray-50"
+                                                    : "border-gray-200 hover:bg-gray-50"
                                                     }`}
                                             >
 
