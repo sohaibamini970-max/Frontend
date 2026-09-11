@@ -27,6 +27,7 @@ import {
     ListTodo,
     AlertCircle,
     FolderKanban,
+    Layers,
 } from "lucide-react";
 
 const API_BASE = "https://backend-five-swart-88.vercel.app";
@@ -397,6 +398,26 @@ export default function Projects() {
         MemberProgramProject[]
     >([]);
 
+    const [openProgramProjectMenu, setOpenProgramProjectMenu] = useState<
+  string | null
+>(null);
+
+const [createProgramTaskOpen, setCreateProgramTaskOpen] = useState(false);
+const [cptProgramProjectId, setCptProgramProjectId] = useState<string | null>(
+  null
+);
+const [cptProgramProjectName, setCptProgramProjectName] = useState("");
+
+const [cptName, setCptName] = useState("");
+const [cptDescription, setCptDescription] = useState("");
+const [cptObjectives, setCptObjectives] = useState("");
+const [cptPriority, setCptPriority] =
+  useState<ProjectPriority>("Medium");
+const [cptStartDate, setCptStartDate] = useState("");
+const [cptDueDate, setCptDueDate] = useState("");
+const [cptSaving, setCptSaving] = useState(false);
+const [cptError, setCptError] = useState("");
+const [cptSuccess, setCptSuccess] = useState("");
     /* =========================================================
        ROLE PERMISSIONS
     ========================================================= */
@@ -458,6 +479,80 @@ export default function Projects() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
     });
+
+    const openCreateProgramTaskModal = (pp: MemberProgramProject) => {
+  setCptProgramProjectId(pp.id);
+  setCptProgramProjectName(pp.name);
+  setCptName("");
+  setCptDescription("");
+  setCptObjectives("");
+  setCptPriority("Medium");
+  setCptStartDate("");
+  setCptDueDate("");
+  setCptError("");
+  setCptSuccess("");
+  setOpenProgramProjectMenu(null);
+  setCreateProgramTaskOpen(true);
+};
+
+const closeCreateProgramTaskModal = () => {
+  if (cptSaving) return;
+  setCreateProgramTaskOpen(false);
+  setCptProgramProjectId(null);
+  setCptProgramProjectName("");
+};
+
+const handleCreateProgramTask = async () => {
+  if (!cptProgramProjectId) return;
+  if (!cptName.trim()) {
+    setCptError("Task name is required.");
+    return;
+  }
+
+  try {
+    setCptSaving(true);
+    setCptError("");
+    setCptSuccess("");
+
+    const res = await fetch(
+      `${PROGRAM_TASK_API}/program-project/${cptProgramProjectId}`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: cptName.trim(),
+          description: cptDescription.trim() || null,
+          objectives: cptObjectives.trim() || null,
+          priority: cptPriority,
+          status: "To Do",
+          // Member: server overrides this to self. Manager: could send null.
+          assigneeId: null,
+          startDate: cptStartDate || null,
+          dueDate: cptDueDate || null,
+        }),
+      }
+    );
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to create task");
+    }
+
+    setCptSuccess(`Task "${cptName.trim()}" created.`);
+
+    // Refresh the member's program projects (task counts will update)
+    await fetchMemberProgramProjects();
+
+    setTimeout(() => {
+      closeCreateProgramTaskModal();
+      setCptSuccess("");
+    }, 1200);
+  } catch (e: any) {
+    setCptError(e.message || "Failed to create task");
+  } finally {
+    setCptSaving(false);
+  }
+};
 
     const fetchMemberProgramProjects = async () => {
         try {
@@ -2047,171 +2142,251 @@ export default function Projects() {
 
                                 </div>
                             </div>
-
-                            {/* =========================================================
-    PROGRAM PROJECT MEMBERSHIPS (Member only)
+{/* =========================================================
+    PROGRAM PROJECT MEMBERSHIPS (Member only) — rendered FIRST
 ========================================================= */}
-                            {isMember && memberProgramProjects.length > 0 && (
-                                <div className="border-t border-emerald-100 bg-emerald-50/40 px-4 py-6 sm:px-6">
-                                    <div className="mb-4 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
-                                                <ListTodo size={16} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-bold text-gray-900">
-                                                    Program project memberships
-                                                </h3>
-                                                <p className="mt-0.5 text-[11px] text-gray-600">
-                                                    Program projects you are a member of. Tasks inside them appear on your Tasks page.
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <span className="rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-700">
-                                            {memberProgramProjects.length} program project
-                                            {memberProgramProjects.length === 1 ? "" : "s"}
-                                        </span>
-                                    </div>
+{!loading && isMember && memberProgramProjects.length > 0 && (
+  <div className="border-b border-emerald-100 bg-emerald-50/40 px-4 py-6 sm:px-6">
+    <div className="mb-4 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
+          <ListTodo size={16} />
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-gray-900">
+            Program project memberships
+          </h3>
+          <p className="mt-0.5 text-[11px] text-gray-600">
+            Program projects you are a member of. Tasks inside them appear on your Tasks page.
+          </p>
+        </div>
+      </div>
+      <span className="rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+        {memberProgramProjects.length} program project
+        {memberProgramProjects.length === 1 ? "" : "s"}
+      </span>
+    </div>
 
-                                    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                                        {memberProgramProjects.map((pp) => {
-                                            const progress =
-                                                pp.task_count > 0
-                                                    ? Math.round((pp.completed_task_count / pp.task_count) * 100)
-                                                    : 0;
+    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      {memberProgramProjects.map((pp) => {
+        const progress =
+          pp.task_count > 0
+            ? Math.round((pp.completed_task_count / pp.task_count) * 100)
+            : 0;
 
-                                            return (
-                                                <div
-                                                    key={pp.id}
-                                                    className="rounded-2xl border border-emerald-200 bg-white shadow-[0_4px_16px_rgba(16,185,129,0.08)] transition hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-[0_10px_28px_rgba(16,185,129,0.16)]"
-                                                >
-                                                    {/* GREEN HEADER */}
-                                                    <div className="rounded-t-2xl bg-gradient-to-r from-emerald-600 to-green-700 px-4 py-3 text-white">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                                                                <FolderKanban size={15} />
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                    <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider">
-                                                                        Program
-                                                                    </span>
-                                                                    <span className="truncate text-[10px] font-bold text-emerald-50">
-                                                                        {pp.program_name || "Program"}
-                                                                    </span>
-                                                                </div>
-                                                                <h4 className="mt-0.5 truncate text-sm font-bold">
-                                                                    {pp.name}
-                                                                </h4>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+        return (
+          <div
+            key={pp.id}
+            className="group relative rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_4px_16px_rgba(16,185,129,0.06)] transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_10px_28px_rgba(16,185,129,0.12)]"
+          >
+            {/* TOP: program tag + kebab */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                <Layers size={11} />
+                <span className="truncate">
+                  {pp.program_name || "Program"}
+                </span>
+              </div>
 
-                                                    {/* BODY */}
-                                                    <div className="p-4">
-                                                        <p className="truncate text-[12px] text-gray-500">
-                                                            {pp.domain || "No domain"}
-                                                        </p>
+              {/* Kebab */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenProgramProjectMenu(
+                      openProgramProjectMenu === pp.id ? null : pp.id
+                    );
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                >
+                  <MoreVertical size={17} />
+                </button>
 
-                                                        <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-gray-600">
-                                                            {pp.about_description || "No description provided."}
-                                                        </p>
+                {openProgramProjectMenu === pp.id && (
+                  <div
+                    className="absolute right-0 top-9 z-50 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenProgramProjectMenu(null);
+                        // Route into the Tasks page or expand inline — for
+                        // simplicity we just close the menu; navigation is
+                        // handled by the Tasks page.
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <Eye size={16} className="text-gray-500" />
+                      View Project
+                    </button>
 
-                                                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                                                            <span
-                                                                className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold ${pp.status === "Done"
-                                                                    ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                                                                    : pp.status === "In Progress"
-                                                                        ? "border-blue-300 bg-blue-50 text-blue-700"
-                                                                        : pp.status === "Paused"
-                                                                            ? "border-orange-300 bg-orange-50 text-orange-700"
-                                                                            : "border-gray-300 bg-gray-50 text-gray-700"
-                                                                    }`}
-                                                            >
-                                                                {pp.status}
-                                                            </span>
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500">
-                                                                <Flag size={10} />
-                                                                {pp.priority}
-                                                            </span>
-                                                            {pp.assigned_to_name && (
-                                                                <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
-                                                                    <User size={10} />
-                                                                    PM: {pp.assigned_to_name}
-                                                                </span>
-                                                            )}
-                                                        </div>
+                    <button
+                      type="button"
+                      onClick={() => openCreateProgramTaskModal(pp)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-emerald-50"
+                    >
+                      <Plus size={16} className="text-emerald-600" />
+                      Create Task
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
 
-                                                        {/* Progress bar */}
-                                                        <div className="mt-3">
-                                                            <div className="mb-1 flex items-center justify-between">
-                                                                <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400">
-                                                                    Progress
-                                                                </span>
-                                                                <span className="text-[10px] font-bold text-gray-700">
-                                                                    {progress}%
-                                                                </span>
-                                                            </div>
-                                                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                                                                <div
-                                                                    className="h-full rounded-full bg-emerald-600 transition-all"
-                                                                    style={{ width: `${progress}%` }}
-                                                                />
-                                                            </div>
-                                                        </div>
+            {/* BODY — matches the manager card layout */}
+            <div className="mt-3 flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
+                PM
+              </div>
 
-                                                        {/* Stat tiles */}
-                                                        <div className="mt-3 grid grid-cols-2 gap-2">
-                                                            <div className="rounded-lg border border-gray-100 bg-gray-50 p-2 text-center">
-                                                                <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
-                                                                    All tasks
-                                                                </p>
-                                                                <p className="mt-0.5 text-sm font-bold text-gray-800">
-                                                                    {pp.completed_task_count}/{pp.task_count}
-                                                                </p>
-                                                            </div>
-                                                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-center">
-                                                                <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-600">
-                                                                    My tasks
-                                                                </p>
-                                                                <p className="mt-0.5 text-sm font-bold text-emerald-800">
-                                                                    {pp.my_completed_task_count}/{pp.my_task_count}
-                                                                </p>
-                                                            </div>
-                                                        </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-lg font-semibold text-gray-900">
+                  {pp.name}
+                </h3>
+                <p className="mt-0.5 truncate text-[14px] text-gray-400">
+                  {pp.domain || "No domain"}
+                </p>
+                <p className="mt-1 text-[11px] font-medium text-emerald-700">
+                  {pp.task_count} task{pp.task_count === 1 ? "" : "s"}
+                  {" · "}
+                  {pp.completed_task_count} done
+                </p>
+              </div>
+            </div>
 
-                                                        {/* Dates */}
-                                                        {(pp.start_date || pp.deadline) && (
-                                                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                                                {pp.start_date && (
-                                                                    <div className="rounded-lg border border-gray-100 bg-white p-2">
-                                                                        <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
-                                                                            Start
-                                                                        </p>
-                                                                        <p className="mt-0.5 text-[11px] font-bold text-gray-800">
-                                                                            {formatDate(pp.start_date)}
-                                                                        </p>
-                                                                    </div>
-                                                                )}
-                                                                {pp.deadline && (
-                                                                    <div className="rounded-lg border border-gray-100 bg-white p-2">
-                                                                        <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
-                                                                            Deadline
-                                                                        </p>
-                                                                        <p className="mt-0.5 text-[11px] font-bold text-gray-800">
-                                                                            {formatDate(pp.deadline)}
-                                                                        </p>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
+            {/* Description box */}
+            <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
+              <p className="text-sm font-semibold text-gray-800">
+                {pp.about_title || "Project"}
+              </p>
+              <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-gray-500">
+                {pp.about_description || "No description provided."}
+              </p>
+            </div>
+
+            {/* Assigned members (chips) — uses assigned_to_name as PM */}
+            {pp.assigned_to_name && (
+              <div className="mt-4">
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                  Assigned manager
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[8px] font-bold text-white">
+                      {initialsOf(pp.assigned_to_name)}
+                    </span>
+                    {pp.assigned_to_name}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Status + Priority */}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex rounded-md border px-2.5 py-1 text-[12px] font-medium ${
+                  pp.status === "Done"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : pp.status === "In Progress"
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : pp.status === "Paused"
+                    ? "border-orange-200 bg-orange-50 text-orange-700"
+                    : "border-pink-200 bg-pink-50 text-pink-700"
+                }`}
+              >
+                {pp.status}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[12px] font-medium text-gray-500">
+                <Flag size={10} />
+                {pp.priority || "Medium"}
+              </span>
+            </div>
+
+            {/* PM owner + Reassign-like row (but for Member it's informational) */}
+            <div className="mt-4 flex items-center justify-between">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-700">
+                  {initialsOf(pp.assigned_to_name || "PM")}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold text-gray-700">
+                    {pp.assigned_to_name || "Unassigned"}
+                  </p>
+                  <p className="text-[11px] text-gray-400">
+                    Project Manager
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <p className="text-[13px] text-gray-400">Tasks</p>
+                <p className="text-lg font-semibold text-gray-700">
+                  {pp.completed_task_count}/{pp.task_count}
+                </p>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                  Progress
+                </span>
+                <span className="text-xs font-bold text-gray-700">
+                  {progress}%
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                <div
+                  className="h-full rounded-full bg-emerald-600 transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Dates */}
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-lg border border-gray-100 bg-white p-2.5">
+                <div className="flex items-center gap-1.5">
+                  <Calendar size={12} className="text-gray-600" />
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-gray-600">
+                    Start
+                  </span>
+                </div>
+                <p className="mt-1 text-[13px] font-medium text-gray-900">
+                  {formatDate(pp.start_date)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-100 bg-white p-2.5">
+                <div className="flex items-center gap-1.5">
+                  <Calendar size={12} className="text-gray-600" />
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-gray-600">
+                    Deadline
+                  </span>
+                </div>
+                <p className="mt-1 text-[13px] font-medium text-gray-900">
+                  {formatDate(pp.deadline)}
+                </p>
+              </div>
+            </div>
+
+            {/* Green details button */}
+            <button
+              type="button"
+              onClick={() => openCreateProgramTaskModal(pp)}
+              className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 text-xs font-semibold text-white transition hover:bg-emerald-700"
+            >
+              <Eye size={14} />
+              View Project Details
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
 
                             {/* LOADING */}
 
@@ -4960,6 +5135,181 @@ export default function Projects() {
                         </div>
                     </div>
                 )}
+
+            {/* =====================================================
+    CREATE PROGRAM TASK MODAL (Member)
+===================================================== */}
+{createProgramTaskOpen && cptProgramProjectId && (
+  <div
+    className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]"
+    onMouseDown={(e) => {
+      if (e.target === e.currentTarget) closeCreateProgramTaskModal();
+    }}
+  >
+    <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      {/* Header */}
+      <div className="flex items-start justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 text-white">
+        <div>
+          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
+            <ListTodo size={19} />
+          </div>
+          <h2 className="text-lg font-semibold">Create a program task</h2>
+          <p className="mt-1 text-xs text-emerald-50">
+            Under{" "}
+            <span className="font-semibold text-white">
+              {cptProgramProjectName}
+            </span>
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={closeCreateProgramTaskModal}
+          disabled={cptSaving}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/20 disabled:opacity-50"
+        >
+          <X size={19} />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="overflow-y-auto bg-white px-6 py-6">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Task name <span className="text-red-600">*</span>
+            </label>
+            <input
+              value={cptName}
+              onChange={(e) => setCptName(e.target.value)}
+              placeholder="e.g. Build recommendation engine"
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Description
+            </label>
+            <textarea
+              value={cptDescription}
+              onChange={(e) => setCptDescription(e.target.value)}
+              rows={3}
+              placeholder="Describe what needs to be completed..."
+              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Objectives
+            </label>
+            <textarea
+              value={cptObjectives}
+              onChange={(e) => setCptObjectives(e.target.value)}
+              rows={3}
+              placeholder="What should this task achieve?"
+              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Priority
+            </label>
+            <select
+              value={cptPriority}
+              onChange={(e) =>
+                setCptPriority(e.target.value as ProjectPriority)
+              }
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+            >
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Assigned to
+            </label>
+            <div className="flex h-11 items-center rounded-lg border border-gray-200 bg-gray-50 px-3.5 text-sm font-semibold text-gray-700">
+              You (the current member)
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Start date
+            </label>
+            <input
+              type="date"
+              value={cptStartDate}
+              onChange={(e) => setCptStartDate(e.target.value)}
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Due date
+            </label>
+            <input
+              type="date"
+              value={cptDueDate}
+              min={cptStartDate || undefined}
+              onChange={(e) => setCptDueDate(e.target.value)}
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+            />
+          </div>
+        </div>
+
+        {cptError && (
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+            <p className="text-xs font-medium text-red-600">{cptError}</p>
+          </div>
+        )}
+        {cptSuccess && (
+          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+            <p className="text-xs font-medium text-emerald-700">
+              {cptSuccess}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={closeCreateProgramTaskModal}
+          disabled={cptSaving}
+          className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleCreateProgramTask}
+          disabled={cptSaving || !cptName.trim()}
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-green-700 px-5 text-sm font-medium text-white hover:from-emerald-700 hover:to-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {cptSaving ? (
+            <>
+              <RefreshCw size={14} className="animate-spin" />
+              Creating...
+            </>
+          ) : (
+            <>
+              <Plus size={15} />
+              Create task
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
             {/* =====================================================
           ASSIGN MODAL
