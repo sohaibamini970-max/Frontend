@@ -2547,19 +2547,19 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
           </div>
 
           {/* =========================================================
-    PROGRAM PROJECT TASKS  (green header, program tag)
-========================================================= */}
-{groupedProgramTasks.length > 0 && (
-  <section className="mt-7">
-    <div className="mb-3 flex items-center gap-2">
-      <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-600 px-3 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
-        <FolderKanban size={12} />
-        Program Project Tasks
-      </span>
-      <p className="text-xs font-medium text-gray-600">
-        Special tasks under programs. Header is green so they're easy to spot.
-      </p>
-    </div>
+                 PROGRAM PROJECT TASKS  (green header, program tag)
+              ========================================================= */}
+          {groupedProgramTasks.length > 0 && (
+            <section className="mt-7">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-600 px-3 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
+                  <FolderKanban size={12} />
+                  Program Project Tasks
+                </span>
+                <p className="text-xs font-medium text-gray-600">
+                  Special tasks under programs. Header is green so they're easy to spot.
+                </p>
+              </div>
 
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
       {groupedProgramTasks.map((group) => {
@@ -2809,88 +2809,121 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                           </div>
 
                           {/* Action row — 5 buttons */}
-                          <div className="mt-3 grid grid-cols-5 gap-2 border-t border-emerald-100 pt-2.5">
+                         {/* Action row — 5 buttons (Details, Guide, Work, Challenges, Files) */}
+                        <div className="mt-3 grid grid-cols-5 gap-2 border-t border-emerald-100 pt-2.5">
+                          {/* Details */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openTaskDetails(task);
+                            }}
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#07111f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#172235]"
+                          >
+                            <Eye size={13} />
+                            <span>Details</span>
+                          </button>
+                        
+                          {/* Guide (program-specific) */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openProgramTaskInstructions(task);
+                            }}
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-emerald-800"
+                            title="View instruction files"
+                          >
+                            <FileText size={13} />
+                            <span>Guide</span>
+                            {(programTaskInstructions[task.id]?.length || 0) > 0 && (
+                              <span className="flex min-w-[17px] items-center justify-center rounded-full bg-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-950">
+                                {programTaskInstructions[task.id]?.length || 0}
+                              </span>
+                            )}
+                          </button>
+                        
+                          {/* Work Submissions — same dynamic label + badge as normal tasks */}
+                          {canViewSubmissions(task) ? (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openTaskDetails(task);
+                                openProgramSubmissionModal(task);
                               }}
-                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#07111f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#172235]"
+                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#1a4a3a] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#23634b]"
+                              title={
+                                canSubmitWork(task)
+                                  ? hasSubmissions(task.id) || (workParts[task.id]?.length || 0) > 0
+                                    ? "You have submitted work — view or add another version"
+                                    : "Submit your work"
+                                  : "View work submissions"
+                              }
                             >
-                              <Eye size={13} />
-                              <span>Details</span>
-                            </button>
-
-                            {/* Instructions */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openProgramTaskInstructions(task);
-                              }}
-                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-emerald-800"
-                            >
-                              <FileText size={13} />
-                              <span>Guide</span>
-                              {(programTaskInstructions[task.id]?.length || 0) > 0 && (
-                                <span className="flex min-w-[17px] items-center justify-center rounded-full bg-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-950">
-                                  {programTaskInstructions[task.id]?.length || 0}
+                              <CheckCircle2 size={13} />
+                              <span>
+                                {canSubmitWork(task)
+                                  ? hasSubmissions(task.id) || (workParts[task.id]?.length || 0) > 0
+                                    ? "Submitted Work"
+                                    : "Submit Work"
+                                  : "Work"}
+                              </span>
+                              {(hasSubmissions(task.id) || (workParts[task.id]?.length || 0) > 0) && (
+                                <span className="flex min-w-[17px] items-center justify-center rounded-full bg-emerald-300 px-1.5 py-0.5 text-[9px] font-bold text-emerald-950">
+                                  {(submissions[task.id]?.length || 0) +
+                                    (workParts[task.id]?.length || 0)}
                                 </span>
                               )}
                             </button>
-
-                            {/* Work submissions */}
-                            {canViewSubmissions(task) ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openProgramSubmissionModal(task);
-                                }}
-                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#1a4a3a] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#23634b]"
-                              >
-                                <CheckCircle2 size={13} />
-                                <span>Work</span>
-                              </button>
-                            ) : (
-                              <div />
-                            )}
-
-                            {/* Challenges */}
-                            {canReadChallenge(task) ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openProgramChallenges(task);
-                                }}
-                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#31204f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#432968]"
-                              >
-                                <Flag size={13} />
-                                <span>Issues</span>
-                              </button>
-                            ) : (
-                              <div />
-                            )}
-
-                            {/* Files */}
-                            {canReadAttachments(task) ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openProgramAttachmentModal(task);
-                                }}
-                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#49351b] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#60451f]"
-                              >
-                                <File size={13} />
-                                <span>Files</span>
-                              </button>
-                            ) : (
-                              <div />
-                            )}
-                          </div>
+                          ) : (
+                            <div />
+                          )}
+                        
+                          {/* Challenges — renamed from "Issues" */}
+                          {canReadChallenge(task) ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openProgramChallenges(task);
+                              }}
+                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#31204f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#432968]"
+                            >
+                              <Flag size={13} />
+                              <span>Challenges</span>
+                              {challengeCounts[task.id] !== undefined && (
+                                <span className="flex min-w-[17px] items-center justify-center rounded-full bg-violet-300 px-1.5 py-0.5 text-[9px] font-bold text-violet-950">
+                                  {challengeCounts[task.id]}
+                                </span>
+                              )}
+                            </button>
+                          ) : (
+                            <div />
+                          )}
+                        
+                          {/* Files */}
+                          {canReadAttachments(task) ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openProgramAttachmentModal(task);
+                              }}
+                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#49351b] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#60451f]"
+                            >
+                              <File size={13} />
+                              <span>Files</span>
+                              {(attachments[task.id]?.length || 0) > 0 && (
+                                <span className="flex min-w-[17px] items-center justify-center rounded-full bg-amber-300 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">
+                                  {attachments[task.id]?.length || 0}
+                                </span>
+                              )}
+                            </button>
+                          ) : (
+                            <div />
+                          )}
+                        </div>
+                          
                         </div>
                       </div>
                     </div>
