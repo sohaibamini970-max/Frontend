@@ -1345,55 +1345,6 @@ const handlePreviewAttachment = async (attachment: Attachment) => {
     setPreviewLoading(false);
 };
 
- const handleDeleteSubmission = async (
-    submissionId: string,
-    basePath: string = API_BASE
-) => {
-    const confirmed = window.confirm(
-        "Are you sure you want to delete this submission?"
-    );
-    if (!confirmed) return;
-
-    try {
-        setDeletingSubmission(submissionId);
-
-        const url =
-            basePath === PROGRAM_API
-                ? `${PROGRAM_API}/submissions/${submissionId}`
-                : `${API_BASE}/submissions/${submissionId}`;
-
-        const response = await fetch(url, {
-            method: "DELETE",
-            headers: authHeaders(),
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.message || "Failed to delete submission");
-        }
-
-        if (basePath === PROGRAM_API && selectedTaskForSubmission) {
-            const r = await fetch(
-                `${PROGRAM_API}/${selectedTaskForSubmission.id}/submissions`,
-                { headers: authHeaders() }
-            );
-            const d = await r.json();
-            setSubmissions((prev) => ({
-                ...prev,
-                [selectedTaskForSubmission.id]: d.submissions || [],
-            }));
-        } else if (selectedTaskForSubmission) {
-            await fetchTaskSubmissions(selectedTaskForSubmission.id);
-        }
-
-        alert("Submission deleted successfully");
-    } catch (error) {
-        console.error("Delete submission error:", error);
-        alert(error instanceof Error ? error.message : "Failed to delete submission");
-    } finally {
-        setDeletingSubmission(null);
-    }
-};
 
   const openAttachmentModal = async (task: Task) => {
     setSelectedTaskForAttachment(task);
