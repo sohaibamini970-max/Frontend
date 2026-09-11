@@ -118,6 +118,16 @@ type ProgramTask = {
   created_at: string;
 };
 
+type ProjectMemberRow = {
+  id: string;
+  user_id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  job_title: string | null;
+  assigned_at?: string;
+};
+
 /* =========================================================
    HELPERS
 ========================================================= */
@@ -240,6 +250,11 @@ export default function Programs() {
     Record<string, { total: number; done: number }>
   >({});
 
+  /* Program project members (per program project) */
+  const [projectMembers, setProjectMembers] = useState<
+    Record<string, ProjectMemberRow[]>
+  >({});
+
   /* Tasks shown inside the View Project modal */
   const [projectTasks, setProjectTasks] = useState<ProgramTask[]>([]);
   const [loadingProjectTasks, setLoadingProjectTasks] = useState(false);
@@ -253,6 +268,15 @@ export default function Programs() {
     null
   );
   const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null);
+
+  /* Members modal */
+  const [membersModalOpen, setMembersModalOpen] = useState(false);
+  const [membersModalProjectId, setMembersModalProjectId] = useState<
+    string | null
+  >(null);
+  const [membersModalProjectName, setMembersModalProjectName] = useState("");
+  const [currentMemberIds, setCurrentMemberIds] = useState<string[]>([]);
+  const [savingMembers, setSavingMembers] = useState(false);
 
   /* Create program form */
   const [pName, setPName] = useState("");
@@ -400,8 +424,9 @@ export default function Programs() {
       const projects: ProgramProject[] = data.projects || [];
       setProgramProjects(projects);
 
-      // Fire-and-forget: fetch task counts for every project
+      // Fire-and-forget background fetches
       fetchAllProgramProjectTaskCounts(projects);
+      fetchAllProgramProjectMembers(projects);
     } catch (err: any) {
       setError(err.message || "Unable to load program details.");
     } finally {
@@ -439,6 +464,30 @@ export default function Programs() {
     );
 
     setProjectTaskCounts(results);
+  };
+
+  /* Per-project member list */
+  const fetchProjectMembers = async (programProjectId: string) => {
+    try {
+      const res = await fetch(
+        `${PROGRAM_TASK_API}/program-project/${programProjectId}/members`,
+        { headers: getAuthHeaders() }
+      );
+      const data = await res.json();
+      if (!res.ok) return;
+      setProjectMembers((prev) => ({
+        ...prev,
+        [programProjectId]: data.members || [],
+      }));
+    } catch (e) {
+      console.error("Fetch project members error:", e);
+    }
+  };
+
+  const fetchAllProgramProjectMembers = async (
+    projects: ProgramProject[]
+  ) => {
+    await Promise.all(projects.map((p) => fetchProjectMembers(p.id)));
   };
 
   /* Tasks for the View Project modal */
@@ -483,6 +532,7 @@ export default function Programs() {
     setProgramProjects([]);
     setSearch("");
     setProjectTaskCounts({});
+    setProjectMembers({});
   };
 
   /* =======================================================
@@ -580,7 +630,7 @@ export default function Programs() {
   };
 
   /* =======================================================
-     ASSIGN PROJECT
+     ASSIGN PROJECT (single PM owner)
   ======================================================= */
 
   const openAssignModal = (
@@ -617,6 +667,58 @@ export default function Programs() {
       setError(err.message);
     } finally {
       setAssigning(false);
+    }
+  };
+
+  /* =======================================================
+     ASSIGN MEMBERS TO PROGRAM PROJECT
+  ======================================================= */
+
+  const openMembersModal = async (project: ProgramProject) => {
+    setMembersModalProjectId(project.id);
+    setMembersModalProjectName(project.name);
+    setCurrentMemberIds(
+      (projectMembers[project.id] || []).map((m) => m.user_id)
+    );
+    setOpenProjectMenu(null);
+    setMembersModalOpen(true);
+
+    // Ensure the member list for this project is loaded
+    if (!projectMembers[project.id]) {
+      await fetchProjectMembers(project.id);
+    }
+  };
+
+  const closeMembersModal = () => {
+    if (savingMembers) return;
+    setMembersModalOpen(false);
+    setMembersModalProjectId(null);
+    setMembersModalProjectName("");
+    setCurrentMemberIds([]);
+  };
+
+  const handleSaveMembers = async () => {
+    if (!membersModalProjectId) return;
+    try {
+      setSavingMembers(true);
+      setError("");
+      const res = await fetch(
+        `${PROGRAM_TASK_API}/program-project/${membersModalProjectId}/members`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ userIds: currentMemberIds }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to save members");
+
+      await fetchProjectMembers(membersModalProjectId);
+      closeMembersModal();
+    } catch (e: any) {
+      setError(e.message || "Failed to save members");
+    } finally {
+      setSavingMembers(false);
     }
   };
 
@@ -736,7 +838,7 @@ export default function Programs() {
         }.`
       );
 
-      // Reset form but keep the modal visible for a moment
+      // Reset form but keep modal visible briefly
       setTName("");
       setTDescription("");
       setTObjectives("");
@@ -746,7 +848,6 @@ export default function Programs() {
       setTDueDate("");
       setTInstructionFile(null);
 
-      // Refresh task counts for the currently open program
       if (programProjects.length > 0) {
         fetchAllProgramProjectTaskCounts(programProjects);
       }
@@ -1142,6 +1243,8 @@ export default function Programs() {
                     done: project.completed_task_count ?? 0,
                   };
 
+                  const members = projectMembers[project.id] || [];
+
                   return (
                     <div
                       key={project.id}
@@ -1197,7 +1300,7 @@ export default function Programs() {
 
                               {openProjectMenu === project.id && (
                                 <div
-                                  className="absolute right-0 top-9 z-50 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+                                  className="absolute right-0 top-9 z-50 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <button
@@ -1226,12 +1329,28 @@ export default function Programs() {
                                       size={16}
                                       className="text-gray-500"
                                     />
-                                    {project.assigned_to ? "Reassign" : "Assign"}
+                                    {project.assigned_to
+                                      ? "Reassign PM"
+                                      : "Assign PM"}
                                   </button>
 
                                   <button
                                     type="button"
-                                    onClick={() => openCreateTaskModal(project)}
+                                    onClick={() => openMembersModal(project)}
+                                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-emerald-50"
+                                  >
+                                    <Users
+                                      size={16}
+                                      className="text-emerald-600"
+                                    />
+                                    Assign Members
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openCreateTaskModal(project)
+                                    }
                                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-emerald-50"
                                   >
                                     <ListTodo
@@ -1257,6 +1376,34 @@ export default function Programs() {
                         </p>
                       </div>
 
+                      {/* Assigned members chips */}
+                      {members.length > 0 && (
+                        <div className="mt-4">
+                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                            Assigned members
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {members.slice(0, 4).map((m) => (
+                              <span
+                                key={m.user_id}
+                                title={m.email}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
+                              >
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[8px] font-bold text-white">
+                                  {initialsOf(m.full_name)}
+                                </span>
+                                {m.full_name.split(" ")[0]}
+                              </span>
+                            ))}
+                            {members.length > 4 && (
+                              <span className="text-[10px] font-semibold text-emerald-600">
+                                +{members.length - 4} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Status / Priority */}
                       <div className="mt-4 flex flex-wrap items-center gap-2">
                         <span
@@ -1272,7 +1419,7 @@ export default function Programs() {
                         </span>
                       </div>
 
-                      {/* Assignee */}
+                      {/* PM Assignee */}
                       <div className="mt-4 flex items-center justify-between">
                         <div className="flex min-w-0 items-center gap-2">
                           {project.assigned_to_name ? (
@@ -1296,10 +1443,10 @@ export default function Programs() {
                               </div>
                               <div>
                                 <p className="text-[11px] font-semibold text-gray-600">
-                                  Unassigned
+                                  Unassigned PM
                                 </p>
                                 <p className="text-[9px] text-gray-400">
-                                  No assignee
+                                  No PM owner
                                 </p>
                               </div>
                             </div>
@@ -1693,7 +1840,7 @@ export default function Programs() {
       )}
 
       {/* =====================================================
-          ASSIGN MODAL
+          ASSIGN PM MODAL
       ===================================================== */}
 
       {assignModalOpen && (
@@ -1705,10 +1852,11 @@ export default function Programs() {
                   <UserPlus size={18} />
                 </div>
                 <h2 className="text-lg font-semibold text-gray-900">
-                  Assign project
+                  Assign project manager
                 </h2>
                 <p className="mt-1 text-xs text-gray-500">
-                  Choose a Project Manager or admin to assign this project to.
+                  Choose a Project Manager or admin as owner of this program
+                  project.
                 </p>
               </div>
               <button
@@ -1784,10 +1932,127 @@ export default function Programs() {
                 ) : (
                   <>
                     <UserPlus size={15} />
-                    Assign project
+                    Assign PM
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================
+          ASSIGN MEMBERS MODAL
+      ===================================================== */}
+
+      {membersModalOpen && membersModalProjectId && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]">
+          <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+              <div>
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white">
+                  <Users size={18} />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Assign members
+                </h2>
+                <p className="mt-1 text-xs text-gray-500">
+                  Members on{" "}
+                  <span className="font-semibold text-emerald-700">
+                    {membersModalProjectName}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeMembersModal}
+                disabled={savingMembers}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="max-h-[420px] space-y-2 overflow-y-auto px-6 py-5">
+              {membersOnly.length === 0 ? (
+                <p className="text-center text-sm text-gray-400">
+                  No Members found.
+                </p>
+              ) : (
+                membersOnly.map((u) => {
+                  const selected = currentMemberIds.includes(u.id);
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() =>
+                        setCurrentMemberIds((prev) =>
+                          selected
+                            ? prev.filter((id) => id !== u.id)
+                            : [...prev, u.id]
+                        )
+                      }
+                      className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${
+                        selected
+                          ? "border-emerald-500 bg-emerald-50"
+                          : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-700">
+                        {initialsOf(u.full_name)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {u.full_name}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-gray-400 truncate">
+                          {u.email}
+                          {u.job_title ? ` · ${u.job_title}` : ""}
+                        </p>
+                      </div>
+                      {selected && (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white">
+                          <Check size={13} />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
+              <span className="text-[11px] font-medium text-gray-500">
+                {currentMemberIds.length} selected
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeMembersModal}
+                  disabled={savingMembers}
+                  className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveMembers}
+                  disabled={savingMembers}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+                >
+                  {savingMembers ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={15} />
+                      Save members
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1805,7 +2070,6 @@ export default function Programs() {
           }}
         >
           <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            {/* Header */}
             <div className="flex items-start justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 text-white">
               <div>
                 <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
@@ -1833,7 +2097,6 @@ export default function Programs() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="overflow-y-auto bg-white px-6 py-6">
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="sm:col-span-2">
@@ -1921,12 +2184,14 @@ export default function Programs() {
                     className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
                   >
                     <option value="">— Unassigned —</option>
-                    {membersOnly.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.full_name}
-                        {u.job_title ? ` · ${u.job_title}` : ""}
-                      </option>
-                    ))}
+                    {(projectMembers[taskProjectId] || membersOnly).map(
+                      (u: any) => (
+                        <option key={u.user_id || u.id} value={u.user_id || u.id}>
+                          {u.full_name}
+                          {u.job_title ? ` · ${u.job_title}` : ""}
+                        </option>
+                      )
+                    )}
                   </select>
                   {membersOnly.length === 0 && (
                     <p className="mt-2 text-xs text-amber-700">
@@ -1983,7 +2248,6 @@ export default function Programs() {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:flex-row sm:justify-end">
               <button
                 type="button"
@@ -2080,7 +2344,7 @@ export default function Programs() {
 
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <p className="text-[12px] font-medium uppercase tracking-wide text-gray-800">
-                    Assignee
+                    PM Owner
                   </p>
                   <p className="mt-2 truncate text-sm font-semibold text-gray-800">
                     {selectedProject.assigned_to_name || "Unassigned"}
@@ -2089,10 +2353,13 @@ export default function Programs() {
 
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <p className="text-[12px] font-medium uppercase tracking-wide text-gray-800">
-                    Assignee Role
+                    Assigned members
                   </p>
                   <p className="mt-2 truncate text-sm font-semibold text-gray-800">
-                    {selectedProject.assigned_to_role || "—"}
+                    {(projectMembers[selectedProject.id] || []).length} member
+                    {(projectMembers[selectedProject.id] || []).length === 1
+                      ? ""
+                      : "s"}
                   </p>
                 </div>
               </div>
@@ -2105,6 +2372,50 @@ export default function Programs() {
                   {selectedProject.about_description ||
                     "No description provided."}
                 </p>
+              </div>
+
+              {/* Members */}
+              <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <Users size={15} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">
+                        Assigned members
+                      </h3>
+                      <p className="text-[10px] font-medium text-gray-500">
+                        Members who can see tasks in this program project
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                    {(projectMembers[selectedProject.id] || []).length}
+                  </span>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {(projectMembers[selectedProject.id] || []).length === 0 ? (
+                    <p className="text-xs text-gray-400">
+                      No members assigned yet. Use Assign Members from the
+                      kebab menu.
+                    </p>
+                  ) : (
+                    (projectMembers[selectedProject.id] || []).map((m) => (
+                      <span
+                        key={m.user_id}
+                        className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700"
+                        title={m.email}
+                      >
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold text-white">
+                          {initialsOf(m.full_name)}
+                        </span>
+                        {m.full_name}
+                      </span>
+                    ))
+                  )}
+                </div>
               </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -2132,7 +2443,7 @@ export default function Programs() {
                 </div>
               </div>
 
-              {/* ============ PROGRAM TASKS SECTION ============ */}
+              {/* Tasks */}
               <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -2265,15 +2576,12 @@ export default function Programs() {
                 type="button"
                 onClick={() => {
                   setViewProjectModalOpen(false);
-                  openAssignModal(
-                    selectedProject.id,
-                    selectedProject.assigned_to
-                  );
+                  openMembersModal(selectedProject);
                 }}
                 className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-medium text-white hover:bg-emerald-700"
               >
-                <UserPlus size={15} />
-                {selectedProject.assigned_to ? "Reassign" : "Assign"}
+                <Users size={15} />
+                Manage members
               </button>
             </div>
           </div>
