@@ -4462,7 +4462,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                 />
                 <div className="mt-3 flex justify-end">
                   <button
-                    onClick={handleAddChallenge}
+                    onClick={() => handleAddChallenge(challengeBasePath)}
                     disabled={
                       savingChallenge ||
                       !challengeText.trim()
