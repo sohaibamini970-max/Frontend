@@ -68,6 +68,22 @@ const formatDate = (dateString: string | number | null | undefined): string => {
         return "Not set";
     }
 };
+
+/* =========================================================
+   INITIALS HELPER
+   Used to build avatar initials like "MS" from "Muhammad Suhaib"
+========================================================= */
+
+const initialsOf = (name: string | null | undefined): string => {
+    if (!name) return "—";
+    return name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part.charAt(0))
+        .join("")
+        .toUpperCase();
+};
 /* =========================================================
    TYPES
 ========================================================= */
