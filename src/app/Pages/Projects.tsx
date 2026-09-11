@@ -26,6 +26,7 @@ import {
     CheckCircle2,
     ListTodo,
     AlertCircle,
+    FolderKanban,
 } from "lucide-react";
 
 const API_BASE = "https://backend-five-swart-88.vercel.app";
