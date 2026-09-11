@@ -22,6 +22,7 @@ import {
   FileText,
   Eye,
   CheckCircle2,
+    Target,
 } from "lucide-react";
 
 type ProjectStatus =
@@ -133,11 +134,18 @@ type WorkPart = {
     created_at?: string;
     updated_at?: string;
 };
-
+type ProgramTask = Task & {
+  program_project_id: string;
+  program_project_name?: string;
+  program_project_domain?: string;
+  program_project_manager_id?: string;
+  program_name?: string;
+  objectives?: string;
+};
 
 
 const API_BASE = "https://backend-five-swart-88.vercel.app/api";
-
+const PROGRAM_API = `${API_BASE}/program-tasks`;
 function getToken() {
   if (typeof window === "undefined") return "";
   return localStorage.getItem("token") || "";
@@ -547,6 +555,16 @@ const [newPartDescription, setNewPartDescription] = useState("");
 const [newPartStatus, setNewPartStatus] = useState<WorkPartStatus>("To Do");
 const [savingWorkPart, setSavingWorkPart] = useState(false);
 const [deletingWorkPart, setDeletingWorkPart] = useState<string | null>(null);
+  
+const [programTasks, setProgramTasks] = useState<ProgramTask[]>([]);
+const [programTaskInstructions, setProgramTaskInstructions] =
+  useState<Record<string, any[]>>({});
+
+const [loadingInstructions, setLoadingInstructions] = useState(false);
+const [instructionPreview, setInstructionPreview] = useState<{
+  url: string | null;
+  file: any | null;
+} | null>(null);
 
 
   const isManagementRole =
@@ -819,45 +837,71 @@ const getFileIcon = (fileType: string) => {
     fetchUsers();
   }, []);
 
-  const fetchProjectsAndTasks = async () => {
-    try {
-      setLoading(true);
-      setError("");
+const fetchProjectsAndTasks = async () => {
+  try {
+    setLoading(true);
+    setError("");
 
-      const user = getCurrentUser();
+    const user = getCurrentUser();
+    if (!user?.id) {
+      throw new Error("User information not found. Please login again.");
+    }
 
-      if (!user?.id) {
-        throw new Error("User information not found. Please login again.");
+    const role = user.role || "";
+
+    // ============================================================
+    // PROGRAM TASKS — fetch in parallel, works for every role
+    // ============================================================
+    const programPromise = (async (): Promise<ProgramTask[]> => {
+      try {
+        const url =
+          role === "Member"
+            ? `${PROGRAM_API}/my/tasks`
+            : `${PROGRAM_API}/all`;
+
+        const res = await fetch(url, { headers: authHeaders() });
+        if (!res.ok) return [];
+
+        const data = await res.json();
+        const list = data.tasks || [];
+        return list.map((t: any) => ({
+          ...normalizeTask(t),
+          program_project_id: String(t.program_project_id || ""),
+          program_project_name: t.program_project_name || "",
+          program_project_domain: t.program_project_domain || "",
+          program_project_manager_id: String(
+            t.program_project_manager_id || ""
+          ),
+          program_name: t.program_name || "",
+          objectives: t.objectives || "",
+        }));
+      } catch (e) {
+        console.error("Program tasks fetch error:", e);
+        return [];
       }
+    })();
 
-      const role = user.role || "";
+    // ============================================================
+    // ROLE-SPECIFIC PROJECT + NORMAL TASK FETCH
+    // ============================================================
+    const rolePromise = (async () => {
       const canSeeEverything =
         role === "System Administrator" || role === "Executive Manager";
       const isProjectManager = role === "Project Manager";
       const isMemberRole = role === "Member";
 
-      /*
-       * SYSTEM ADMINISTRATOR / EXECUTIVE MANAGER
-       * ---------------------------------------
-       * These roles can see every project and every task.
-       */
       if (canSeeEverything) {
         const projectResponse = await fetch(`${API_BASE}/projects`, {
           headers: authHeaders(),
         });
-
-        if (!projectResponse.ok) {
-          throw new Error("Failed to fetch projects");
-        }
+        if (!projectResponse.ok) throw new Error("Failed to fetch projects");
 
         const projectData = await projectResponse.json();
         const rawProjects =
           projectData.projects ||
           projectData.data ||
           (Array.isArray(projectData) ? projectData : []);
-
         const visibleProjects = rawProjects.map(normalizeProject);
-        setProjects(visibleProjects);
 
         const taskResponses = await Promise.all(
           visibleProjects.map(async (project: Project) => {
@@ -866,15 +910,10 @@ const getFileIcon = (fileType: string) => {
                 `${API_BASE}/tasks/project/${project.id}`,
                 { headers: authHeaders() }
               );
-
               if (!response.ok) return [];
-
               const data = await response.json();
               const rawTasks =
-                data.tasks ||
-                data.data ||
-                (Array.isArray(data) ? data : []);
-
+                data.tasks || data.data || (Array.isArray(data) ? data : []);
               return rawTasks.map((task: any) =>
                 normalizeTask({
                   ...task,
@@ -882,50 +921,35 @@ const getFileIcon = (fileType: string) => {
                     task.project_id || task.projectId || project.id,
                 })
               );
-            } catch (taskError) {
-              console.error(`Failed to load tasks for project ${project.id}`, taskError);
+            } catch {
               return [];
             }
           })
         );
-
         const allTasks = taskResponses.flat();
-        setTasks(allTasks);
-        setExpandedProjects(
-          visibleProjects
-            .filter((project: Project) =>
-              allTasks.some(
-                (task) => String(task.project_id) === String(project.id)
-              )
+        return {
+          projects: visibleProjects,
+          tasks: allTasks,
+          expanded: visibleProjects
+            .filter((p: Project) =>
+              allTasks.some((t) => String(t.project_id) === String(p.id))
             )
-            .map((project: Project) => project.id)
-        );
-        return;
+            .map((p: Project) => p.id),
+        };
       }
 
-      /*
-       * PROJECT MANAGER
-       * ---------------
-       * A Project Manager only sees projects assigned to them.
-       * A project is considered assigned when the current user is the
-       * project manager OR appears in the project's members list.
-       * All tasks belonging to those assigned projects are then shown.
-       */
       if (isProjectManager) {
         const projectResponse = await fetch(`${API_BASE}/projects`, {
           headers: authHeaders(),
         });
-
-        if (!projectResponse.ok) {
+        if (!projectResponse.ok)
           throw new Error("Failed to fetch assigned projects");
-        }
 
         const projectData = await projectResponse.json();
         const rawProjects =
           projectData.projects ||
           projectData.data ||
           (Array.isArray(projectData) ? projectData : []);
-
         const allProjects = rawProjects.map(normalizeProject);
         const myUserId = String(user.id);
 
@@ -933,7 +957,7 @@ const getFileIcon = (fileType: string) => {
           const isManager =
             String(project.project_manager_id || "") === myUserId;
           const isMember = (project.members || []).some(
-            (member) => String(member.user_id) === myUserId
+            (m) => String(m.user_id) === myUserId
           );
           return isManager || isMember;
         });
@@ -945,15 +969,10 @@ const getFileIcon = (fileType: string) => {
                 `${API_BASE}/tasks/project/${project.id}`,
                 { headers: authHeaders() }
               );
-
               if (!response.ok) return [];
-
               const data = await response.json();
               const rawTasks =
-                data.tasks ||
-                data.data ||
-                (Array.isArray(data) ? data : []);
-
+                data.tasks || data.data || (Array.isArray(data) ? data : []);
               return rawTasks.map((task: any) =>
                 normalizeTask({
                   ...task,
@@ -961,32 +980,23 @@ const getFileIcon = (fileType: string) => {
                     task.project_id || task.projectId || project.id,
                 })
               );
-            } catch (taskError) {
-              console.error(`Failed to load tasks for project ${project.id}`, taskError);
+            } catch {
               return [];
             }
           })
         );
-
         const managerTasks = taskResponses.flat();
-        setProjects(assignedProjects);
-        setTasks(managerTasks);
-        setExpandedProjects(assignedProjects.map((project: Project) => project.id));
-        return;
+        return {
+          projects: assignedProjects,
+          tasks: managerTasks,
+          expanded: assignedProjects.map((p: Project) => p.id),
+        };
       }
 
-      /*
-       * MEMBER
-       * ------
-       * Members only see tasks assigned to their own account and the
-       * projects those tasks belong to. This also protects the UI if the
-       * backend accidentally returns another member's task.
-       */
       if (isMemberRole) {
         const myTasksResponse = await fetch(`${API_BASE}/tasks/my/tasks`, {
           headers: authHeaders(),
         });
-
         if (!myTasksResponse.ok) {
           const errorData = await myTasksResponse.json().catch(() => ({}));
           throw new Error(
@@ -995,7 +1005,6 @@ const getFileIcon = (fileType: string) => {
               "Failed to fetch your tasks"
           );
         }
-
         const myTasksData = await myTasksResponse.json();
         const rawMyTasks =
           myTasksData.tasks ||
@@ -1013,51 +1022,57 @@ const getFileIcon = (fileType: string) => {
           );
 
         const projectIds = [
-          ...new Set(onlyMyTasks.map((task: Task) => String(task.project_id))),
+          ...new Set(onlyMyTasks.map((t: Task) => String(t.project_id))),
         ];
 
         if (projectIds.length === 0) {
-          setTasks([]);
-          setProjects([]);
-          setExpandedProjects([]);
-          return;
+          return { projects: [], tasks: onlyMyTasks, expanded: [] };
         }
 
         const projectResponse = await fetch(`${API_BASE}/projects`, {
           headers: authHeaders(),
         });
-
-        if (!projectResponse.ok) {
+        if (!projectResponse.ok)
           throw new Error("Failed to fetch assigned projects");
-        }
 
         const projectData = await projectResponse.json();
         const rawProjects =
           projectData.projects ||
           projectData.data ||
           (Array.isArray(projectData) ? projectData : []);
-
         const myProjects = rawProjects
           .map(normalizeProject)
-          .filter((project: Project) => projectIds.includes(String(project.id)));
+          .filter((p: Project) => projectIds.includes(String(p.id)));
 
-        setTasks(onlyMyTasks);
-        setProjects(myProjects);
-        setExpandedProjects(myProjects.map((project: Project) => project.id));
-        return;
+        return {
+          projects: myProjects,
+          tasks: onlyMyTasks,
+          expanded: myProjects.map((p: Project) => p.id),
+        };
       }
 
-      // Unknown roles get no task data rather than accidentally seeing all data.
-      setProjects([]);
-      setTasks([]);
-      setExpandedProjects([]);
-    } catch (error) {
-      console.error("Loading projects/tasks error:", error);
-      setError(error instanceof Error ? error.message : "Failed to load tasks");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return { projects: [], tasks: [], expanded: [] };
+    })();
+
+    // ============================================================
+    // AWAIT BOTH IN PARALLEL
+    // ============================================================
+    const [roleResult, programResult] = await Promise.all([
+      rolePromise,
+      programPromise,
+    ]);
+
+    setProjects(roleResult.projects);
+    setTasks(roleResult.tasks);
+    setExpandedProjects(roleResult.expanded);
+    setProgramTasks(programResult);
+  } catch (error) {
+    console.error("Loading projects/tasks error:", error);
+    setError(error instanceof Error ? error.message : "Failed to load tasks");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const fetchUsers = async () => {
     try {
@@ -1314,6 +1329,33 @@ const handlePreviewAttachment = async (attachment: Attachment) => {
     setSelectedTaskForAttachment(null);
     setSelectedFile(null);
   };
+
+  const groupedProgramTasks = useMemo(() => {
+  const map = new Map<
+    string,
+    {
+      program_project_id: string;
+      program_project_name: string;
+      program_name: string;
+      tasks: ProgramTask[];
+    }
+  >();
+
+  programTasks.forEach((t) => {
+    const key = t.program_project_id;
+    if (!map.has(key)) {
+      map.set(key, {
+        program_project_id: key,
+        program_project_name: t.program_project_name || "Program Project",
+        program_name: t.program_name || "Program",
+        tasks: [],
+      });
+    }
+    map.get(key)!.tasks.push(t);
+  });
+
+  return Array.from(map.values());
+}, [programTasks]);
 
   const filteredProjects = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -1614,6 +1656,183 @@ if (taskStartDate && taskDueDate && taskDueDate <= taskStartDate) {
     }
   };
 
+  /* =========================================================
+   PROGRAM TASK HANDLERS
+========================================================= */
+
+  const fetchProgramTaskInstructions = async (taskId: string) => {
+  try {
+    setLoadingInstructions(true);
+    const res = await fetch(`${PROGRAM_API}/${taskId}/instructions`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      setProgramTaskInstructions((prev) => ({ ...prev, [taskId]: [] }));
+      return;
+    }
+    const data = await res.json();
+    setProgramTaskInstructions((prev) => ({
+      ...prev,
+      [taskId]: data.instructions || [],
+    }));
+  } catch (e) {
+    console.error("Instructions fetch:", e);
+    setProgramTaskInstructions((prev) => ({ ...prev, [taskId]: [] }));
+  } finally {
+    setLoadingInstructions(false);
+  }
+};
+
+const handlePreviewInstruction = async (instruction: any) => {
+  try {
+    const res = await fetch(
+      `${PROGRAM_API}/instructions/${instruction.id}/preview`,
+      { headers: authHeaders(), cache: "no-store" }
+    );
+    if (!res.ok) throw new Error("Preview failed");
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    setInstructionPreview({ url, file: instruction });
+  } catch (e: any) {
+    alert(e.message || "Failed to preview");
+  }
+};
+
+const handleDownloadInstruction = async (instruction: any) => {
+  try {
+    const res = await fetch(
+      `${PROGRAM_API}/instructions/${instruction.id}/download`,
+      { headers: authHeaders() }
+    );
+    if (!res.ok) throw new Error("Download failed");
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = instruction.file_name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  } catch (e: any) {
+    alert(e.message || "Failed to download");
+  }
+};
+
+const closeInstructionPreview = () => {
+  if (instructionPreview?.url) {
+    window.URL.revokeObjectURL(instructionPreview.url);
+  }
+  setInstructionPreview(null);
+};
+
+
+
+const handleProgramTaskStatusChange = async (
+  taskId: string,
+  status: TaskStatus
+) => {
+  try {
+    const res = await fetch(`${PROGRAM_API}/${taskId}/status`, {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to update status");
+    }
+    setProgramTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status } : t))
+    );
+    setOpenTaskMenu(null);
+  } catch (e: any) {
+    alert(e.message || "Failed to update status");
+  }
+};
+
+const handleDeleteProgramTask = async (taskId: string) => {
+  if (!confirm("Delete this program task? This cannot be undone.")) return;
+  try {
+    const res = await fetch(`${PROGRAM_API}/${taskId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Failed to delete");
+    setProgramTasks((prev) => prev.filter((t) => t.id !== taskId));
+  } catch (e: any) {
+    alert(e.message || "Failed to delete");
+  }
+};
+
+const openProgramTaskInstructions = async (task: ProgramTask) => {
+  await fetchProgramTaskInstructions(task.id);
+  setSelectedTaskForAttachment(task as any); // reuse the modal shell
+  setAttachmentModalOpen(true);
+};
+
+/* ---- Challenges ---- */
+
+const openProgramChallenges = async (task: ProgramTask) => {
+  setSelectedChallengeTask(task as any);
+  setChallengeModalOpen(true);
+  // Adjust to program endpoint
+  try {
+    setLoadingChallenges(true);
+    const res = await fetch(`${PROGRAM_API}/${task.id}/challenges`, {
+      headers: authHeaders(),
+    });
+    const data = await res.json();
+    setChallenges(data.challenges || []);
+  } finally {
+    setLoadingChallenges(false);
+  }
+};
+
+/* ---- Files ---- */
+
+const openProgramAttachmentModal = async (task: ProgramTask) => {
+  setSelectedTaskForAttachment(task as any);
+  setAttachmentModalOpen(true);
+  try {
+    setLoadingAttachments(true);
+    const res = await fetch(`${PROGRAM_API}/${task.id}/attachments`, {
+      headers: authHeaders(),
+    });
+    const data = await res.json();
+    setAttachments((prev) => ({
+      ...prev,
+      [task.id]: data.attachments || [],
+    }));
+  } finally {
+    setLoadingAttachments(false);
+  }
+};
+
+/* ---- Submissions ---- */
+
+const openProgramSubmissionModal = async (task: ProgramTask) => {
+  setSelectedTaskForSubmission(task as any);
+  setSubmissionModalOpen(true);
+  try {
+    const [subsRes, partsRes] = await Promise.all([
+      fetch(`${PROGRAM_API}/${task.id}/submissions`, {
+        headers: authHeaders(),
+      }),
+      fetch(`${PROGRAM_API}/${task.id}/work-parts`, {
+        headers: authHeaders(),
+      }),
+    ]);
+    const subs = await subsRes.json();
+    const parts = await partsRes.json();
+    setSubmissions((prev) => ({ ...prev, [task.id]: subs.submissions || [] }));
+    setWorkParts((prev) => ({ ...prev, [task.id]: parts.workParts || [] }));
+  } catch (e) {
+    console.error(e);
+  }
+};
+
 const fetchTaskChallenges = async (task: Task) => {
   try {
     setLoadingChallenges(true);
@@ -1821,68 +2040,65 @@ const fetchTaskChallenges = async (task: Task) => {
   // ====================================
 // WORK PART API FUNCTIONS
 // ====================================
-const fetchWorkParts = async (taskId: string) => {
-    try {
-        setLoadingWorkParts(true);
-        const response = await fetch(
-            `${API_BASE}/tasks/${taskId}/work-parts`,
-            { headers: authHeaders() }
-        );
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.message || data.error || "Failed to load work parts");
-        }
-        setWorkParts(prev => ({
-            ...prev,
-            [taskId]: data.workParts || []
-        }));
-    } catch (error) {
-        console.error("Fetch work parts error:", error);
-        setWorkParts(prev => ({ ...prev, [taskId]: [] }));
-    } finally {
-        setLoadingWorkParts(false);
+const fetchWorkParts = async (taskId: string, basePath = API_BASE) => {
+  try {
+    setLoadingWorkParts(true);
+    const url =
+      basePath === PROGRAM_API
+        ? `${PROGRAM_API}/${taskId}/work-parts`
+        : `${API_BASE}/tasks/${taskId}/work-parts`;
+    const response = await fetch(url, { headers: authHeaders() });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || data.error || "Failed to load work parts");
     }
+    setWorkParts((prev) => ({ ...prev, [taskId]: data.workParts || [] }));
+  } catch (error) {
+    console.error("Fetch work parts error:", error);
+    setWorkParts((prev) => ({ ...prev, [taskId]: [] }));
+  } finally {
+    setLoadingWorkParts(false);
+  }
 };
 
-const handleAddWorkPart = async (taskId: string) => {
-    if (!newPartTitle.trim()) {
-        alert("Please provide a title for the work part.");
-        return;
+const handleAddWorkPart = async (taskId: string, basePath = API_BASE) => {
+  if (!newPartTitle.trim()) {
+    alert("Please provide a title for the work part.");
+    return;
+  }
+
+  try {
+    setSavingWorkPart(true);
+    const url =
+      basePath === PROGRAM_API
+        ? `${PROGRAM_API}/${taskId}/work-parts`
+        : `${API_BASE}/tasks/${taskId}/work-parts`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: newPartTitle.trim(),
+        description: newPartDescription.trim() || null,
+        status: newPartStatus,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || data.message || "Failed to create work part");
     }
 
-    try {
-        setSavingWorkPart(true);
-        const response = await fetch(
-            `${API_BASE}/tasks/${taskId}/work-parts`,
-            {
-                method: "POST",
-                headers: {
-                    ...authHeaders(),
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    title: newPartTitle.trim(),
-                    description: newPartDescription.trim() || null,
-                    status: newPartStatus,
-                }),
-            }
-        );
-
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || data.message || "Failed to create work part");
-        }
-
-        await fetchWorkParts(taskId);
-        setNewPartTitle("");
-        setNewPartDescription("");
-        setNewPartStatus("To Do");
-    } catch (error) {
-        console.error("Add work part error:", error);
-        alert(error instanceof Error ? error.message : "Failed to add work part");
-    } finally {
-        setSavingWorkPart(false);
-    }
+    await fetchWorkParts(taskId, basePath);
+    setNewPartTitle("");
+    setNewPartDescription("");
+    setNewPartStatus("To Do");
+  } catch (error) {
+    console.error("Add work part error:", error);
+    alert(error instanceof Error ? error.message : "Failed to add work part");
+  } finally {
+    setSavingWorkPart(false);
+  }
 };
 
 const handleUpdateWorkPartStatus = async (
@@ -2293,6 +2509,365 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
               </div>
             </div>
           </div>
+
+          {/* =========================================================
+    PROGRAM PROJECT TASKS  (green header, program tag)
+========================================================= */}
+{groupedProgramTasks.length > 0 && (
+  <section className="mt-7">
+    <div className="mb-3 flex items-center gap-2">
+      <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-600 px-3 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
+        <FolderKanban size={12} />
+        Program Project Tasks
+      </span>
+      <p className="text-xs font-medium text-gray-600">
+        Special tasks under programs. Header is green so they're easy to spot.
+      </p>
+    </div>
+
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      {groupedProgramTasks.map((group) => {
+        const groupTasks = group.tasks;
+
+        const doneCount = groupTasks.filter(
+          (t) => t.status === "Done"
+        ).length;
+
+        const completedCount = groupTasks.filter(
+          (t) => t.status === "Completed"
+        ).length;
+
+        const inProgressCount = groupTasks.filter(
+          (t) => t.status === "In Progress"
+        ).length;
+
+        const progress = groupTasks.length
+          ? Math.round((doneCount / groupTasks.length) * 100)
+          : 0;
+
+        const projectStatus =
+          groupTasks.length > 0 && doneCount === groupTasks.length
+            ? "Completed"
+            : inProgressCount > 0 || completedCount > 0
+            ? "In Progress"
+            : "To Do";
+
+        return (
+          <article
+            key={group.program_project_id}
+            className="group overflow-visible rounded-2xl border border-emerald-200 bg-white shadow-[0_5px_22px_rgba(16,185,129,0.10)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(16,185,129,0.16)]"
+          >
+            {/* ============ GREEN HEADER ============ */}
+            <div className="rounded-t-2xl bg-gradient-to-r from-emerald-600 to-green-700 px-5 py-4 text-white sm:px-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-sm">
+                  <FolderKanban size={18} />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-white/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                      Program
+                    </span>
+                    <span className="truncate text-[11px] font-bold text-emerald-50">
+                      {group.program_name}
+                    </span>
+                  </div>
+                  <h3 className="mt-1 truncate text-base font-bold tracking-[-0.2px] sm:text-lg">
+                    {group.program_project_name}
+                  </h3>
+                </div>
+
+                <div className="shrink-0 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-right">
+                  <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-100">
+                    Tasks
+                  </p>
+                  <p className="text-sm font-bold text-white">
+                    {doneCount}/{groupTasks.length}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              {/* Summary strip */}
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[10px] font-bold ${
+                      projectStatus === "Completed"
+                        ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+                        : projectStatus === "In Progress"
+                        ? "border-green-300 bg-green-50 text-green-800"
+                        : "border-slate-200 bg-white text-slate-700"
+                    }`}
+                  >
+                    {projectStatus === "Completed" ? (
+                      <Check size={11} />
+                    ) : projectStatus === "In Progress" ? (
+                      <Clock3 size={11} />
+                    ) : (
+                      <Circle size={11} />
+                    )}
+                    {projectStatus}
+                  </span>
+
+                  <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-emerald-700">
+                    <ListTodo size={11} />
+                    {groupTasks.length}{" "}
+                    {groupTasks.length === 1 ? "task" : "tasks"}
+                  </span>
+                </div>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-emerald-100">
+                    <div
+                      className="h-full rounded-full bg-emerald-600 transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <span className="min-w-[38px] text-right text-[10px] font-bold text-emerald-800">
+                    {progress}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Tasks list */}
+              <div className="mt-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-slate-950">
+                    Program Tasks
+                  </h4>
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+                    {groupTasks.length}{" "}
+                    {groupTasks.length === 1 ? "task" : "tasks"}
+                  </span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {groupTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      onClick={() => openTaskDetails(task)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          openTaskDetails(task);
+                        }
+                      }}
+                      className="group/task cursor-pointer rounded-xl border border-emerald-200 bg-white p-3.5 transition hover:border-emerald-400 hover:bg-emerald-50/40 hover:shadow-sm"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                            task.status === "Done"
+                              ? "bg-emerald-600 text-white"
+                              : task.status === "Completed"
+                              ? "bg-amber-50 text-amber-600"
+                              : task.status === "In Progress"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-emerald-50 text-emerald-700"
+                          }`}
+                        >
+                          {task.status === "Done" ? (
+                            <Check size={15} />
+                          ) : task.status === "Completed" ? (
+                            <CheckCircle2 size={15} />
+                          ) : task.status === "In Progress" ? (
+                            <Clock3 size={15} />
+                          ) : (
+                            <Circle size={15} />
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-slate-950">
+                                {task.name}
+                              </p>
+                              <p className="mt-1 line-clamp-1 text-[11px] font-medium text-slate-500">
+                                {task.description || "No description provided."}
+                              </p>
+                            </div>
+
+                            <div
+                              className="relative shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOpenTaskMenu(
+                                    openTaskMenu === task.id ? null : task.id
+                                  )
+                                }
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-400 hover:border-slate-200 hover:bg-white hover:text-slate-900"
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+
+                              {openTaskMenu === task.id && (
+                                <div className="absolute right-0 top-9 z-50 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_35px_rgba(15,23,42,0.16)]">
+                                  <p className="px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                                    Change status
+                                  </p>
+                                  {(isMember
+                                    ? (["To Do", "In Progress", "Completed"] as const)
+                                    : (["To Do", "In Progress", "Completed", "Done"] as const)
+                                  ).map((s) => (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() =>
+                                        handleProgramTaskStatusChange(task.id, s)
+                                      }
+                                      className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold ${
+                                        task.status === s
+                                          ? "bg-emerald-50 text-emerald-900"
+                                          : "text-slate-600 hover:bg-emerald-50/60"
+                                      }`}
+                                    >
+                                      {s}
+                                    </button>
+                                  ))}
+                                  {isAdmin && (
+                                    <>
+                                      <div className="my-1 border-t border-slate-100" />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleDeleteProgramTask(task.id)
+                                        }
+                                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50"
+                                      >
+                                        <Trash2 size={12} />
+                                        Delete program task
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                            <TaskStatusBadge status={task.status} />
+                            <PriorityBadge priority={task.priority} />
+
+                            {task.assignee_name && (
+                              <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-800">
+                                <Users size={11} />
+                                {task.assignee_name}
+                              </span>
+                            )}
+
+                            {task.due_date && (
+                              <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600">
+                                <Calendar size={11} />
+                                {formatDate(task.due_date)}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Action row — 5 buttons */}
+                          <div className="mt-3 grid grid-cols-5 gap-2 border-t border-emerald-100 pt-2.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openTaskDetails(task);
+                              }}
+                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#07111f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#172235]"
+                            >
+                              <Eye size={13} />
+                              <span>Details</span>
+                            </button>
+
+                            {/* Instructions */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openProgramTaskInstructions(task);
+                              }}
+                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-emerald-800"
+                            >
+                              <FileText size={13} />
+                              <span>Guide</span>
+                              {(programTaskInstructions[task.id]?.length || 0) > 0 && (
+                                <span className="flex min-w-[17px] items-center justify-center rounded-full bg-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-950">
+                                  {programTaskInstructions[task.id]?.length || 0}
+                                </span>
+                              )}
+                            </button>
+
+                            {/* Work submissions */}
+                            {canViewSubmissions(task) ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openProgramSubmissionModal(task);
+                                }}
+                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#1a4a3a] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#23634b]"
+                              >
+                                <CheckCircle2 size={13} />
+                                <span>Work</span>
+                              </button>
+                            ) : (
+                              <div />
+                            )}
+
+                            {/* Challenges */}
+                            {canReadChallenge(task) ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openProgramChallenges(task);
+                                }}
+                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#31204f] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#432968]"
+                              >
+                                <Flag size={13} />
+                                <span>Issues</span>
+                              </button>
+                            ) : (
+                              <div />
+                            )}
+
+                            {/* Files */}
+                            {canReadAttachments(task) ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openProgramAttachmentModal(task);
+                                }}
+                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#49351b] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#60451f]"
+                              >
+                                <File size={13} />
+                                <span>Files</span>
+                              </button>
+                            ) : (
+                              <div />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  </section>
+)}
 
           <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
             {filteredProjects.map((project, projectIndex) => {
@@ -2733,173 +3308,555 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
 
       {/* Your existing modals (create task, challenges) remain unchanged */}
       {/* TASK + PROJECT DETAILS MODAL */}
-      {selectedTaskDetails && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/65 px-4 py-6 backdrop-blur-[3px]"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closeTaskDetails();
-          }}
-        >
-          {(() => {
-            const task = selectedTaskDetails;
-            const project = projects.find(
-              (item) => String(item.id) === String(task.project_id)
-            );
+   {selectedTaskDetails && (
+  <div
+    className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/65 px-4 py-6 backdrop-blur-[3px]"
+    onMouseDown={(event) => {
+      if (event.target === event.currentTarget) closeTaskDetails();
+    }}
+  >
+    {(() => {
+      const task = selectedTaskDetails;
+      const isProgramTask = Boolean((task as any).program_project_id);
 
-            if (!project) return null;
+      /* ============================================================
+         PROGRAM TASK DETAILS — green header, objectives, instructions
+      ============================================================ */
+      if (isProgramTask) {
+        const pTask = task as ProgramTask;
+        const instructions = programTaskInstructions[pTask.id] || [];
 
-            return (
-              <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_25px_70px_rgba(0,0,0,0.25)]">
-                <div className="shrink-0 bg-[#07111f] px-5 py-5 text-white sm:px-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                        Task details
-                      </p>
-                      <h2 className="mt-1 break-words text-xl font-bold tracking-tight sm:text-2xl">
-                        {task.name}
-                      </h2>
-                      <div className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-300">
-                        <FolderKanban size={13} />
-                        <span className="truncate">{project.name}</span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={closeTaskDetails}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-slate-300 hover:bg-white/15 hover:text-white"
-                      aria-label="Close task details"
-                    >
-                      <X size={18} />
-                    </button>
+        return (
+          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_25px_70px_rgba(0,0,0,0.25)]">
+            {/* GREEN HEADER */}
+            <div className="shrink-0 bg-gradient-to-r from-emerald-600 to-green-700 px-5 py-5 text-white sm:px-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-white/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                      Program
+                    </span>
+                    <span className="truncate text-[11px] font-bold text-emerald-50">
+                      {pTask.program_name || "—"}
+                    </span>
+                  </div>
+                  <h2 className="mt-2 break-words text-xl font-bold tracking-tight sm:text-2xl">
+                    {pTask.name}
+                  </h2>
+                  <div className="mt-2 flex items-center gap-2 text-xs font-medium text-emerald-50">
+                    <FolderKanban size={13} />
+                    <span className="truncate">
+                      {pTask.program_project_name || "Program Project"}
+                    </span>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={closeTaskDetails}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-white hover:bg-white/20"
+                  aria-label="Close task details"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
 
-                <div className="overflow-y-auto bg-[#f4f6f8] p-5 sm:p-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Status</p>
-                      <div className="mt-2"><TaskStatusBadge status={task.status} /></div>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Priority</p>
-                      <div className="mt-2"><PriorityBadge priority={task.priority} /></div>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Assignee</p>
-                      <p className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
-                        <Users size={14} className="text-slate-500" />
-                        {task.assignee_name || "Unassigned"}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Deadline</p>
-                      <p className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
-                        <Calendar size={14} className="text-slate-500" />
-                        {task.due_date ? formatDate(task.due_date) : "No deadline"}
-                      </p>
-                    </div>
+            <div className="overflow-y-auto bg-[#f4f6f8] p-5 sm:p-6">
+              {/* Status / Priority / Assignee / Deadline */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                    Status
+                  </p>
+                  <div className="mt-2">
+                    <TaskStatusBadge status={pTask.status} />
                   </div>
-
-                  <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                        <ListTodo size={15} />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-950">Task description</h3>
-                        <p className="text-[10px] font-medium text-slate-500">What needs to be completed</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3.5">
-                      <p className="whitespace-pre-wrap text-sm font-medium leading-6 text-slate-700">
-                        {task.description || "No description provided for this task."}
-                      </p>
-                    </div>
-                  </section>
-
-                  <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                        <FolderKanban size={15} />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-950">Project information</h3>
-                        <p className="text-[10px] font-medium text-slate-500">Project this task belongs to</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project</p>
-                        <p className="mt-1 text-sm font-bold text-slate-900">{project.name}</p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project deadline</p>
-                        <p className="mt-1 text-sm font-bold text-slate-900">
-                          {project.deadline ? formatDate(project.deadline) : "No deadline"}
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project priority</p>
-                        <p className="mt-1 text-sm font-bold text-slate-900">{project.priority || "Medium"}</p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project progress</p>
-                        <p className="mt-1 text-sm font-bold text-slate-900">{project.progress ?? 0}%</p>
-                      </div>
-                    </div>
-
-                    {project.about_description && (
-                      <div className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">About project</p>
-                        <p className="mt-1.5 text-xs font-medium leading-5 text-slate-600">
-                          {project.about_description}
-                        </p>
-                      </div>
-                    )}
-                  </section>
-
-                  <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
-                    <h3 className="text-sm font-bold text-slate-950">Task timeline</h3>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
-                        <Calendar size={15} className="text-slate-500" />
-                        <div>
-                          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Start date</p>
-                          <p className="mt-0.5 text-xs font-bold text-slate-800">
-                            {task.start_date ? formatDate(task.start_date) : "Not set"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
-                        <Calendar size={15} className="text-slate-500" />
-                        <div>
-                          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Due date</p>
-                          <p className="mt-0.5 text-xs font-bold text-slate-800">
-                            {task.due_date ? formatDate(task.due_date) : "Not set"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
                 </div>
-
-                <div className="flex justify-end border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
-                  <button
-                    type="button"
-                    onClick={closeTaskDetails}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#111c2c]"
-                  >
-                    <Eye size={15} />
-                    Close details
-                  </button>
+                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                    Priority
+                  </p>
+                  <div className="mt-2">
+                    <PriorityBadge priority={pTask.priority} />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                    Assignee
+                  </p>
+                  <p className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <Users size={14} className="text-slate-500" />
+                    {pTask.assignee_name || "Unassigned"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                    Deadline
+                  </p>
+                  <p className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <Calendar size={14} className="text-slate-500" />
+                    {pTask.due_date ? formatDate(pTask.due_date) : "No deadline"}
+                  </p>
                 </div>
               </div>
-            );
-          })()}
+
+              {/* DESCRIPTION */}
+              <section className="mt-4 rounded-xl border border-emerald-100 bg-white p-5">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                    <ListTodo size={15} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-950">
+                      Task description
+                    </h3>
+                    <p className="text-[10px] font-medium text-slate-500">
+                      What needs to be completed
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50/40 px-4 py-3.5">
+                  <p className="whitespace-pre-wrap text-sm font-medium leading-6 text-slate-700">
+                    {pTask.description || "No description provided for this task."}
+                  </p>
+                </div>
+              </section>
+
+              {/* OBJECTIVES */}
+              {pTask.objectives && (
+                <section className="mt-4 rounded-xl border border-emerald-100 bg-white p-5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <Target size={15} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-950">
+                        Objectives
+                      </h3>
+                      <p className="text-[10px] font-medium text-slate-500">
+                        What this task aims to achieve
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50/40 px-4 py-3.5">
+                    <p className="whitespace-pre-wrap text-sm font-medium leading-6 text-slate-700">
+                      {pTask.objectives}
+                    </p>
+                  </div>
+                </section>
+              )}
+
+              {/* INSTRUCTION FILES */}
+              <section className="mt-4 rounded-xl border border-emerald-100 bg-white p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <FileText size={15} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-950">
+                        Instruction files
+                      </h3>
+                      <p className="text-[10px] font-medium text-slate-500">
+                        Guides and references provided by the manager
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">
+                    {instructions.length} file{instructions.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {loadingInstructions ? (
+                    <div className="flex min-h-[80px] items-center justify-center rounded-lg border border-gray-200 bg-white">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-emerald-700" />
+                    </div>
+                  ) : instructions.length === 0 ? (
+                    <div className="rounded-lg border-2 border-dashed border-emerald-200 bg-emerald-50/40 px-4 py-6 text-center">
+                      <p className="text-xs font-bold text-emerald-900">
+                        No instruction files attached
+                      </p>
+                      <p className="mt-1 text-[11px] font-medium text-emerald-700/80">
+                        Managers have not uploaded any reference material yet.
+                      </p>
+                    </div>
+                  ) : (
+                    instructions.map((ins: any) => (
+                      <div
+                        key={ins.id}
+                        className="flex items-center gap-3 rounded-lg border border-emerald-100 bg-white p-3"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                          {getFileIcon(ins.file_type || "")}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-bold text-slate-950">
+                            {ins.file_name}
+                          </p>
+                          <p className="mt-0.5 text-[10px] font-medium text-slate-500">
+                            {formatFileSize(ins.file_size || 0)}
+                            {ins.created_at
+                              ? ` • ${formatDate(ins.created_at)}`
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handlePreviewInstruction(ins)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                            title="Preview"
+                          >
+                            <FileText size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadInstruction(ins)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            title="Download"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              {/* PROGRAM PROJECT INFO */}
+              <section className="mt-4 rounded-xl border border-emerald-100 bg-white p-5">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                    <FolderKanban size={15} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-950">
+                      Program project information
+                    </h3>
+                    <p className="text-[10px] font-medium text-slate-500">
+                      Where this task lives
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg bg-emerald-50/40 p-3">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700">
+                      Program
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">
+                      {pTask.program_name || "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-emerald-50/40 p-3">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700">
+                      Program project
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">
+                      {pTask.program_project_name || "—"}
+                    </p>
+                  </div>
+                  {pTask.program_project_domain && (
+                    <div className="rounded-lg bg-emerald-50/40 p-3 sm:col-span-2">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700">
+                        Domain
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-slate-900">
+                        {pTask.program_project_domain}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* TIMELINE */}
+              <section className="mt-4 rounded-xl border border-emerald-100 bg-white p-5">
+                <h3 className="text-sm font-bold text-slate-950">
+                  Task timeline
+                </h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
+                    <Calendar size={15} className="text-slate-500" />
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                        Start date
+                      </p>
+                      <p className="mt-0.5 text-xs font-bold text-slate-800">
+                        {pTask.start_date
+                          ? formatDate(pTask.start_date)
+                          : "Not set"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
+                    <Calendar size={15} className="text-slate-500" />
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                        Due date
+                      </p>
+                      <p className="mt-0.5 text-xs font-bold text-slate-800">
+                        {pTask.due_date
+                          ? formatDate(pTask.due_date)
+                          : "Not set"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div className="flex justify-end border-t border-emerald-100 bg-white px-5 py-4 sm:px-6">
+              <button
+                type="button"
+                onClick={closeTaskDetails}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-green-700 px-5 text-sm font-bold text-white shadow-sm transition hover:from-emerald-700 hover:to-green-800"
+              >
+                <Eye size={15} />
+                Close details
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      /* ============================================================
+         REGULAR TASK DETAILS — original behavior
+      ============================================================ */
+      const project = projects.find(
+        (item) => String(item.id) === String(task.project_id)
+      );
+
+      if (!project) return null;
+
+      return (
+        <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_25px_70px_rgba(0,0,0,0.25)]">
+          <div className="shrink-0 bg-[#07111f] px-5 py-5 text-white sm:px-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Task details
+                </p>
+                <h2 className="mt-1 break-words text-xl font-bold tracking-tight sm:text-2xl">
+                  {task.name}
+                </h2>
+                <div className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-300">
+                  <FolderKanban size={13} />
+                  <span className="truncate">{project.name}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeTaskDetails}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-slate-300 hover:bg-white/15 hover:text-white"
+                aria-label="Close task details"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-y-auto bg-[#f4f6f8] p-5 sm:p-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Status</p>
+                <div className="mt-2"><TaskStatusBadge status={task.status} /></div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Priority</p>
+                <div className="mt-2"><PriorityBadge priority={task.priority} /></div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Assignee</p>
+                <p className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <Users size={14} className="text-slate-500" />
+                  {task.assignee_name || "Unassigned"}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Deadline</p>
+                <p className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <Calendar size={14} className="text-slate-500" />
+                  {task.due_date ? formatDate(task.due_date) : "No deadline"}
+                </p>
+              </div>
+            </div>
+
+            <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                  <ListTodo size={15} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-950">Task description</h3>
+                  <p className="text-[10px] font-medium text-slate-500">What needs to be completed</p>
+                </div>
+              </div>
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3.5">
+                <p className="whitespace-pre-wrap text-sm font-medium leading-6 text-slate-700">
+                  {task.description || "No description provided for this task."}
+                </p>
+              </div>
+            </section>
+
+            <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                  <FolderKanban size={15} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-950">Project information</h3>
+                  <p className="text-[10px] font-medium text-slate-500">Project this task belongs to</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project</p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">{project.name}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project deadline</p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">
+                    {project.deadline ? formatDate(project.deadline) : "No deadline"}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project priority</p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">{project.priority || "Medium"}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Project progress</p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">{project.progress ?? 0}%</p>
+                </div>
+              </div>
+
+              {project.about_description && (
+                <div className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">About project</p>
+                  <p className="mt-1.5 text-xs font-medium leading-5 text-slate-600">
+                    {project.about_description}
+                  </p>
+                </div>
+              )}
+            </section>
+
+            <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
+              <h3 className="text-sm font-bold text-slate-950">Task timeline</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
+                  <Calendar size={15} className="text-slate-500" />
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Start date</p>
+                    <p className="mt-0.5 text-xs font-bold text-slate-800">
+                      {task.start_date ? formatDate(task.start_date) : "Not set"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
+                  <Calendar size={15} className="text-slate-500" />
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Due date</p>
+                    <p className="mt-0.5 text-xs font-bold text-slate-800">
+                      {task.due_date ? formatDate(task.due_date) : "Not set"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div className="flex justify-end border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
+            <button
+              type="button"
+              onClick={closeTaskDetails}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#07111f] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#111c2c]"
+            >
+              <Eye size={15} />
+              Close details
+            </button>
+          </div>
         </div>
-      )}
+      );
+    })()}
+  </div>
+)}
+
+{/* INSTRUCTION PREVIEW MODAL */}
+{instructionPreview && (
+  <div
+    className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-[2px]"
+    onMouseDown={(e) => {
+      if (e.target === e.currentTarget) closeInstructionPreview();
+    }}
+  >
+    <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-emerald-300 bg-white shadow-2xl">
+      <div className="flex items-center justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-green-700 px-5 py-3 text-white">
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-bold">
+            {instructionPreview.file?.file_name}
+          </h2>
+          <p className="mt-0.5 text-[11px] text-emerald-50">
+            {formatFileSize(instructionPreview.file?.file_size || 0)}
+          </p>
+        </div>
+        <button
+          onClick={closeInstructionPreview}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/20"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-auto bg-gray-50 p-4 sm:p-6">
+        {instructionPreview.file?.file_type === "pdf" ||
+        instructionPreview.file?.file_type === "txt" ? (
+          <iframe
+            src={instructionPreview.url!}
+            title={instructionPreview.file?.file_name}
+            className="h-[65vh] min-h-[450px] w-full rounded-lg border-2 border-gray-300 bg-white"
+          />
+        ) : (
+          <div className="flex min-h-[450px] flex-col items-center justify-center text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+              <FileText size={24} className="text-emerald-700" />
+            </div>
+            <p className="mt-4 text-sm font-bold text-gray-950">
+              Preview is not available
+            </p>
+            <p className="mt-2 max-w-md text-xs font-medium text-gray-600">
+              {instructionPreview.file?.file_name}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              DOC and DOCX files can be downloaded and opened in Word.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 border-t border-emerald-100 bg-white px-5 py-4">
+        <button
+          onClick={() => {
+            if (instructionPreview.file) {
+              handleDownloadInstruction(instructionPreview.file);
+            }
+          }}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800"
+        >
+          <Download size={15} />
+          Download
+        </button>
+        <button
+          onClick={closeInstructionPreview}
+          className="h-10 rounded-lg border-2 border-gray-400 bg-white px-5 text-sm font-semibold text-gray-900 hover:bg-gray-100"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {modalOpen && (
         <div
