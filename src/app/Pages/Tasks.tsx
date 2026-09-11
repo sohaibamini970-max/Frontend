@@ -2811,8 +2811,8 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                           </div>
 
                           {/* Action row — 5 buttons */}
-                         {/* Action row — 5 buttons (Details, Guide, Work, Challenges, Files) */}
-                        <div className="mt-3 grid grid-cols-5 gap-2 border-t border-emerald-100 pt-2.5">
+                        {/* Action row — 4 buttons (Details, Guide, Work, Challenges) */}
+                        <div className="mt-3 grid grid-cols-4 gap-2 border-t border-emerald-100 pt-2.5">
                           {/* Details */}
                           <button
                             type="button"
@@ -2826,7 +2826,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                             <span>Details</span>
                           </button>
                         
-                          {/* Guide (program-specific) */}
+                          {/* Guide (instruction files for program tasks) */}
                           <button
                             type="button"
                             onClick={(e) => {
@@ -2845,7 +2845,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                             )}
                           </button>
                         
-                          {/* Work Submissions — same dynamic label + badge as normal tasks */}
+                          {/* Work Submissions — dynamic label + badge */}
                           {canViewSubmissions(task) ? (
                             <button
                               type="button"
@@ -2881,7 +2881,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                             <div />
                           )}
                         
-                          {/* Challenges — renamed from "Issues" */}
+                          {/* Challenges */}
                           {canReadChallenge(task) ? (
                             <button
                               type="button"
@@ -2896,28 +2896,6 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                               {challengeCounts[task.id] !== undefined && (
                                 <span className="flex min-w-[17px] items-center justify-center rounded-full bg-violet-300 px-1.5 py-0.5 text-[9px] font-bold text-violet-950">
                                   {challengeCounts[task.id]}
-                                </span>
-                              )}
-                            </button>
-                          ) : (
-                            <div />
-                          )}
-                        
-                          {/* Files */}
-                          {canReadAttachments(task) ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openProgramAttachmentModal(task);
-                              }}
-                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#49351b] px-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#60451f]"
-                            >
-                              <File size={13} />
-                              <span>Files</span>
-                              {(attachments[task.id]?.length || 0) > 0 && (
-                                <span className="flex min-w-[17px] items-center justify-center rounded-full bg-amber-300 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">
-                                  {attachments[task.id]?.length || 0}
                                 </span>
                               )}
                             </button>
