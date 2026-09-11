@@ -115,11 +115,6 @@ const formatDate = (dateString: string | null | undefined): string => {
   }
 };
 
-const membersOnly = useMemo(
-  () => assignableUsers.filter((u) => u.role === "Member"),
-  [assignableUsers]
-);
-
 const formatFileSize = (bytes: number) => {
   if (!bytes) return "0 B";
   const k = 1024;
@@ -266,6 +261,12 @@ const [successMessage, setSuccessMessage] = useState("");
       currentUser?.role === "Project Manager",
     [currentUser]
   );
+
+  const membersOnly = useMemo(
+  () => assignableUsers.filter((u) => u.role === "Member"),
+  [assignableUsers]
+);
+
 
   /* =======================================================
      AUTH
@@ -782,6 +783,22 @@ const handleCreateProgramTask = async () => {
               type="button"
               onClick={() => setError("")}
               className="rounded-md p-1 text-red-400 hover:bg-red-100 hover:text-red-700"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mt-5 flex items-start justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+              <p className="font-medium">{successMessage}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSuccessMessage("")}
+              className="rounded-md p-1 text-emerald-500 hover:bg-emerald-100 hover:text-emerald-700"
             >
               <X size={15} />
             </button>
