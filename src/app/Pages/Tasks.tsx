@@ -681,10 +681,10 @@ const fetchTaskSubmissions = async (taskId: string) => {
     }
 };
 
-const handleAddSubmission = async (taskId: string) => {
-    // =========================================================
-    // Require at least one work part (backend also enforces this)
-    // =========================================================
+const handleAddSubmission = async (
+    taskId: string,
+    basePath: string = API_BASE
+) => {
     const parts = workParts[taskId] || [];
     if (parts.length === 0) {
         alert(
@@ -696,28 +696,42 @@ const handleAddSubmission = async (taskId: string) => {
     try {
         setSavingSubmission(true);
 
-        const response = await fetch(
-            `${API_BASE}/tasks/${taskId}/submissions`,
-            {
-                method: "POST",
-                headers: {
-                    ...authHeaders(),
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    link: submissionLink.trim() || null,
-                    description: submissionDescription.trim() || null,
-                }),
-            }
-        );
+        const url =
+            basePath === PROGRAM_API
+                ? `${PROGRAM_API}/${taskId}/submissions`
+                : `${API_BASE}/tasks/${taskId}/submissions`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                ...authHeaders(),
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                link: submissionLink.trim() || null,
+                description: submissionDescription.trim() || null,
+            }),
+        });
 
         const data = await response.json();
         if (!response.ok) {
             throw new Error(data.error || data.message || "Failed to submit work");
         }
 
-        await fetchTaskSubmissions(taskId);
-        await fetchProjectsAndTasks();
+        if (basePath === PROGRAM_API) {
+            const r = await fetch(
+                `${PROGRAM_API}/${taskId}/submissions`,
+                { headers: authHeaders() }
+            );
+            const d = await r.json();
+            setSubmissions((prev) => ({
+                ...prev,
+                [taskId]: d.submissions || [],
+            }));
+        } else {
+            await fetchTaskSubmissions(taskId);
+            await fetchProjectsAndTasks();
+        }
 
         setSubmissionLink("");
         setSubmissionDescription("");
@@ -729,7 +743,6 @@ const handleAddSubmission = async (taskId: string) => {
         setSavingSubmission(false);
     }
 };
-  
 const handleDeleteSubmission = async (submissionId: string) => {
     const confirmed = window.confirm(
         "Are you sure you want to delete this submission?"
@@ -1332,42 +1345,55 @@ const handlePreviewAttachment = async (attachment: Attachment) => {
     setPreviewLoading(false);
 };
 
-  const handleDeleteAttachment = async (attachmentId: string) => {
+ const handleDeleteSubmission = async (
+    submissionId: string,
+    basePath: string = API_BASE
+) => {
     const confirmed = window.confirm(
-      "Are you sure you want to delete this attachment?"
+        "Are you sure you want to delete this submission?"
     );
-
     if (!confirmed) return;
 
     try {
-      setDeletingAttachment(attachmentId);
+        setDeletingSubmission(submissionId);
 
-      const response = await fetch(
-        `${API_BASE}/attachments/${attachmentId}`,
-        {
-          method: "DELETE",
-          headers: authHeaders(),
+        const url =
+            basePath === PROGRAM_API
+                ? `${PROGRAM_API}/submissions/${submissionId}`
+                : `${API_BASE}/submissions/${submissionId}`;
+
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: authHeaders(),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to delete submission");
         }
-      );
 
-      const data = await response.json();
+        if (basePath === PROGRAM_API && selectedTaskForSubmission) {
+            const r = await fetch(
+                `${PROGRAM_API}/${selectedTaskForSubmission.id}/submissions`,
+                { headers: authHeaders() }
+            );
+            const d = await r.json();
+            setSubmissions((prev) => ({
+                ...prev,
+                [selectedTaskForSubmission.id]: d.submissions || [],
+            }));
+        } else if (selectedTaskForSubmission) {
+            await fetchTaskSubmissions(selectedTaskForSubmission.id);
+        }
 
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to delete attachment");
-      }
-
-      if (selectedTaskForAttachment) {
-        await fetchTaskAttachments(selectedTaskForAttachment.id);
-      }
-
-      alert("Attachment deleted successfully");
+        alert("Submission deleted successfully");
     } catch (error) {
-      console.error("Delete error:", error);
-      alert(error instanceof Error ? error.message : "Failed to delete attachment");
+        console.error("Delete submission error:", error);
+        alert(error instanceof Error ? error.message : "Failed to delete submission");
     } finally {
-      setDeletingAttachment(null);
+        setDeletingSubmission(null);
     }
-  };
+};
 
   const openAttachmentModal = async (task: Task) => {
     setSelectedTaskForAttachment(task);
@@ -4810,7 +4836,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                                         isManagementRole) && (
                                         <button
                                             onClick={() =>
-                                                handleDeleteWorkPart(part.id, selectedTaskForSubmission.id)
+                                                handleDeleteWorkPart(part.id, selectedTaskForSubmission.id, submissionBasePath)
                                             }
                                             disabled={deletingWorkPart === part.id}
                                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
@@ -4850,11 +4876,11 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                                                 type="button"
                                                 disabled={!canEdit}
                                                 onClick={() =>
-                                                    handleUpdateWorkPartStatus(
+                                                      handleUpdateWorkPartStatus(
                                                         part.id,
                                                         s,
-                                                        selectedTaskForSubmission.id
-                                                    )
+                                                        selectedTaskForSubmission.id,
+                                                        submissionBasePath
                                                 }
                                                 className={`rounded-md border px-2.5 py-1 text-[10px] font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${styleMap[s]}`}
                                             >
@@ -4918,8 +4944,8 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                                 <div className="ml-auto">
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            handleAddWorkPart(selectedTaskForSubmission.id)
+                                         onClick={() =>
+                                         handleAddWorkPart(selectedTaskForSubmission.id, submissionBasePath)
                                         }
                                         disabled={savingWorkPart || !newPartTitle.trim()}
                                         className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
@@ -5024,7 +5050,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
 
                                     {canDeleteSubmission(submission) && (
                                         <button
-                                            onClick={() => handleDeleteSubmission(submission.id)}
+                                           onClick={() => handleDeleteSubmission(submission.id, submissionBasePath)}
                                             disabled={deletingSubmission === submission.id}
                                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
                                             title="Delete submission"
@@ -5089,7 +5115,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                         />
                         <div className="flex justify-end">
                             <button
-                                onClick={() => handleAddSubmission(selectedTaskForSubmission.id)}
+                                 onClick={() => handleAddSubmission(selectedTaskForSubmission.id, submissionBasePath)}
                                 disabled={
                                     savingSubmission ||
                                     (workParts[selectedTaskForSubmission.id]?.length || 0) === 0
