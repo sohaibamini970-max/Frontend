@@ -4882,6 +4882,7 @@ const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
                                                         selectedTaskForSubmission.id,
                                                         submissionBasePath
                                                 )
+                                              }
                                                 className={`rounded-md border px-2.5 py-1 text-[10px] font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${styleMap[s]}`}
                                             >
                                                 {s}
