@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 
 const API_BASE = "https://backend-five-swart-88.vercel.app";
-
+const PROGRAM_TASK_API = `${API_BASE}/api/program-tasks`;
 /* =========================================================
    TYPES
 ========================================================= */
@@ -113,6 +113,19 @@ const formatDate = (dateString: string | null | undefined): string => {
   } catch {
     return "Not set";
   }
+};
+
+const membersOnly = useMemo(
+  () => assignableUsers.filter((u) => u.role === "Member"),
+  [assignableUsers]
+);
+
+const formatFileSize = (bytes: number) => {
+  if (!bytes) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${Math.round((bytes / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
 };
 
 const initialsOf = (name: string | null | undefined) => {
@@ -225,6 +238,21 @@ export default function Programs() {
   const [prPriority, setPrPriority] = useState<ProgramPriority>("Medium");
   const [prAssignedTo, setPrAssignedTo] = useState<string>("");
   const [savingProject, setSavingProject] = useState(false);
+
+  /* Create Program Task form */
+const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
+const [taskProjectId, setTaskProjectId] = useState<string | null>(null);
+const [taskProjectName, setTaskProjectName] = useState("");
+const [tName, setTName] = useState("");
+const [tDescription, setTDescription] = useState("");
+const [tObjectives, setTObjectives] = useState("");
+const [tPriority, setTPriority] = useState<ProgramPriority>("Medium");
+const [tAssignee, setTAssignee] = useState<string>("");
+const [tStartDate, setTStartDate] = useState("");
+const [tDueDate, setTDueDate] = useState("");
+const [tInstructionFile, setTInstructionFile] = useState<File | null>(null);
+const [savingTask, setSavingTask] = useState(false);
+const [successMessage, setSuccessMessage] = useState("");
 
   /* Assign modal */
   const [assignProjectId, setAssignProjectId] = useState<string | null>(null);
@@ -463,6 +491,150 @@ export default function Programs() {
       setAssigning(false);
     }
   };
+
+  /* ==========================================================
+      Createe Tasks
+  =============================================================*/
+
+  /* ========================================================
+   CREATE PROGRAM TASK
+======================================================== */
+
+const openCreateTaskModal = (project: ProgramProject) => {
+  setTaskProjectId(project.id);
+  setTaskProjectName(project.name);
+  setTName("");
+  setTDescription("");
+  setTObjectives("");
+  setTPriority("Medium");
+  setTAssignee("");
+  setTStartDate("");
+  setTDueDate("");
+  setTInstructionFile(null);
+  setOpenProjectMenu(null);
+  setSuccessMessage("");
+  setError("");
+  setCreateTaskModalOpen(true);
+};
+
+const closeCreateTaskModal = () => {
+  if (savingTask) return;
+  setCreateTaskModalOpen(false);
+  setTaskProjectId(null);
+  setTaskProjectName("");
+  setTName("");
+  setTDescription("");
+  setTObjectives("");
+  setTPriority("Medium");
+  setTAssignee("");
+  setTStartDate("");
+  setTDueDate("");
+  setTInstructionFile(null);
+};
+
+const handleCreateProgramTask = async () => {
+  if (!taskProjectId) return;
+  if (!tName.trim()) {
+    setError("Task name is required.");
+    return;
+  }
+
+  try {
+    setSavingTask(true);
+    setError("");
+    setSuccessMessage("");
+
+    /* --- 1. Create the task --- */
+    const createRes = await fetch(
+      `${PROGRAM_TASK_API}/program-project/${taskProjectId}`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: tName.trim(),
+          description: tDescription.trim() || null,
+          objectives: tObjectives.trim() || null,
+          priority: tPriority,
+          status: "To Do",
+          assigneeId: tAssignee || null,
+          startDate: tStartDate || null,
+          dueDate: tDueDate || null,
+        }),
+      }
+    );
+
+    const createData = await createRes.json();
+    if (!createRes.ok) {
+      throw new Error(createData.message || "Failed to create task");
+    }
+
+    const createdTaskId: string | undefined = createData?.task?.id;
+    if (!createdTaskId) {
+      throw new Error("Task created but no id was returned.");
+    }
+
+    /* --- 2. Upload instruction file if provided --- */
+    if (tInstructionFile) {
+      const fd = new FormData();
+      fd.append("file", tInstructionFile);
+
+      const upRes = await fetch(
+        `${PROGRAM_TASK_API}/${createdTaskId}/instructions`,
+        {
+          method: "POST",
+          // NOTE: do not set Content-Type — browser adds the multipart boundary
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+          },
+          body: fd,
+        }
+      );
+
+      if (!upRes.ok) {
+        const upData = await upRes.json().catch(() => ({}));
+        console.error("Instruction upload failed:", upData);
+        setError(
+          upData.message ||
+            "Task created, but the instruction file failed to upload."
+        );
+      }
+    }
+
+    setSuccessMessage(
+      `Task "${tName.trim()}" created${
+        tAssignee
+          ? ` and assigned to ${
+              membersOnly.find((m) => m.id === tAssignee)?.full_name || "the member"
+            }`
+          : ""
+      }.`
+    );
+
+    // Reset the modal but keep it visible so the manager sees the success
+    setTName("");
+    setTDescription("");
+    setTObjectives("");
+    setTPriority("Medium");
+    setTAssignee("");
+    setTStartDate("");
+    setTDueDate("");
+    setTInstructionFile(null);
+
+    // Close after a short delay so the message is visible
+    setTimeout(() => {
+      setCreateTaskModalOpen(false);
+      setTaskProjectId(null);
+      setTaskProjectName("");
+      setSuccessMessage("");
+    }, 1400);
+  } catch (err: any) {
+    console.error("Create program task error:", err);
+    setError(err.message || "Failed to create task");
+  } finally {
+    setSavingTask(false);
+  }
+};
+  
 
   /* =======================================================
      FILTERS
@@ -843,6 +1015,15 @@ export default function Programs() {
                                   >
                                     <UserPlus size={16} className="text-gray-500" />
                                     {project.assigned_to ? "Reassign" : "Assign"}
+                                  </button>
+
+                                  <button
+                                  type="button"
+                                  onClick={() => openCreateTaskModal(project)}
+                                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-emerald-50"
+                                >
+                                  <ListTodo size={16} className="text-emerald-600" />
+                                  Create Task
                                   </button>
                                 </div>
                               )}
@@ -1370,6 +1551,236 @@ export default function Programs() {
           </div>
         </div>
       )}
+
+      {/*=============================================
+      Craete Tasks Modal
+      ================================================*/}
+
+      {/* =====================================================
+    CREATE PROGRAM TASK MODAL
+===================================================== */}
+
+{createTaskModalOpen && taskProjectId && (
+  <div
+    className="fixed inset-0 z-[75] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]"
+    onMouseDown={(e) => {
+      if (e.target === e.currentTarget) closeCreateTaskModal();
+    }}
+  >
+    <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      {/* ---------- Header ---------- */}
+      <div className="flex items-start justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 text-white">
+        <div>
+          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
+            <ListTodo size={19} />
+          </div>
+          <h2 className="text-lg font-semibold">Create a program task</h2>
+          <p className="mt-1 text-xs text-emerald-50">
+            Under{" "}
+            <span className="font-semibold text-white">
+              {activeProgram?.name || "Program"}
+            </span>{" "}
+            → <span className="font-semibold text-white">{taskProjectName}</span>
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={closeCreateTaskModal}
+          disabled={savingTask}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/20 disabled:opacity-50"
+        >
+          <X size={19} />
+        </button>
+      </div>
+
+      {/* ---------- Body ---------- */}
+      <div className="overflow-y-auto bg-white px-6 py-6">
+        <div className="grid gap-5 sm:grid-cols-2">
+
+          {/* Task name */}
+          <div className="sm:col-span-2">
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Task name <span className="text-red-600">*</span>
+            </label>
+            <input
+              value={tName}
+              onChange={(e) => setTName(e.target.value)}
+              placeholder="e.g. Build recommendation engine"
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+
+          {/* Description */}
+          <div className="sm:col-span-2">
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Description
+            </label>
+            <textarea
+              value={tDescription}
+              onChange={(e) => setTDescription(e.target.value)}
+              rows={3}
+              placeholder="Describe what needs to be completed..."
+              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+
+          {/* Objectives */}
+          <div className="sm:col-span-2">
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Objectives
+            </label>
+            <textarea
+              value={tObjectives}
+              onChange={(e) => setTObjectives(e.target.value)}
+              rows={3}
+              placeholder="What should this task achieve?"
+              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+
+          {/* Instruction file */}
+          <div className="sm:col-span-2">
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Instruction file (optional)
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt"
+              onChange={(e) =>
+                setTInstructionFile(e.target.files?.[0] || null)
+              }
+              className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-700"
+            />
+            {tInstructionFile && (
+              <p className="mt-2 text-xs text-gray-500">
+                Selected: {tInstructionFile.name} (
+                {formatFileSize(tInstructionFile.size)})
+              </p>
+            )}
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Priority
+            </label>
+            <select
+              value={tPriority}
+              onChange={(e) => setTPriority(e.target.value as ProgramPriority)}
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+            >
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+
+          {/* Assignee — Members only */}
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Assignee (Member)
+            </label>
+            <select
+              value={tAssignee}
+              onChange={(e) => setTAssignee(e.target.value)}
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+            >
+              <option value="">— Unassigned —</option>
+              {membersOnly.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.full_name}
+                  {u.job_title ? ` · ${u.job_title}` : ""}
+                </option>
+              ))}
+            </select>
+            {membersOnly.length === 0 && (
+              <p className="mt-2 text-xs text-amber-700">
+                No Members found. Add a user with role &quot;Member&quot; first.
+              </p>
+            )}
+          </div>
+
+          {/* Start date */}
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Start date
+            </label>
+            <input
+              type="date"
+              value={tStartDate}
+              onChange={(e) => setTStartDate(e.target.value)}
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          {/* Due date */}
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-gray-700">
+              Due date
+            </label>
+            <input
+              type="date"
+              value={tDueDate}
+              min={tStartDate || undefined}
+              onChange={(e) => setTDueDate(e.target.value)}
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-sm text-black outline-none focus:border-emerald-500"
+            />
+          </div>
+        </div>
+
+        {/* Info note */}
+        <div className="mt-6 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+          <div className="flex gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-sm">
+              <AlertCircle size={15} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-900">
+                How this task is delivered
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-gray-700">
+                It will appear in the &quot;Program Project Tasks&quot; section of the
+                assignee&apos;s Tasks page, with a green card header showing the program
+                name. The member can add work parts, submit links, report challenges,
+                and upload files. You can mark it Done once evidence is provided.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ---------- Footer ---------- */}
+      <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={closeCreateTaskModal}
+          disabled={savingTask}
+          className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleCreateProgramTask}
+          disabled={savingTask || !tName.trim()}
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-green-700 px-5 text-sm font-medium text-white hover:from-emerald-700 hover:to-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {savingTask ? (
+            <>
+              <RefreshCw size={14} className="animate-spin" />
+              Creating...
+            </>
+          ) : (
+            <>
+              <Plus size={15} />
+              Create task
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* =====================================================
           VIEW PROJECT MODAL
