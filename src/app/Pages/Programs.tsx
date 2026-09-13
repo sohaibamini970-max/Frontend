@@ -1231,17 +1231,18 @@ export default function Programs() {
             ) : (
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredProgramProjects.map((project) => {
-                  const progress =
-                    project.status === "Done"
-                      ? 100
-                      : project.status === "In Progress"
-                      ? 50
-                      : 0;
-
-                  const counts = projectTaskCounts[project.id] || {
-                    total: project.task_count ?? 0,
-                    done: project.completed_task_count ?? 0,
-                  };
+                 const counts = projectTaskCounts[project.id] || {
+                  total: project.task_count ?? 0,
+                  done: project.completed_task_count ?? 0,
+                };
+                
+                // Progress based on actual task completion
+                const progress =
+                  counts.total > 0
+                    ? Math.round((counts.done / counts.total) * 100)
+                    : project.status === "Done"
+                    ? 100
+                    : 0;
 
                   const members = projectMembers[project.id] || [];
 
