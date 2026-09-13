@@ -941,17 +941,18 @@ export default function Tasks() {
               merged.set(String(t.id), t);
             });
 
-            return Array.from(merged.values()).map((t: any) => ({
-              ...normalizeTask(t),
-              program_project_id: String(t.program_project_id || ""),
-              program_project_name: t.program_project_name || "",
-              program_project_domain: t.program_project_domain || "",
-              program_project_manager_id: String(
-                t.program_project_manager_id || ""
-              ),
-              program_name: t.program_name || "",
-              objectives: t.objectives || "",
-            }));
+          return Array.from(merged.values()).map((t: any) => ({
+                ...normalizeTask(t),
+                program_project_id: String(t.program_project_id || ""),
+                program_project_name: t.program_project_name || "",
+                program_project_domain: t.program_project_domain || "",
+                program_project_manager_id: String(
+                  t.program_project_manager_id || ""
+                ),
+                program_name: t.program_name || "",
+                objectives: t.objectives || "",
+                instructions_text: t.instructions_text ?? null,   // ← new
+              }));
           }
 
           // Managers — unchanged
@@ -971,6 +972,7 @@ export default function Tasks() {
             ),
             program_name: t.program_name || "",
             objectives: t.objectives || "",
+            instructions_text: t.instructions_text ?? null,   // ← new
           }));
         } catch (e) {
           console.error("Program tasks fetch error:", e);
