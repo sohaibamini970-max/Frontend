@@ -128,6 +128,20 @@ type ProjectMemberRow = {
   assigned_at?: string;
 };
 
+type BulkTaskRow = {
+  rowNumber: number;
+  name: string;
+  description: string;
+  objectives: string;
+  priority: ProgramPriority;
+  assigneeEmail: string;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  startDate: string;
+  dueDate: string;
+  errors: string[];
+};
+
 /* =========================================================
    HELPERS
 ========================================================= */
@@ -318,6 +332,15 @@ export default function Programs() {
   const [assignUserId, setAssignUserId] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
 
+  /* Bulk create tasks */
+const [bulkModalOpen, setBulkModalOpen] = useState(false);
+const [bulkProject, setBulkProject] = useState<ProgramProject | null>(null);
+const [bulkRows, setBulkRows] = useState<BulkTaskRow[]>([]);
+const [bulkParsing, setBulkParsing] = useState(false);
+const [bulkCreating, setBulkCreating] = useState(false);
+const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+const [bulkError, setBulkError] = useState("");
+
   const isAdminOrManager = useMemo(
     () =>
       currentUser?.role === "Executive Manager" ||
@@ -327,6 +350,8 @@ export default function Programs() {
   );
 
   const membersOnly = useMemo(
+
+
     () =>
       assignableUsers.filter(
         (u) => String(u.role).trim().toLowerCase() === "member"
@@ -352,6 +377,259 @@ export default function Programs() {
       console.error("Failed to parse user:", err);
     }
   }, []);
+
+  /* =======================================================
+   BULK CREATE PROGRAM TASKS  (Member + Managers)
+======================================================= */
+
+  const openBulkModal = async (project: ProgramProject) => {
+    setOpenProjectMenu(null);
+    setBulkProject(project);
+    setBulkRows([]);
+    setBulkError("");
+    setBulkProgress({ done: 0, total: 0 });
+    setBulkModalOpen(true);
+
+    // Make sure the member list for this project is loaded (assignee matching)
+    if (!projectMembers[project.id]) {
+      await fetchProjectMembers(project.id);
+    }
+  };
+
+  const closeBulkModal = () => {
+    if (bulkCreating) return;
+    setBulkModalOpen(false);
+    setBulkProject(null);
+    setBulkRows([]);
+    setBulkError("");
+    setBulkProgress({ done: 0, total: 0 });
+  };
+
+  const downloadBulkTemplate = () => {
+    const headers = [
+      "name",
+      "description",
+      "objectives",
+      "priority",
+      "assignee_email",
+      "start_date",
+      "due_date",
+    ];
+    const example = [
+      "Build landing page",
+      "Create hero + features section",
+      "Landing page shipped to staging",
+      "High",
+      "member@example.com",
+      "2026-09-15",
+      "2026-09-25",
+    ];
+    const csv = `${headers.join(",")}\n${example.join(",")}\n`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "program-tasks-template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleBulkFileUpload = async (file: File) => {
+    setBulkParsing(true);
+    setBulkError("");
+    setBulkRows([]);
+
+    try {
+      const XLSX = await import("xlsx");
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      if (!ws) throw new Error("The file has no sheets.");
+
+      const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, {
+        defval: "",
+      });
+      if (raw.length === 0) throw new Error("The file is empty.");
+
+      const memberList = projectMembers[bulkProject!.id] || [];
+      const byEmail = new Map(
+        memberList.map((m) => [String(m.email || "").toLowerCase().trim(), m])
+      );
+      const byName = new Map(
+        memberList.map((m) => [String(m.full_name || "").toLowerCase().trim(), m])
+      );
+      const byId = new Map(memberList.map((m) => [String(m.user_id), m]));
+
+      const parsed: BulkTaskRow[] = raw.map((r, idx) => {
+        const pick = (...keys: string[]) => {
+          for (const k of keys) {
+            const found = Object.keys(r).find(
+              (rk) => rk.trim().toLowerCase() === k.toLowerCase()
+            );
+            if (found && String(r[found]).trim() !== "") {
+              return String(r[found]).trim();
+            }
+          }
+          return "";
+        };
+
+        const name = pick("name", "task", "task_name", "title");
+        const description = pick("description", "desc");
+        const objectives = pick("objectives", "objective", "goal");
+        const rawPriority = pick("priority").toLowerCase();
+        const priority: ProgramPriority =
+          rawPriority === "high"
+            ? "High"
+            : rawPriority === "low"
+              ? "Low"
+              : "Medium";
+        const assigneeEmail = pick("assignee_email", "email", "member_email");
+        const assigneeField = pick("assignee", "assignee_name", "member");
+        const startDate = pick("start_date", "start");
+        const dueDate = pick("due_date", "deadline", "due");
+
+        const errors: string[] = [];
+        if (!name) errors.push("Task name is required.");
+
+        let assigneeId: string | null = null;
+        let assigneeName: string | null = null;
+
+        if (assigneeEmail) {
+          const m = byEmail.get(assigneeEmail.toLowerCase());
+          if (!m) {
+            errors.push(
+              `Email "${assigneeEmail}" is not a member of this project.`
+            );
+          } else {
+            assigneeId = m.user_id;
+            assigneeName = m.full_name;
+          }
+        } else if (assigneeField) {
+          const mById = byId.get(assigneeField);
+          if (mById) {
+            assigneeId = mById.user_id;
+            assigneeName = mById.full_name;
+          } else {
+            const m = byName.get(assigneeField.toLowerCase());
+            if (!m) {
+              errors.push(
+                `Assignee "${assigneeField}" is not a member of this project.`
+              );
+            } else {
+              assigneeId = m.user_id;
+              assigneeName = m.full_name;
+            }
+          }
+        }
+
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (startDate && !dateRegex.test(startDate)) {
+          errors.push("start_date must be YYYY-MM-DD.");
+        }
+        if (dueDate && !dateRegex.test(dueDate)) {
+          errors.push("due_date must be YYYY-MM-DD.");
+        }
+        if (
+          startDate &&
+          dueDate &&
+          dateRegex.test(startDate) &&
+          dateRegex.test(dueDate) &&
+          dueDate <= startDate
+        ) {
+          errors.push("due_date must be after start_date.");
+        }
+
+        return {
+          rowNumber: idx + 2,
+          name,
+          description,
+          objectives,
+          priority,
+          assigneeEmail,
+          assigneeId,
+          assigneeName,
+          startDate,
+          dueDate,
+          errors,
+        };
+      });
+
+      setBulkRows(parsed);
+    } catch (e: any) {
+      console.error("Bulk parse error:", e);
+      setBulkError(e.message || "Failed to parse file.");
+    } finally {
+      setBulkParsing(false);
+    }
+  };
+
+  const handleBulkCreate = async () => {
+    if (!bulkProject) return;
+    const valid = bulkRows.filter((r) => r.errors.length === 0);
+    if (valid.length === 0) {
+      setBulkError("No valid rows to create.");
+      return;
+    }
+
+    setBulkCreating(true);
+    setBulkError("");
+    setBulkProgress({ done: 0, total: valid.length });
+
+    const failures: { row: number; reason: string }[] = [];
+
+    for (let i = 0; i < valid.length; i++) {
+      const row = valid[i];
+      try {
+        const res = await fetch(
+          `${PROGRAM_TASK_API}/program-project/${bulkProject.id}`,
+          {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              name: row.name,
+              description: row.description || null,
+              objectives: row.objectives || null,
+              priority: row.priority,
+              status: "To Do",
+              assigneeId: row.assigneeId,
+              startDate: row.startDate || null,
+              dueDate: row.dueDate || null,
+            }),
+          }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          failures.push({
+            row: row.rowNumber,
+            reason: data.message || `HTTP ${res.status}`,
+          });
+        }
+      } catch (e: any) {
+        failures.push({ row: row.rowNumber, reason: e.message || "Network error." });
+      }
+      setBulkProgress({ done: i + 1, total: valid.length });
+    }
+
+    if (programProjects.length > 0) {
+      fetchAllProgramProjectTaskCounts(programProjects);
+    }
+
+    setBulkCreating(false);
+
+    if (failures.length === 0) {
+      setSuccessMessage(
+        `Created ${valid.length} program task${valid.length === 1 ? "" : "s"}.`
+      );
+      closeBulkModal();
+    } else {
+      setBulkError(
+        `${valid.length - failures.length} of ${valid.length} created. Failures: ` +
+        failures.map((f) => `row ${f.row} → ${f.reason}`).join(" | ")
+      );
+    }
+  };
 
   /* =======================================================
      FETCH PROGRAMS
@@ -1360,6 +1638,15 @@ export default function Programs() {
                                     />
                                     Create Task
                                   </button>
+
+                                  <button
+  type="button"
+  onClick={() => openBulkModal(project)}
+  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-emerald-50"
+>
+  <MoreVertical size={16} className="text-emerald-600" />
+  Create Tasks in Bulk
+</button>
                                 </div>
                               )}
                             </div>
@@ -2588,6 +2875,256 @@ export default function Programs() {
           </div>
         </div>
       )}
+
+
+      {/* =====================================================
+    BULK CREATE PROGRAM TASKS MODAL  (Member + Managers)
+====================================================== */}
+
+{bulkModalOpen && bulkProject && (
+  <div
+    className="fixed inset-0 z-[85] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]"
+    onMouseDown={(e) => {
+      if (e.target === e.currentTarget) closeBulkModal();
+    }}
+  >
+    <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      {/* Header */}
+      <div className="flex items-start justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 text-white">
+        <div>
+          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+            <ListTodo size={19} />
+          </div>
+          <h2 className="text-lg font-semibold">Bulk create program tasks</h2>
+          <p className="mt-1 text-xs text-emerald-50">
+            Under{" "}
+            <span className="font-semibold text-white">
+              {activeProgram?.name || "Program"}
+            </span>{" "}
+            →{" "}
+            <span className="font-semibold text-white">{bulkProject.name}</span>
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={closeBulkModal}
+          disabled={bulkCreating}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/20 disabled:opacity-50"
+        >
+          <X size={19} />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="overflow-y-auto bg-white px-6 py-6">
+        {bulkError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+            {bulkError}
+          </div>
+        )}
+
+        {/* Upload strip */}
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={downloadBulkTemplate}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-white px-4 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              <Check size={14} />
+              Download CSV template
+            </button>
+
+            <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-emerald-600 px-4 text-xs font-semibold text-white hover:bg-emerald-700">
+              <Plus size={14} />
+              Choose Excel / CSV file
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                disabled={bulkParsing || bulkCreating}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleBulkFileUpload(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+
+            {bulkParsing && (
+              <span className="inline-flex items-center gap-2 text-xs font-medium text-emerald-700">
+                <RefreshCw size={13} className="animate-spin" />
+                Parsing file...
+              </span>
+            )}
+          </div>
+
+          <p className="mt-3 text-[11px] leading-relaxed text-gray-700">
+            Required column: <b>name</b>. Optional: <b>description</b>,{" "}
+            <b>objectives</b>, <b>priority</b> (Low/Medium/High),{" "}
+            <b>assignee_email</b> (must be a member of this project),{" "}
+            <b>start_date</b>, <b>due_date</b> (YYYY-MM-DD). Rows with errors are
+            skipped and shown in red.
+          </p>
+        </div>
+
+        {/* Preview table */}
+        {bulkRows.length > 0 && (
+          <div className="mt-5">
+            <div className="mb-2">
+              <h3 className="text-sm font-bold text-gray-900">
+                Preview ({bulkRows.length} row
+                {bulkRows.length === 1 ? "" : "s"})
+              </h3>
+              <p className="text-[11px] text-gray-500">
+                {bulkRows.filter((r) => r.errors.length === 0).length} valid ·{" "}
+                {bulkRows.filter((r) => r.errors.length > 0).length} with errors
+                (will be skipped)
+              </p>
+            </div>
+
+            <div className="max-h-[340px] overflow-y-auto rounded-xl border border-gray-200">
+              <table className="w-full text-left text-[11px]">
+                <thead className="sticky top-0 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2">#</th>
+                    <th className="px-3 py-2">Task</th>
+                    <th className="px-3 py-2">Priority</th>
+                    <th className="px-3 py-2">Assignee</th>
+                    <th className="px-3 py-2">Start</th>
+                    <th className="px-3 py-2">Due</th>
+                    <th className="px-3 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkRows.map((r) => {
+                    const ok = r.errors.length === 0;
+                    return (
+                      <tr
+                        key={r.rowNumber}
+                        className={`border-t border-gray-100 ${
+                          ok ? "" : "bg-red-50/60"
+                        }`}
+                      >
+                        <td className="px-3 py-2 font-semibold text-gray-500">
+                          {r.rowNumber}
+                        </td>
+                        <td className="px-3 py-2">
+                          <p className="font-semibold text-gray-900">
+                            {r.name || <span className="text-red-600">—</span>}
+                          </p>
+                          {r.description && (
+                            <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-500">
+                              {r.description}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">{r.priority}</td>
+                        <td className="px-3 py-2">
+                          {r.assigneeName ? (
+                            r.assigneeName
+                          ) : r.assigneeEmail ? (
+                            <span className="text-red-600">{r.assigneeEmail}</span>
+                          ) : (
+                            <span className="text-gray-400">Unassigned</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">{r.startDate || "—"}</td>
+                        <td className="px-3 py-2">{r.dueDate || "—"}</td>
+                        <td className="px-3 py-2">
+                          {ok ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                              <Check size={10} /> Ready
+                            </span>
+                          ) : (
+                            <span
+                              title={r.errors.join(" · ")}
+                              className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700"
+                            >
+                              <AlertCircle size={10} /> {r.errors.length} error
+                              {r.errors.length === 1 ? "" : "s"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Progress */}
+        {bulkCreating && (
+          <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
+              <span>
+                Creating tasks... {bulkProgress.done}/{bulkProgress.total}
+              </span>
+              <span>
+                {bulkProgress.total
+                  ? Math.round((bulkProgress.done / bulkProgress.total) * 100)
+                  : 0}
+                %
+              </span>
+            </div>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-100">
+              <div
+                className="h-full rounded-full bg-emerald-600 transition-all"
+                style={{
+                  width: `${
+                    bulkProgress.total
+                      ? (bulkProgress.done / bulkProgress.total) * 100
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={closeBulkModal}
+          disabled={bulkCreating}
+          className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleBulkCreate}
+          disabled={
+            bulkCreating ||
+            bulkRows.length === 0 ||
+            bulkRows.filter((r) => r.errors.length === 0).length === 0
+          }
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-green-700 px-5 text-sm font-medium text-white hover:from-emerald-700 hover:to-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {bulkCreating ? (
+            <>
+              <RefreshCw size={14} className="animate-spin" />
+              Creating {bulkProgress.done}/{bulkProgress.total}...
+            </>
+          ) : (
+            <>
+              <Plus size={15} />
+              Create{" "}
+              {bulkRows.filter((r) => r.errors.length === 0).length} task
+              {bulkRows.filter((r) => r.errors.length === 0).length === 1
+                ? ""
+                : "s"}
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </main>
   );
 }
