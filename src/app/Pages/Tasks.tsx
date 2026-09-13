@@ -647,34 +647,39 @@ export default function Tasks() {
   // SUBMISSION API FUNCTIONS
   // ====================================
 
-  const fetchTaskSubmissions = async (taskId: string) => {
-    try {
-      setLoadingSubmissions(true);
-      const response = await fetch(
-        `${API_BASE}/tasks/${taskId}/submissions`,
-        { headers: authHeaders() }
-      );
+ const fetchTaskSubmissions = async (
+  taskId: string,
+  basePath: string = API_BASE
+) => {
+  try {
+    setLoadingSubmissions(true);
 
-      const data = await response.json();
+    const url =
+      basePath === PROGRAM_API
+        ? `${PROGRAM_API}/${taskId}/submissions`
+        : `${API_BASE}/tasks/${taskId}/submissions`;
 
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to load submissions");
-      }
+    const response = await fetch(url, { headers: authHeaders() });
+    const data = await response.json();
 
-      setSubmissions(prev => ({
-        ...prev,
-        [taskId]: data.submissions || []
-      }));
-    } catch (error) {
-      console.error("Fetch submissions error:", error);
-      setSubmissions(prev => ({
-        ...prev,
-        [taskId]: []
-      }));
-    } finally {
-      setLoadingSubmissions(false);
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to load submissions");
     }
-  };
+
+    setSubmissions((prev) => ({
+      ...prev,
+      [taskId]: data.submissions || [],
+    }));
+  } catch (error) {
+    console.error("Fetch submissions error:", error);
+    setSubmissions((prev) => ({
+      ...prev,
+      [taskId]: [],
+    }));
+  } finally {
+    setLoadingSubmissions(false);
+  }
+};
 
   const handleAddSubmission = async (
     taskId: string,
@@ -1801,38 +1806,87 @@ export default function Tasks() {
 
 
 
-  const handleProgramTaskStatusChange = async (
-    taskId: string,
-    status: TaskStatus
-  ) => {
-    try {
-     const res = await fetch(`${PROGRAM_API}/${taskId}/status`, {
-  method: "PATCH",
-  headers: { ...authHeaders(), "Content-Type": "application/json" },
-  body: JSON.stringify({ status }),
-});
+ const handleProgramTaskStatusChange = async (
+  taskId: string,
+  status: TaskStatus
+) => {
+  try {
+    const task = programTasks.find((t) => t.id === taskId);
+    if (!task) return;
 
-const data = await res.json();
-console.log("PATCH program status →", {
-  httpStatus: res.status,
-  ok: res.ok,
-  body: data,
-  url: `${PROGRAM_API}/${taskId}/status`,
-  tokenPresent: !!getToken(),
-  taskId,
-  status,
-});
-if (!res.ok) {
-  throw new Error(data.message || "Failed to update status");
-}
-      setProgramTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status } : t))
+    // =========================================================
+    // EVIDENCE RULE — applies to ALL roles (Member, PM, EM, SysAdmin)
+    // "Completed" and "Done" require:
+    //   1. At least one work part
+    //   2. AND (a work part marked "Done" OR a submitted link)
+    // =========================================================
+    if (status === "Completed" || status === "Done") {
+      // Make sure work parts + submissions are loaded for this task
+      if (
+        workParts[taskId] === undefined ||
+        submissions[taskId] === undefined
+      ) {
+        await Promise.all([
+          fetchWorkParts(taskId, PROGRAM_API),
+          fetchTaskSubmissions(taskId, PROGRAM_API),
+        ]);
+      }
+
+      const parts = workParts[taskId] || [];
+      const subs = submissions[taskId] || [];
+
+      if (parts.length === 0) {
+        alert(
+          `This task cannot be marked as ${status} yet. At least one work part must be added before this task can be completed.`
+        );
+        return;
+      }
+
+      const hasDonePart = parts.some((p) => p.status === "Done");
+      const hasLink = subs.some(
+        (s) => s.link && String(s.link).trim() !== ""
       );
-      setOpenTaskMenu(null);
-    } catch (e: any) {
-      alert(e.message || "Failed to update status");
+
+      if (!hasDonePart && !hasLink) {
+        alert(
+          `This task cannot be marked as ${status} yet. At least one work part must be marked Done, or at least one work link must be submitted.`
+        );
+        return;
+      }
     }
-  };
+
+    // =========================================================
+    // Send the PATCH (unchanged)
+    // =========================================================
+    const res = await fetch(`${PROGRAM_API}/${taskId}/status`, {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+
+    const data = await res.json();
+    console.log("PATCH program status →", {
+      httpStatus: res.status,
+      ok: res.ok,
+      body: data,
+      url: `${PROGRAM_API}/${taskId}/status`,
+      tokenPresent: !!getToken(),
+      taskId,
+      status,
+    });
+
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to update status");
+    }
+
+    setProgramTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status } : t))
+    );
+    setOpenTaskMenu(null);
+  } catch (e: any) {
+    alert(e.message || "Failed to update status");
+  }
+};
 
   const handleDeleteProgramTask = async (taskId: string) => {
     if (!confirm("Delete this program task? This cannot be undone.")) return;
