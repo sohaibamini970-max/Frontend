@@ -570,7 +570,8 @@ export default function Tasks() {
   const [guideModalOpen, setGuideModalOpen] = useState(false);
   const [guideTask, setGuideTask] = useState<ProgramTask | null>(null);
   const [submissionBasePath, setSubmissionBasePath] = useState<string>(API_BASE);
-
+  const [myProgramProjectIds, setMyProgramProjectIds] = useState<string[]>([]);
+  
   const isManagementRole =
     currentUser?.role === "System Administrator" ||
     currentUser?.role === "Executive Manager" ||
@@ -584,21 +585,34 @@ export default function Tasks() {
   // ====================================
   // SUBMISSION HELPERS
   // ====================================
-  const canSubmitWork = (task: Task): boolean => {
-    return (
-      isMember &&
-      String(task.assignee_id || "") === String(currentUser?.id || "") &&
-      task.status !== "Done"
-    );
-  };
+ const canSubmitWork = (task: Task): boolean => {
+  // Members can only submit on tasks assigned to themselves,
+  // even if they share the project with other members.
+  return (
+    isMember &&
+    String(task.assignee_id || "") === String(currentUser?.id || "") &&
+    task.status !== "Done"
+  );
+};
 
   const canViewSubmissions = (task: Task): boolean => {
-    return (
-      isManagementRole ||
-      (isMember &&
-        String(task.assignee_id || "") === String(currentUser?.id || ""))
-    );
-  };
+  // Managers see everything
+  if (isManagementRole) return true;
+
+  // The assignee sees their own
+  if (
+    isMember &&
+    String(task.assignee_id || "") === String(currentUser?.id || "")
+  ) {
+    return true;
+  }
+
+  // 👇 Any member in the same program project can view
+  if (isMember && isInSameProgramProject(task)) return true;
+
+  return false;
+};
+
 
   const canDeleteSubmission = (submission: TaskSubmission): boolean => {
     return (
@@ -829,15 +843,26 @@ export default function Tasks() {
     );
   };;
 
-  const canReadChallenge = (task: Task) => {
-    return (
-      isManagementRole ||
-      (
-        isMember &&
-        String(task.assignee_id || "") ===
-        String(currentUser?.id || "")
-      )
-    );
+ const canReadChallenge = (task: Task) => {
+  if (isManagementRole) return true;
+
+  if (
+    isMember &&
+    String(task.assignee_id || "") === String(currentUser?.id || "")
+  ) {
+    return true;
+  }
+
+  // 👇 Any member in the same program project can read challenges
+  if (isMember && isInSameProgramProject(task)) return true;
+
+  return false;
+};
+
+  const isInSameProgramProject = (task: Task): boolean => {
+  const ppId = (task as any).program_project_id;
+  if (!ppId) return false;
+  return myProgramProjectIds.includes(String(ppId));
   };
 
   // ====================================
@@ -873,20 +898,11 @@ export default function Tasks() {
     try {
       setLoading(true);
       setError("");
-
       const user = getCurrentUser();
       if (!user?.id) {
         throw new Error("User information not found. Please login again.");
       }
-
       const role = user.role || "";
-
-      // ============================================================
-      // PROGRAM TASKS — fetch in parallel, works for every role
-      // ============================================================
-      // ============================================================
-      // PROGRAM TASKS — for Members: own tasks + all tasks in their program projects
-      // ============================================================
       const programPromise = (async (): Promise<ProgramTask[]> => {
         try {
           if (role === "Member") {
@@ -902,6 +918,8 @@ export default function Tasks() {
             });
             const ppData = ppRes.ok ? await ppRes.json() : { programProjects: [] };
             const myProgramProjects: any[] = ppData.programProjects || [];
+
+            setMyProgramProjectIds(myProgramProjects.map((pp: any) => String(pp.id)));
 
             // 3) All tasks in each of those program projects
             const taskLists = await Promise.all(
