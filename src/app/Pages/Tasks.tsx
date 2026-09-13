@@ -141,6 +141,7 @@ type ProgramTask = Task & {
   program_project_manager_id?: string;
   program_name?: string;
   objectives?: string;
+  instructions_text?: string | null;   // ← new
 };
 
 
@@ -5458,7 +5459,39 @@ export default function Tasks() {
             </div>
 
             {/* Body */}
-            <div className="overflow-y-auto bg-white p-6">
+           {/* Body */}
+<div className="overflow-y-auto bg-white p-6">
+  {/* =====================================================
+      TEXT INSTRUCTIONS  (optional — only when present)
+  ===================================================== */}
+  {guideTask.instructions_text &&
+    String(guideTask.instructions_text).trim() !== "" && (
+      <section className="mb-6">
+        <div className="mb-3 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+            <ListTodo size={15} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-gray-950">
+              Written instructions
+            </h3>
+            <p className="text-[10px] font-medium text-gray-500">
+              Step-by-step guidance from the manager
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 px-4 py-3.5">
+          <p className="whitespace-pre-wrap text-sm font-medium leading-6 text-gray-800">
+            {guideTask.instructions_text}
+          </p>
+        </div>
+      </section>
+    )}
+              
+                {/* =====================================================
+                    INSTRUCTION FILES
+                ===================================================== */}
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-gray-950">
@@ -5475,7 +5508,7 @@ export default function Tasks() {
                     : "s"}
                 </span>
               </div>
-
+            
               <div className="space-y-3">
                 {loadingInstructions ? (
                   <div className="flex min-h-[120px] items-center justify-center rounded-xl border-2 border-gray-300 bg-white">
