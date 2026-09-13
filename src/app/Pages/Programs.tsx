@@ -104,6 +104,7 @@ type ProgramTask = {
   name: string;
   description: string | null;
   objectives: string | null;
+  instructions_text: string | null; 
   status: string;
   priority: ProgramPriority;
   assignee_id: string | null;
@@ -140,6 +141,7 @@ type BulkTaskRow = {
   startDate: string;
   dueDate: string;
   errors: string[];
+  instructionsText: string;  
 };
 
 /* =========================================================
@@ -340,6 +342,7 @@ const [bulkParsing, setBulkParsing] = useState(false);
 const [bulkCreating, setBulkCreating] = useState(false);
 const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
 const [bulkError, setBulkError] = useState("");
+const [tInstructionsText, setTInstructionsText] = useState("");
 
   const isAdminOrManager = useMemo(
     () =>
@@ -410,6 +413,7 @@ const [bulkError, setBulkError] = useState("");
       "name",
       "description",
       "objectives",
+      "instructions_text", 
       "priority",
       "assignee_email",
       "start_date",
@@ -419,6 +423,7 @@ const [bulkError, setBulkError] = useState("");
       "Build landing page",
       "Create hero + features section",
       "Landing page shipped to staging",
+      "Read the design file first, then implement responsive layout.",
       "High",
       "member@example.com",
       "2026-09-15",
@@ -531,6 +536,13 @@ const handleBulkFileUpload = async (file: File) => {
         "goal",
         "goals"
       );
+      const instructionsText = pick(
+        "instructions_text",
+        "instructions",
+        "instruction",
+        "guide",
+        "notes"
+      );
 
       // Fallback: if there's no dedicated name column, use the
       // description (or any non-empty cell) so a one-column sheet
@@ -635,6 +647,7 @@ const handleBulkFileUpload = async (file: File) => {
         description,
         objectives,
         priority,
+        instructionsText, 
         assigneeEmail,
         assigneeId,
         assigneeName,
@@ -679,6 +692,7 @@ const handleBulkFileUpload = async (file: File) => {
               description: row.description || null,
               objectives: row.objectives || null,
               priority: row.priority,
+              instructionsText: row.instructionsText || null,
               status: "To Do",
               assigneeId: row.assigneeId,
               startDate: row.startDate || null,
@@ -1106,6 +1120,7 @@ const handleBulkFileUpload = async (file: File) => {
     setSuccessMessage("");
     setError("");
     setCreateTaskModalOpen(true);
+    setTInstructionsText("");
 
     if (assignableUsers.length === 0) {
       await fetchAssignableUsers();
@@ -1124,6 +1139,7 @@ const handleBulkFileUpload = async (file: File) => {
     setTAssignee("");
     setTStartDate("");
     setTDueDate("");
+    setTInstructionsText("");
     setTInstructionFile(null);
   };
 
@@ -1151,6 +1167,7 @@ const handleBulkFileUpload = async (file: File) => {
             priority: tPriority,
             status: "To Do",
             assigneeId: tAssignee || null,
+            instructionsText: tInstructionsText.trim() || null,
             startDate: tStartDate || null,
             dueDate: tDueDate || null,
           }),
@@ -2514,6 +2531,22 @@ const handleBulkFileUpload = async (file: File) => {
 
                 <div className="sm:col-span-2">
                   <label className="mb-2 block text-xs font-semibold text-gray-700">
+                    Instructions — text (optional)
+                  </label>
+                  <textarea
+                    value={tInstructionsText}
+                    onChange={(e) => setTInstructionsText(e.target.value)}
+                    rows={4}
+                    placeholder="Write step-by-step instructions the assignee should follow..."
+                    className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3.5 py-3 text-sm text-black outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  />
+                  <p className="mt-1.5 text-[11px] text-gray-500">
+                    Either this or the instruction file below can be provided — both are optional.
+                  </p>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="mb-2 block text-xs font-semibold text-gray-700">
                     Instruction file (optional)
                   </label>
                   <input
@@ -3047,11 +3080,9 @@ const handleBulkFileUpload = async (file: File) => {
           </div>
 
           <p className="mt-3 text-[11px] leading-relaxed text-gray-700">
-            Required column: <b>name</b>. Optional: <b>description</b>,{" "}
-            <b>objectives</b>, <b>priority</b> (Low/Medium/High),{" "}
-            <b>assignee_email</b> (must be a member of this project),{" "}
-            <b>start_date</b>, <b>due_date</b> (YYYY-MM-DD). Rows with errors are
-            skipped and shown in red.
+            Required column: name. Optional: description, objectives, instructions_text, priority (Low/Medium/High), 
+            assignee_email (must be a member of this project), start_date, due_date (YYYY-MM-DD). 
+            File-based instructions can only be attached from the single Create Task dialog.
           </p>
         </div>
 
@@ -3096,16 +3127,22 @@ const handleBulkFileUpload = async (file: File) => {
                         <td className="px-3 py-2 font-semibold text-gray-500">
                           {r.rowNumber}
                         </td>
-                        <td className="px-3 py-2">
-                          <p className="font-semibold text-gray-900">
-                            {r.name || <span className="text-red-600">—</span>}
-                          </p>
-                          {r.description && (
-                            <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-500">
-                              {r.description}
-                            </p>
-                          )}
-                        </td>
+                        
+                      <td className="px-3 py-2">
+                              <p className="font-semibold text-gray-900">
+                                {r.name || <span className="text-red-600">—</span>}
+                              </p>
+                              {r.description && (
+                                <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-500">
+                                  {r.description}
+                                </p>
+                              )}
+                              {r.instructionsText && (
+                                <p className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
+                                  📝 Instructions
+                                </p>
+                              )}
+                      </td>
                         <td className="px-3 py-2">{r.priority}</td>
                         <td className="px-3 py-2">
                           {r.assigneeName ? (
