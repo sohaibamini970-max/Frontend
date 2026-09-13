@@ -436,135 +436,222 @@ const [bulkError, setBulkError] = useState("");
     URL.revokeObjectURL(url);
   };
 
-  const handleBulkFileUpload = async (file: File) => {
-    setBulkParsing(true);
-    setBulkError("");
-    setBulkRows([]);
+const handleBulkFileUpload = async (file: File) => {
+  setBulkParsing(true);
+  setBulkError("");
+  setBulkRows([]);
 
-    try {
-      const XLSX = await import("xlsx");
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      if (!ws) throw new Error("The file has no sheets.");
+  try {
+    const XLSX = await import("xlsx");
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) throw new Error("The file has no sheets.");
 
-      const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, {
-        defval: "",
-      });
-      if (raw.length === 0) throw new Error("The file is empty.");
+    const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, {
+      defval: "",
+    });
+    if (raw.length === 0) throw new Error("The file is empty.");
 
-      const memberList = projectMembers[bulkProject!.id] || [];
-      const byEmail = new Map(
-        memberList.map((m) => [String(m.email || "").toLowerCase().trim(), m])
+    /* ---------- header normalization helpers ---------- */
+
+    // Trim, lowercase, strip BOM + non-breaking spaces, and collapse
+    // internal whitespace so "Task Name", "task_name", "TASK NAME " and
+    // "task  name" all normalize to the same key.
+    const normalizeKey = (s: string) =>
+      String(s)
+        .replace(/\uFEFF/g, "")   // BOM
+        .replace(/\u00A0/g, " ")  // non-breaking space → normal space
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+
+    // Build a normalized-header → value map for one row.
+    const rowLookup = (r: Record<string, any>) => {
+      const map = new Map<string, string>();
+      for (const k of Object.keys(r)) {
+        const value = String(r[k] ?? "").trim();
+        if (value !== "") map.set(normalizeKey(k), value);
+      }
+      return map;
+    };
+
+    /* ---------- member lookup tables ---------- */
+
+    const memberList = projectMembers[bulkProject!.id] || [];
+    const byEmail = new Map(
+      memberList.map((m) => [
+        String(m.email || "").toLowerCase().trim(),
+        m,
+      ])
+    );
+    const byName = new Map(
+      memberList.map((m) => [
+        String(m.full_name || "").toLowerCase().trim(),
+        m,
+      ])
+    );
+    const byId = new Map(
+      memberList.map((m) => [String(m.user_id), m])
+    );
+
+    /* ---------- parse each row ---------- */
+
+    const parsed: BulkTaskRow[] = raw.map((r, idx) => {
+      const L = rowLookup(r);
+
+      const pick = (...keys: string[]) => {
+        for (const k of keys) {
+          const v = L.get(normalizeKey(k));
+          if (v !== undefined && v !== "") return v;
+        }
+        return "";
+      };
+
+      // Title column — try many common aliases
+      let name = pick(
+        "name",
+        "task",
+        "task_name",
+        "taskname",
+        "task title",
+        "task_title",
+        "title"
       );
-      const byName = new Map(
-        memberList.map((m) => [String(m.full_name || "").toLowerCase().trim(), m])
+
+      const description = pick(
+        "description",
+        "desc",
+        "details",
+        "detail"
       );
-      const byId = new Map(memberList.map((m) => [String(m.user_id), m]));
+      const objectives = pick(
+        "objectives",
+        "objective",
+        "goal",
+        "goals"
+      );
 
-      const parsed: BulkTaskRow[] = raw.map((r, idx) => {
-        const pick = (...keys: string[]) => {
-          for (const k of keys) {
-            const found = Object.keys(r).find(
-              (rk) => rk.trim().toLowerCase() === k.toLowerCase()
-            );
-            if (found && String(r[found]).trim() !== "") {
-              return String(r[found]).trim();
-            }
-          }
-          return "";
-        };
+      // Fallback: if there's no dedicated name column, use the
+      // description (or any non-empty cell) so a one-column sheet
+      // still produces a task instead of failing.
+      if (!name) {
+        const fallback =
+          description ||
+          Array.from(L.values()).find((v) => v !== "") ||
+          "";
+        if (fallback) {
+          name =
+            fallback.length > 80
+              ? fallback.slice(0, 77).trimEnd() + "..."
+              : fallback;
+        }
+      }
 
-        const name = pick("name", "task", "task_name", "title");
-        const description = pick("description", "desc");
-        const objectives = pick("objectives", "objective", "goal");
-        const rawPriority = pick("priority").toLowerCase();
-        const priority: ProgramPriority =
-          rawPriority === "high"
-            ? "High"
-            : rawPriority === "low"
-              ? "Low"
-              : "Medium";
-        const assigneeEmail = pick("assignee_email", "email", "member_email");
-        const assigneeField = pick("assignee", "assignee_name", "member");
-        const startDate = pick("start_date", "start");
-        const dueDate = pick("due_date", "deadline", "due");
+      const rawPriority = pick("priority", "prio").toLowerCase();
+      const priority: ProgramPriority =
+        rawPriority === "high"
+          ? "High"
+          : rawPriority === "low"
+            ? "Low"
+            : "Medium";
 
-        const errors: string[] = [];
-        if (!name) errors.push("Task name is required.");
+      const assigneeEmail = pick(
+        "assignee_email",
+        "email",
+        "member_email"
+      );
+      const assigneeField = pick(
+        "assignee",
+        "assignee_name",
+        "member",
+        "assigned_to"
+      );
 
-        let assigneeId: string | null = null;
-        let assigneeName: string | null = null;
+      const startDate = pick("start_date", "start", "startdate");
+      const dueDate = pick(
+        "due_date",
+        "deadline",
+        "due",
+        "duedate"
+      );
 
-        if (assigneeEmail) {
-          const m = byEmail.get(assigneeEmail.toLowerCase());
+      /* ---------- validation ---------- */
+
+      const errors: string[] = [];
+      if (!name) errors.push("Task name is required.");
+
+      let assigneeId: string | null = null;
+      let assigneeName: string | null = null;
+
+      if (assigneeEmail) {
+        const m = byEmail.get(assigneeEmail.toLowerCase());
+        if (!m) {
+          errors.push(
+            `Email "${assigneeEmail}" is not a member of this project.`
+          );
+        } else {
+          assigneeId = m.user_id;
+          assigneeName = m.full_name;
+        }
+      } else if (assigneeField) {
+        const mById = byId.get(assigneeField);
+        if (mById) {
+          assigneeId = mById.user_id;
+          assigneeName = mById.full_name;
+        } else {
+          const m = byName.get(assigneeField.toLowerCase());
           if (!m) {
             errors.push(
-              `Email "${assigneeEmail}" is not a member of this project.`
+              `Assignee "${assigneeField}" is not a member of this project.`
             );
           } else {
             assigneeId = m.user_id;
             assigneeName = m.full_name;
           }
-        } else if (assigneeField) {
-          const mById = byId.get(assigneeField);
-          if (mById) {
-            assigneeId = mById.user_id;
-            assigneeName = mById.full_name;
-          } else {
-            const m = byName.get(assigneeField.toLowerCase());
-            if (!m) {
-              errors.push(
-                `Assignee "${assigneeField}" is not a member of this project.`
-              );
-            } else {
-              assigneeId = m.user_id;
-              assigneeName = m.full_name;
-            }
-          }
         }
+      }
 
-        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-        if (startDate && !dateRegex.test(startDate)) {
-          errors.push("start_date must be YYYY-MM-DD.");
-        }
-        if (dueDate && !dateRegex.test(dueDate)) {
-          errors.push("due_date must be YYYY-MM-DD.");
-        }
-        if (
-          startDate &&
-          dueDate &&
-          dateRegex.test(startDate) &&
-          dateRegex.test(dueDate) &&
-          dueDate <= startDate
-        ) {
-          errors.push("due_date must be after start_date.");
-        }
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (startDate && !dateRegex.test(startDate)) {
+        errors.push("start_date must be YYYY-MM-DD.");
+      }
+      if (dueDate && !dateRegex.test(dueDate)) {
+        errors.push("due_date must be YYYY-MM-DD.");
+      }
+      if (
+        startDate &&
+        dueDate &&
+        dateRegex.test(startDate) &&
+        dateRegex.test(dueDate) &&
+        dueDate <= startDate
+      ) {
+        errors.push("due_date must be after start_date.");
+      }
 
-        return {
-          rowNumber: idx + 2,
-          name,
-          description,
-          objectives,
-          priority,
-          assigneeEmail,
-          assigneeId,
-          assigneeName,
-          startDate,
-          dueDate,
-          errors,
-        };
-      });
+      return {
+        rowNumber: idx + 2, // +2 = skip header row + 0-index
+        name,
+        description,
+        objectives,
+        priority,
+        assigneeEmail,
+        assigneeId,
+        assigneeName,
+        startDate,
+        dueDate,
+        errors,
+      };
+    });
 
-      setBulkRows(parsed);
-    } catch (e: any) {
-      console.error("Bulk parse error:", e);
-      setBulkError(e.message || "Failed to parse file.");
-    } finally {
-      setBulkParsing(false);
-    }
-  };
-
+    setBulkRows(parsed);
+  } catch (e: any) {
+    console.error("Bulk parse error:", e);
+    setBulkError(e.message || "Failed to parse file.");
+  } finally {
+    setBulkParsing(false);
+  }
+};
   const handleBulkCreate = async () => {
     if (!bulkProject) return;
     const valid = bulkRows.filter((r) => r.errors.length === 0);
