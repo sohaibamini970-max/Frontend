@@ -29,6 +29,7 @@ import {
   Edit2,
   Archive,
   Star,
+  Layers,
 } from "lucide-react";
 
 // ============================================================
@@ -44,7 +45,12 @@ interface Message {
   functionCalled?: string | null;
   requiresAction?: boolean;
   isError?: boolean;
-  agent?: "general" | "program"; // NEW
+  agent?: "general" | "program";
+  sections?: {
+    normal?: any;
+    program?: any;
+    target?: any;
+  };
 }
 
 interface ConversationHistory {
@@ -97,54 +103,68 @@ const formatDate = (date: Date): string => {
 
 const API_BASE = "https://backend-five-swart-88.vercel.app/api";
 
-    /**
-     * Route a message to the right AI agent:
-     *   - Program-related prompts  → /ai/program-agent
-     *   - Everything else          → /ai/chat
-     *
-     * Detection is intentionally conservative: we only route to the
-     * program agent when the message clearly references programs,
-     * program projects, or program tasks.
-     */
-    const PROGRAM_KEYWORDS = [
-      "program",
-      "programs",
-      "program project",
-      "program projects",
-      "program task",
-      "program tasks",
-      "internship program",
-      "mentorship program",
-    ];
-    
-    const PROGRAM_VERBS = [
-      "create program",
-      "add program",
-      "list program",
-      "show program",
-      "assign program",
-      "delete program",
-      "update program",
-      "program stats",
-      "program members",
-    ];
-    
-    function isProgramRequest(message: string): boolean {
-      const m = message.toLowerCase();
-    
-      // Explicit verbs win
-      if (PROGRAM_VERBS.some(v => m.includes(v))) return true;
-    
-      // Keyword match — require the word "program" somewhere
-      return PROGRAM_KEYWORDS.some(k => m.includes(k));
-    }
-    
-    function getAgentEndpoint(message: string): string {
-      return isProgramRequest(message)
-        ? `${API_BASE}/ai/program-agent`
-        : `${API_BASE}/ai/chat`;
-    }
+   const PROGRAM_KEYWORDS = [
+  "program",
+  "programs",
+  "program project",
+  "program projects",
+  "program task",
+  "program tasks",
+  "internship program",
+  "mentorship program",
+];
 
+const PROGRAM_VERBS = [
+  "create program",
+  "add program",
+  "list program",
+  "show program",
+  "assign program",
+  "delete program",
+  "update program",
+  "program stats",
+  "program members",
+  "program project",
+  "program projects",
+  "program task",
+  "program tasks",
+];
+
+// Performance prompts can be handled by the program agent
+// because it now includes getMemberPerformance (normal + program).
+const PERFORMANCE_TRIGGERS = [
+  "performance",
+  "how is",
+  "how's",
+  "how are",
+  "show me performance",
+  "performance report",
+  "stats for",
+  "statistics for",
+  "productivity",
+  "how many tasks",
+  "tasks done by",
+  "tasks assigned to",
+];
+
+function isProgramRequest(message: string): boolean {
+  const m = message.toLowerCase().trim();
+
+  // Performance questions → program agent (it has both normal + program stats)
+  if (PERFORMANCE_TRIGGERS.some(t => m.includes(t))) return true;
+
+  // Explicit program verbs win
+  if (PROGRAM_VERBS.some(v => m.includes(v))) return true;
+
+  // Keyword match — require the word "program" somewhere
+  return PROGRAM_KEYWORDS.some(k => m.includes(k));
+}
+
+function getAgentEndpoint(message: string): string {
+  return isProgramRequest(message)
+    ? `${API_BASE}/ai/program-agent`
+    : `${API_BASE}/ai/chat`;
+}
 const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
   // Get user info from localStorage or session
   const user = typeof window !== 'undefined' ? {
@@ -368,6 +388,18 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
         throw new Error(data.error || "Failed to process request");
       }
 
+      // Detect a performance report and split it into normal vs program sections
+        let sections: Message["sections"] = undefined;
+        
+        const firstResult = Array.isArray(data.data) ? data.data[0] : null;
+        if (firstResult?.function === "getMemberPerformance" && firstResult?.result) {
+          sections = {
+            target: firstResult.result.target,
+            normal: firstResult.result.normal,
+            program: firstResult.result.program,
+          };
+        }
+
       // Add assistant message
      const assistantMessage: Message = {
       id: Date.now().toString() + "-assistant",
@@ -377,7 +409,8 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       data: data.data,
       functionCalled: data.function_called,
       requiresAction: data.requires_action,
-      agent: endpoint.includes("program-agent") ? "program" : "general", // NEW
+      agent: endpoint.includes("program-agent") ? "program" : "general",
+      sections,
     };
 
       setChatSessions(prev => prev.map(session => 
@@ -736,9 +769,14 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                       )}
                     </div>
                   )}
-                  <div className="text-sm leading-relaxed">
-                    {formatMessageContent(message.content)}
-                  </div>
+                  
+                  {message.sections ? (
+                    <PerformanceReport sections={message.sections} />
+                  ) : (
+                    <div className="text-sm leading-relaxed">
+                      {formatMessageContent(message.content)}
+                    </div>
+                  )}
 
                   {/* Function called */}
                   {message.functionCalled && (
@@ -996,5 +1034,139 @@ const ChatListItem: React.FC<ChatListItemProps> = ({
     </div>
   );
 };
+
+function PerformanceReport({ sections }: { sections: NonNullable<Message["sections"]> }) {
+  const t = sections.target || {};
+  const n = sections.normal?.stats || {};
+  const p = sections.program?.stats || {};
+  const normalProjects = sections.normal?.projectBreakdown || [];
+  const programProjects = sections.program?.programProjectBreakdown || [];
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <Users size={14} className="text-blue-600" />
+        <span className="text-sm font-semibold text-gray-900">
+          {t.fullName || "User"}
+        </span>
+        {t.role && (
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-600">
+            {t.role}
+          </span>
+        )}
+      </div>
+
+      {/* NORMAL section */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <FolderKanban size={13} className="text-blue-700" />
+          <span className="text-xs font-bold text-blue-900 uppercase tracking-wide">
+            Normal Projects & Tasks
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StatTile label="Total" value={n.totalTasks ?? 0} tone="blue" />
+          <StatTile label="Done" value={n.completedTasks ?? 0} tone="emerald" />
+          <StatTile label="Pending" value={n.pendingTasks ?? 0} tone="amber" />
+          <StatTile label="Overdue" value={n.overdueTasks ?? 0} tone="red" />
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-blue-800">
+          <span>Completion: {n.completionRate ?? 0}%</span>
+          <span>On-time: {n.onTimeRate ?? 0}%</span>
+          <span>Projects: {n.projectCount ?? 0}</span>
+        </div>
+
+        {normalProjects.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {normalProjects.slice(0, 4).map((pr: any) => (
+              <div
+                key={pr.project_id}
+                className="flex items-center justify-between rounded bg-white/70 px-2 py-1 text-[11px]"
+              >
+                <span className="truncate font-medium text-slate-700">
+                  {pr.project_name}
+                </span>
+                <span className="font-bold text-slate-900">
+                  {pr.completed_tasks}/{pr.total_tasks}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* PROGRAM section */}
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <Layers size={13} className="text-emerald-700" />
+          <span className="text-xs font-bold text-emerald-900 uppercase tracking-wide">
+            Program Projects & Tasks
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StatTile label="Total" value={p.totalTasks ?? 0} tone="emerald" />
+          <StatTile label="Done" value={p.completedTasks ?? 0} tone="emerald" />
+          <StatTile label="Pending" value={p.pendingTasks ?? 0} tone="amber" />
+          <StatTile label="Overdue" value={p.overdueTasks ?? 0} tone="red" />
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-emerald-800">
+          <span>Completion: {p.completionRate ?? 0}%</span>
+          <span>On-time: {p.onTimeRate ?? 0}%</span>
+          <span>Program projects: {p.programProjectCount ?? 0}</span>
+        </div>
+
+        {programProjects.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {programProjects.slice(0, 4).map((pr: any) => (
+              <div
+                key={pr.program_project_id}
+                className="flex items-center justify-between rounded bg-white/70 px-2 py-1 text-[11px]"
+              >
+                <span className="truncate font-medium text-emerald-900">
+                  {pr.program_project_name}
+                  {pr.program_name ? ` · ${pr.program_name}` : ""}
+                </span>
+                <span className="font-bold text-emerald-950">
+                  {pr.completed_tasks}/{pr.total_tasks}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "blue" | "emerald" | "amber" | "red";
+}) {
+  const toneClass = {
+    blue: "bg-white text-blue-900 ring-blue-100",
+    emerald: "bg-white text-emerald-900 ring-emerald-100",
+    amber: "bg-white text-amber-900 ring-amber-100",
+    red: "bg-white text-red-900 ring-red-100",
+  }[tone];
+
+  return (
+    <div className={`rounded-md px-2 py-1.5 text-center ring-1 ${toneClass}`}>
+      <div className="text-[9px] font-bold uppercase tracking-wide opacity-70">
+        {label}
+      </div>
+      <div className="text-sm font-black">{value}</div>
+    </div>
+  );
+}
 
 export default AIAgentChatbot;
