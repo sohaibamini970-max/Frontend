@@ -886,8 +886,16 @@ const canReadChallenge = (task: Task) => {
   const isInSameProgramProject = (task: Task): boolean => {
   const ppId = (task as any).program_project_id;
   if (!ppId) return false;
-  return myProgramProjectIds.includes(String(ppId));
-  };
+
+  // Primary check: state populated from /my/program-projects
+  if (myProgramProjectIds.includes(String(ppId))) return true;
+
+  // Fallback: any program task in state means the member can see
+  // tasks from that program project — so they belong to it.
+  return programTasks.some(
+    (t) => String(t.program_project_id) === String(ppId)
+  );
+};
 
   // ====================================
   // FILE ATTACHMENT HELPERS
