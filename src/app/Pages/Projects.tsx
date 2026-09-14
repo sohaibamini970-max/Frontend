@@ -179,6 +179,21 @@ type MemberProgramProject = {
     my_completed_task_count: number;
 };
 
+type BulkTaskRow = {
+  rowNumber: number;
+  name: string;
+  description: string;
+  objectives: string;
+  priority: ProjectPriority;
+  assigneeEmail: string;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  startDate: string;
+  dueDate: string;
+  errors: string[];
+  instructionsText: string;
+};
+
 /* =========================================================
    STYLES
 ========================================================= */
@@ -434,6 +449,19 @@ const [cptDueDate, setCptDueDate] = useState("");
 const [cptSaving, setCptSaving] = useState(false);
 const [cptError, setCptError] = useState("");
 const [cptSuccess, setCptSuccess] = useState("");
+
+const [memberBulkOpen, setMemberBulkOpen] = useState(false);
+const [memberBulkProject, setMemberBulkProject] =
+  useState<MemberProgramProject | null>(null);
+const [memberBulkRows, setMemberBulkRows] = useState<BulkTaskRow[]>([]);
+const [memberBulkParsing, setMemberBulkParsing] = useState(false);
+const [memberBulkCreating, setMemberBulkCreating] = useState(false);
+const [memberBulkProgress, setMemberBulkProgress] = useState({
+  done: 0,
+  total: 0,
+});
+const [memberBulkError, setMemberBulkError] = useState("");
+const [memberBulkSuccess, setMemberBulkSuccess] = useState("");
     /* =========================================================
        ROLE PERMISSIONS
     ========================================================= */
@@ -509,6 +537,266 @@ const [cptSuccess, setCptSuccess] = useState("");
   setCptSuccess("");
   setOpenProgramProjectMenu(null);
   setCreateProgramTaskOpen(true);
+};
+
+const openMemberBulkModal = (pp: MemberProgramProject) => {
+  setMemberBulkProject(pp);
+  setMemberBulkRows([]);
+  setMemberBulkError("");
+  setMemberBulkSuccess("");
+  setMemberBulkProgress({ done: 0, total: 0 });
+  setOpenProgramProjectMenu(null);
+  setMemberBulkOpen(true);
+};
+
+const closeMemberBulkModal = () => {
+  if (memberBulkCreating) return;
+  setMemberBulkOpen(false);
+  setMemberBulkProject(null);
+  setMemberBulkRows([]);
+  setMemberBulkError("");
+  setMemberBulkSuccess("");
+  setMemberBulkProgress({ done: 0, total: 0 });
+};
+
+const downloadMemberBulkTemplate = () => {
+  const headers = [
+    "name",
+    "description",
+    "objectives",
+    "instructions_text",
+    "priority",
+    "start_date",
+    "due_date",
+  ];
+  const example = [
+    "Build landing page",
+    "Create hero + features section",
+    "Landing page shipped to staging",
+    "Read the design file first, then implement responsive layout.",
+    "High",
+    "2026-09-15",
+    "2026-09-25",
+  ];
+  const csv = `${headers.join(",")}\n${example.join(",")}\n`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "program-tasks-template.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+const handleMemberBulkFileUpload = async (file: File) => {
+  setMemberBulkParsing(true);
+  setMemberBulkError("");
+  setMemberBulkRows([]);
+
+  try {
+    const XLSX = await import("xlsx");
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) throw new Error("The file has no sheets.");
+
+    const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, {
+      defval: "",
+    });
+    if (raw.length === 0) throw new Error("The file is empty.");
+
+    const normalizeKey = (s: string) =>
+      String(s)
+        .replace(/\uFEFF/g, "")
+        .replace(/\u00A0/g, " ")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+
+    const rowLookup = (r: Record<string, any>) => {
+      const map = new Map<string, string>();
+      for (const k of Object.keys(r)) {
+        const value = String(r[k] ?? "").trim();
+        if (value !== "") map.set(normalizeKey(k), value);
+      }
+      return map;
+    };
+
+    const parsed: BulkTaskRow[] = raw.map((r, idx) => {
+      const L = rowLookup(r);
+
+      const pick = (...keys: string[]) => {
+        for (const k of keys) {
+          const v = L.get(normalizeKey(k));
+          if (v !== undefined && v !== "") return v;
+        }
+        return "";
+      };
+
+      let name = pick(
+        "name",
+        "task",
+        "task_name",
+        "taskname",
+        "task title",
+        "task_title",
+        "title"
+      );
+
+      const description = pick("description", "desc", "details", "detail");
+      const objectives = pick("objectives", "objective", "goal", "goals");
+      const instructionsText = pick(
+        "instructions_text",
+        "instructions",
+        "instruction",
+        "guide",
+        "notes"
+      );
+
+      if (!name) {
+        const fallback =
+          description ||
+          Array.from(L.values()).find((v) => v !== "") ||
+          "";
+        if (fallback) {
+          name =
+            fallback.length > 80
+              ? fallback.slice(0, 77).trimEnd() + "..."
+              : fallback;
+        }
+      }
+
+      const rawPriority = pick("priority", "prio").toLowerCase();
+      const priority: ProjectPriority =
+        rawPriority === "high"
+          ? "High"
+          : rawPriority === "low"
+          ? "Low"
+          : "Medium";
+
+      const startDate = pick("start_date", "start", "startdate");
+      const dueDate = pick("due_date", "deadline", "due", "duedate");
+
+      const errors: string[] = [];
+      if (!name) errors.push("Task name is required.");
+
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (startDate && !dateRegex.test(startDate)) {
+        errors.push("start_date must be YYYY-MM-DD.");
+      }
+      if (dueDate && !dateRegex.test(dueDate)) {
+        errors.push("due_date must be YYYY-MM-DD.");
+      }
+      if (
+        startDate &&
+        dueDate &&
+        dateRegex.test(startDate) &&
+        dateRegex.test(dueDate) &&
+        dueDate <= startDate
+      ) {
+        errors.push("due_date must be after start_date.");
+      }
+
+      return {
+        rowNumber: idx + 2,
+        name,
+        description,
+        objectives,
+        priority,
+        instructionsText,
+        assigneeEmail: "",
+        assigneeId: null,
+        assigneeName: null,
+        startDate,
+        dueDate,
+        errors,
+      };
+    });
+
+    setMemberBulkRows(parsed);
+  } catch (e: any) {
+    console.error("Member bulk parse error:", e);
+    setMemberBulkError(e.message || "Failed to parse file.");
+  } finally {
+    setMemberBulkParsing(false);
+  }
+};
+
+const handleMemberBulkCreate = async () => {
+  if (!memberBulkProject) return;
+
+  const valid = memberBulkRows.filter((r) => r.errors.length === 0);
+  if (valid.length === 0) {
+    setMemberBulkError("No valid rows to create.");
+    return;
+  }
+
+  setMemberBulkCreating(true);
+  setMemberBulkError("");
+  setMemberBulkProgress({ done: 0, total: valid.length });
+
+  const failures: { row: number; reason: string }[] = [];
+
+  for (let i = 0; i < valid.length; i++) {
+    const row = valid[i];
+    try {
+      const res = await fetch(
+        `${PROGRAM_TASK_API}/program-project/${memberBulkProject.id}`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            name: row.name,
+            description: row.description || null,
+            objectives: row.objectives || null,
+            priority: row.priority,
+            instructionsText: row.instructionsText || null,
+            status: "To Do",
+            // The backend forces this to self for Member role;
+            // sending null is fine.
+            assigneeId: null,
+            startDate: row.startDate || null,
+            dueDate: row.dueDate || null,
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        failures.push({
+          row: row.rowNumber,
+          reason: data.message || `HTTP ${res.status}`,
+        });
+      }
+    } catch (e: any) {
+      failures.push({
+        row: row.rowNumber,
+        reason: e.message || "Network error.",
+      });
+    }
+    setMemberBulkProgress({ done: i + 1, total: valid.length });
+  }
+
+  setMemberBulkCreating(false);
+
+  if (failures.length === 0) {
+    setMemberBulkSuccess(
+      `Created ${valid.length} program task${valid.length === 1 ? "" : "s"}.`
+    );
+
+    await fetchMemberProgramProjects();
+
+    setTimeout(() => {
+      closeMemberBulkModal();
+    }, 1200);
+  } else {
+    setMemberBulkError(
+      `${valid.length - failures.length} of ${valid.length} created. Failures: ` +
+        failures.map((f) => `row ${f.row} → ${f.reason}`).join(" | ")
+    );
+  }
 };
 
 const closeCreateProgramTaskModal = () => {
@@ -2245,6 +2533,15 @@ const handleCreateProgramTask = async () => {
                     >
                       <Plus size={16} className="text-emerald-600" />
                       Create Task
+                    </button>
+
+                      <button
+                      type="button"
+                      onClick={() => openMemberBulkModal(pp)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-emerald-50"
+                    >
+                      <MoreVertical size={16} className="text-emerald-600" />
+                      Create Tasks in Bulk
                     </button>
                   </div>
                 )}
@@ -5493,6 +5790,265 @@ const handleCreateProgramTask = async () => {
                         </div>
                     </div>
                 )}
+
+            {/* =====================================================
+    BULK CREATE PROGRAM TASKS MODAL (Member)
+===================================================== */}
+{memberBulkOpen && memberBulkProject && (
+  <div
+    className="fixed inset-0 z-[140] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-[2px]"
+    onMouseDown={(e) => {
+      if (e.target === e.currentTarget) closeMemberBulkModal();
+    }}
+  >
+    <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      {/* Header */}
+      <div className="flex items-start justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 text-white">
+        <div>
+          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+            <ListTodo size={19} />
+          </div>
+          <h2 className="text-lg font-semibold">Bulk create program tasks</h2>
+          <p className="mt-1 text-xs text-emerald-50">
+            Under{" "}
+            <span className="font-semibold text-white">
+              {memberBulkProject.program_name || "Program"}
+            </span>{" "}
+            →{" "}
+            <span className="font-semibold text-white">
+              {memberBulkProject.name}
+            </span>
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={closeMemberBulkModal}
+          disabled={memberBulkCreating}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/20 disabled:opacity-50"
+        >
+          <X size={19} />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="overflow-y-auto bg-white px-6 py-6">
+        {memberBulkError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+            {memberBulkError}
+          </div>
+        )}
+        {memberBulkSuccess && (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
+            {memberBulkSuccess}
+          </div>
+        )}
+
+        {/* Upload strip */}
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={downloadMemberBulkTemplate}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-white px-4 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              <Check size={14} />
+              Download CSV template
+            </button>
+
+            <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-emerald-600 px-4 text-xs font-semibold text-white hover:bg-emerald-700">
+              <Plus size={14} />
+              Choose Excel / CSV file
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                disabled={memberBulkParsing || memberBulkCreating}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleMemberBulkFileUpload(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+
+            {memberBulkParsing && (
+              <span className="inline-flex items-center gap-2 text-xs font-medium text-emerald-700">
+                <RefreshCw size={13} className="animate-spin" />
+                Parsing file...
+              </span>
+            )}
+          </div>
+
+          <p className="mt-3 text-[11px] leading-relaxed text-gray-700">
+            Required column: name. Optional: description, objectives,
+            instructions_text, priority (Low/Medium/High), start_date, due_date
+            (YYYY-MM-DD). Bulk-created tasks will be assigned to you
+            automatically. File-based instructions can only be attached from
+            the single Create Task dialog.
+          </p>
+        </div>
+
+        {/* Preview table */}
+        {memberBulkRows.length > 0 && (
+          <div className="mt-5">
+            <div className="mb-2">
+              <h3 className="text-sm font-bold text-gray-900">
+                Preview ({memberBulkRows.length} row
+                {memberBulkRows.length === 1 ? "" : "s"})
+              </h3>
+              <p className="text-[11px] text-gray-500">
+                {memberBulkRows.filter((r) => r.errors.length === 0).length}{" "}
+                valid ·{" "}
+                {memberBulkRows.filter((r) => r.errors.length > 0).length} with
+                errors (will be skipped)
+              </p>
+            </div>
+
+            <div className="max-h-[340px] overflow-y-auto rounded-xl border border-gray-200">
+              <table className="w-full text-left text-[11px]">
+                <thead className="sticky top-0 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2">#</th>
+                    <th className="px-3 py-2">Task</th>
+                    <th className="px-3 py-2">Priority</th>
+                    <th className="px-3 py-2">Start</th>
+                    <th className="px-3 py-2">Due</th>
+                    <th className="px-3 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {memberBulkRows.map((r) => {
+                    const ok = r.errors.length === 0;
+                    return (
+                      <tr
+                        key={r.rowNumber}
+                        className={`border-t border-gray-100 ${
+                          ok ? "" : "bg-red-50/60"
+                        }`}
+                      >
+                        <td className="px-3 py-2 font-semibold text-gray-500">
+                          {r.rowNumber}
+                        </td>
+                        <td className="px-3 py-2">
+                          <p className="font-semibold text-gray-900">
+                            {r.name || (
+                              <span className="text-red-600">—</span>
+                            )}
+                          </p>
+                          {r.description && (
+                            <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-500">
+                              {r.description}
+                            </p>
+                          )}
+                          {r.instructionsText && (
+                            <p className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
+                              📝 Instructions
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">{r.priority}</td>
+                        <td className="px-3 py-2">{r.startDate || "—"}</td>
+                        <td className="px-3 py-2">{r.dueDate || "—"}</td>
+                        <td className="px-3 py-2">
+                          {ok ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                              <Check size={10} /> Ready
+                            </span>
+                          ) : (
+                            <span
+                              title={r.errors.join(" · ")}
+                              className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700"
+                            >
+                              <AlertCircle size={10} /> {r.errors.length}{" "}
+                              error{r.errors.length === 1 ? "" : "s"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Progress */}
+        {memberBulkCreating && (
+          <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
+              <span>
+                Creating tasks... {memberBulkProgress.done}/
+                {memberBulkProgress.total}
+              </span>
+              <span>
+                {memberBulkProgress.total
+                  ? Math.round(
+                      (memberBulkProgress.done / memberBulkProgress.total) *
+                        100
+                    )
+                  : 0}
+                %
+              </span>
+            </div>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-100">
+              <div
+                className="h-full rounded-full bg-emerald-600 transition-all"
+                style={{
+                  width: `${
+                    memberBulkProgress.total
+                      ? (memberBulkProgress.done /
+                          memberBulkProgress.total) *
+                        100
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={closeMemberBulkModal}
+          disabled={memberBulkCreating}
+          className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleMemberBulkCreate}
+          disabled={
+            memberBulkCreating ||
+            memberBulkRows.length === 0 ||
+            memberBulkRows.filter((r) => r.errors.length === 0).length === 0
+          }
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-green-700 px-5 text-sm font-medium text-white hover:from-emerald-700 hover:to-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {memberBulkCreating ? (
+            <>
+              <RefreshCw size={14} className="animate-spin" />
+              Creating {memberBulkProgress.done}/{memberBulkProgress.total}...
+            </>
+          ) : (
+            <>
+              <Plus size={15} />
+              Create{" "}
+              {memberBulkRows.filter((r) => r.errors.length === 0).length} task
+              {memberBulkRows.filter((r) => r.errors.length === 0).length === 1
+                ? ""
+                : "s"}
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         </>
     );
 }
