@@ -952,7 +952,7 @@ export default function Reports() {
                                 </div>
                             ) : (
                                 filteredPendingProjects.map((project) => {
-                                    const isExpanded = expandedProjects.includes(project.id);
+                                
                                     const isProgram = project.isProgramProject;
 
                                     return (
@@ -1043,85 +1043,6 @@ export default function Reports() {
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            {/* TASKS SECTION */}
-                                            {permissions.canCreateReport && (
-                                                <div className="bg-white p-4">
-                                                    <button
-                                                        onClick={() => toggleProject(project.id)}
-                                                        className="flex w-full items-center justify-between rounded-md hover:bg-gray-50 p-2 -m-2"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <ClipboardList
-                                                                size={14}
-                                                                className="text-gray-600"
-                                                            />
-                                                            <span className="text-xs font-semibold text-gray-700">
-                                                                Tasks ({project.tasks.length})
-                                                            </span>
-                                                        </div>
-                                                        {isExpanded ? (
-                                                            <ChevronDown size={16} />
-                                                        ) : (
-                                                            <ChevronRight size={16} />
-                                                        )}
-                                                    </button>
-
-                                                    {isExpanded && (
-                                                        <div className="mt-2 space-y-1.5 border-t border-gray-100 pt-2">
-                                                            {project.tasks.length === 0 ? (
-                                                                <p className="text-xs text-gray-500 py-2">
-                                                                    No tasks
-                                                                </p>
-                                                            ) : (
-                                                                project.tasks.map((task) => (
-                                                                    <div
-                                                                        key={task.id}
-                                                                        className="rounded-md bg-gray-50 p-2 text-xs"
-                                                                    >
-                                                                        <div className="flex items-start gap-2">
-                                                                            {task.status === "Done" ? (
-                                                                                <CheckCircle2
-                                                                                    size={14}
-                                                                                    className="shrink-0 text-green-600 mt-0.5"
-                                                                                />
-                                                                            ) : task.status ===
-                                                                              "In Progress" ? (
-                                                                                <Clock3
-                                                                                    size={14}
-                                                                                    className="shrink-0 text-blue-600 mt-0.5"
-                                                                                />
-                                                                            ) : (
-                                                                                <Circle
-                                                                                    size={14}
-                                                                                    className="shrink-0 text-gray-400 mt-0.5"
-                                                                                />
-                                                                            )}
-                                                                            <div className="flex-1 min-w-0">
-                                                                                <p className="font-medium text-gray-900 truncate">
-                                                                                    {task.title}
-                                                                                </p>
-                                                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                                                    <span
-                                                                                        className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${getStatusBadgeClass(
-                                                                                            task.status
-                                                                                        )}`}
-                                                                                    >
-                                                                                        {task.status}
-                                                                                    </span>
-                                                                                    <span className="text-[9px] text-gray-600">
-                                                                                        {task.assignee}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                ))
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
                                         </div>
                                     );
                                 })
