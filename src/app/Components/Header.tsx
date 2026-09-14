@@ -137,6 +137,7 @@ function formatRelativeTime(date?: string | null) {
 const navigation = [
   { name: "Dashboard", href: "/dashboard" },
   { name: "Projects", href: "/projects" },
+  { name: "Teams", href: "/teams" },
   { name: "Tasks", href: "/tasks" },
   { name: "Reports", href: "/reports" },
   { name: "Schedule", href: "/schedule" },
