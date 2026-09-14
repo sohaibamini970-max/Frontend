@@ -25,6 +25,7 @@ import {
     File,
     RefreshCw,
     AlertCircle,
+    Layers,
 } from "lucide-react";
 
 // =========================================================
@@ -86,17 +87,21 @@ type Project = {
     report: ProjectReport | null;
     reportStatus: "Done" | "Pending";
     files?: ReportFile[];
+    // ✅ NEW — distinguishes program projects
+    isProgramProject?: boolean;
+    programName?: string | null;
 };
 
 type CreatedReport = {
     id: string;
     title: string;
     targetName: string;
-    targetType: "Project" | "Task";
+    targetType: "Project" | "Program Project";
     format: ReportFormat;
     content: string;
     createdAt: string;
     projectId: string;
+    isProgramProject?: boolean;
 };
 
 type Permissions = {
@@ -212,6 +217,8 @@ const normalizeProject = (project: any): Project => {
             : null,
         reportStatus: project.reportStatus || (project.report ? "Done" : "Pending"),
         files: project.files || [],
+        isProgramProject: Boolean(project.isProgramProject),
+        programName: project.programName || null,
     };
 };
 
@@ -266,7 +273,7 @@ export default function Reports() {
     const [showPreview, setShowPreview] = useState(false);
 
     // =====================================================
-    // FETCH REPORTS
+    // FETCH REPORTS (normal + program)
     // =====================================================
 
     const fetchReports = async (showRefresh = false) => {
@@ -284,6 +291,7 @@ export default function Reports() {
                 throw new Error("Authentication token not found. Please login again.");
             }
 
+            // ---------- 1. Normal reports ----------
             const response = await fetch(`${API_BASE}/reports`, {
                 method: "GET",
                 headers: {
@@ -315,9 +323,54 @@ export default function Reports() {
                 }
             );
 
-            const allProjects = (data.projects || []).map(normalizeProject);
+            const normalProjects = (data.projects || []).map((p) => ({
+                ...normalizeProject(p),
+                isProgramProject: false,
+            }));
 
-            // Split into pending and completed
+            // ---------- 2. Program reports (non-blocking) ----------
+            let programProjects: Project[] = [];
+            try {
+                const progRes = await fetch(`${API_BASE}/program-reports`, {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                    cache: "no-store",
+                });
+
+                if (progRes.ok) {
+                    const progData = await progRes.json();
+                    if (progData.success && Array.isArray(progData.programProjects)) {
+                        programProjects = progData.programProjects.map((pp: any) => ({
+                            ...normalizeProject({
+                                ...pp,
+                                projectManager: {
+                                    id: pp.projectManager?.id,
+                                    name: pp.projectManager?.name,
+                                },
+                                totalTasks: pp.totalTasks,
+                                completedTasks: pp.completedTasks,
+                                progress: pp.progress,
+                                reportStatus: pp.reportStatus,
+                                report: pp.report,
+                                startDate: pp.startDate,
+                                deadline: pp.deadline,
+                            }),
+                            isProgramProject: true,
+                            programName: pp.programName || null,
+                        }));
+                    }
+                }
+            } catch (e) {
+                // Don't fail the whole page if program reports endpoint fails
+                console.warn("Program reports fetch failed (non-blocking):", e);
+            }
+
+            // ---------- 3. Merge ----------
+            const allProjects = [...normalProjects, ...programProjects];
+
             const pending = allProjects.filter((p) => p.reportStatus === "Pending");
             const completed = allProjects.filter((p) => p.reportStatus === "Done");
 
@@ -339,6 +392,7 @@ export default function Reports() {
 
     useEffect(() => {
         fetchReports();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // =====================================================
@@ -362,6 +416,7 @@ export default function Reports() {
                 (project) =>
                     project.name.toLowerCase().includes(query) ||
                     project.manager?.toLowerCase().includes(query) ||
+                    project.programName?.toLowerCase().includes(query) ||
                     project.tasks.length > 0
             );
     }, [pendingProjects, search]);
@@ -373,7 +428,8 @@ export default function Reports() {
         return completedProjects.filter(
             (project) =>
                 project.name.toLowerCase().includes(query) ||
-                project.manager?.toLowerCase().includes(query)
+                project.manager?.toLowerCase().includes(query) ||
+                project.programName?.toLowerCase().includes(query)
         );
     }, [completedProjects, search]);
 
@@ -393,7 +449,7 @@ export default function Reports() {
         setReportContent(
             `Project Report
 
-            Project: ${project.name}
+            ${project.isProgramProject ? `Program: ${project.programName || "N/A"}\n` : ""}Project: ${project.name}
             Manager: ${project.manager || "Unassigned"}
             Status: ${project.status}
             Priority: ${project.priority}
@@ -427,7 +483,6 @@ export default function Reports() {
 
         setUploadError("");
 
-        // Check file type - only PDF and Word
         const allowedTypes = [
             "application/pdf",
             "application/msword",
@@ -440,7 +495,6 @@ export default function Reports() {
             return;
         }
 
-        // Check file size - 10 MB max
         if (file.size > 10 * 1024 * 1024) {
             setUploadError("File size must be less than 10 MB.");
             event.target.value = "";
@@ -451,87 +505,83 @@ export default function Reports() {
         setUploadedFile(null);
     };
 
- const handleFileUpload = async () => {
-    if (!selectedProject) {
-        setUploadError("Please select a project first.");
-        return;
-    }
-
-    if (!permissions.canCreateReport) {
-        setUploadError("Only Project Managers can upload files.");
-        return;
-    }
-
-    if (!selectedFile) {
-        setUploadError("Please select a file first.");
-        return;
-    }
-
-    try {
-        setUploadingFile(true);
-        setUploadError("");
-
-        const token = getToken();
-
-        if (!token) {
-            throw new Error("Authentication token not found.");
+    const handleFileUpload = async () => {
+        if (!selectedProject) {
+            setUploadError("Please select a project first.");
+            return;
         }
 
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-        formData.append("projectId", String(selectedProject.id));
+        if (!permissions.canCreateReport) {
+            setUploadError("Only Project Managers can upload files.");
+            return;
+        }
 
-        const response = await fetch(
-            `${API_BASE}/reports/project/${selectedProject.id}/upload`,
-            {
+        if (!selectedFile) {
+            setUploadError("Please select a file first.");
+            return;
+        }
+
+        try {
+            setUploadingFile(true);
+            setUploadError("");
+
+            const token = getToken();
+
+            if (!token) {
+                throw new Error("Authentication token not found.");
+            }
+
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+            formData.append("projectId", String(selectedProject.id));
+
+            // ✅ Route to the right endpoint
+            const uploadUrl = selectedProject.isProgramProject
+                ? `${API_BASE}/program-reports/program-project/${selectedProject.id}/upload`
+                : `${API_BASE}/reports/project/${selectedProject.id}/upload`;
+
+            const response = await fetch(uploadUrl, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
                 body: formData,
+            });
+
+            let data: any;
+
+            try {
+                data = await response.json();
+            } catch {
+                throw new Error(`Server returned invalid response (${response.status})`);
             }
-        );
 
-        let data: any;
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || "Failed to upload file");
+            }
 
-        try {
-            data = await response.json();
-        } catch {
-            throw new Error(
-                `Server returned invalid response (${response.status})`
+            if (!data.content || !data.content.trim()) {
+                throw new Error("The file was uploaded, but no readable text was found.");
+            }
+
+            setUploadedFile(data.file);
+            setReportContent(data.content.trim());
+            setSelectedFile(null);
+
+            if (fileInputRef?.current) {
+                fileInputRef.current.value = "";
+            }
+
+            alert(
+                "File uploaded successfully. The extracted content has been added to the report. Review it in Live Preview and click Save Report."
             );
+        } catch (error: any) {
+            console.error("File upload error:", error);
+            setUploadError(error.message || "Failed to upload file");
+        } finally {
+            setUploadingFile(false);
         }
-
-        if (!response.ok || !data.success) {
-            throw new Error(
-                data.message || "Failed to upload file"
-            );
-        }
-
-        if (!data.content || !data.content.trim()) {
-            throw new Error(
-                "The file was uploaded, but no readable text was found."
-            );
-        }
-
-        setUploadedFile(data.file);
-        setReportContent(data.content.trim());
-        setSelectedFile(null);
-
-        if (fileInputRef?.current) {
-            fileInputRef.current.value = "";
-        }
-
-        alert(
-            "File uploaded successfully. The extracted content has been added to the report. Review it in Live Preview and click Save Report."
-        );
-    } catch (error: any) {
-        console.error("File upload error:", error);
-        setUploadError(error.message || "Failed to upload file");
-    } finally {
-        setUploadingFile(false);
-    }
-};
+    };
 
     const handleSaveReport = async () => {
         if (!selectedProject) {
@@ -558,21 +608,23 @@ export default function Reports() {
             setSavingReport(true);
             const token = getToken();
 
-            const response = await fetch(
-                `${API_BASE}/reports/project/${selectedProject.id}`,
-                {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        title: reportTitle.trim(),
-                        content: reportContent.trim(),
-                        format: reportFormat,
-                    }),
-                }
-            );
+            // ✅ Route to the right endpoint
+            const saveUrl = selectedProject.isProgramProject
+                ? `${API_BASE}/program-reports/program-project/${selectedProject.id}`
+                : `${API_BASE}/reports/project/${selectedProject.id}`;
+
+            const response = await fetch(saveUrl, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    title: reportTitle.trim(),
+                    content: reportContent.trim(),
+                    format: reportFormat,
+                }),
+            });
 
             const data = await response.json();
 
@@ -584,11 +636,12 @@ export default function Reports() {
                 id: String(data.report?.id || Date.now()),
                 title: data.report?.title || reportTitle,
                 targetName: selectedProject.name,
-                targetType: "Project",
+                targetType: selectedProject.isProgramProject ? "Program Project" : "Project",
                 format: data.report?.format || reportFormat,
                 content: data.report?.content || reportContent,
                 createdAt: data.report?.created_at || new Date().toISOString(),
                 projectId: selectedProject.id,
+                isProgramProject: Boolean(selectedProject.isProgramProject),
             };
 
             setPreviewReport(newReport);
@@ -614,7 +667,11 @@ export default function Reports() {
         }
     };
 
-    const handleDownloadReport = async (projectId: string, format: "pdf" | "word") => {
+    const handleDownloadReport = async (
+        projectId: string,
+        format: "pdf" | "word",
+        isProgramProject = false
+    ) => {
         try {
             if (!permissions.canDownloadReport) {
                 alert("You do not have permission to download reports.");
@@ -626,15 +683,17 @@ export default function Reports() {
                 throw new Error("Authentication token not found.");
             }
 
-            const response = await fetch(
-                `${API_BASE}/reports/project/${projectId}/download/${format}`,
-                {
-                    method: "GET",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
+            // ✅ Route to the right endpoint
+            const url = isProgramProject
+                ? `${API_BASE}/program-reports/program-project/${projectId}/download/${format}`
+                : `${API_BASE}/reports/project/${projectId}/download/${format}`;
+
+            const response = await fetch(url, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
 
             if (!response.ok) {
                 let message = "Failed to download report";
@@ -650,15 +709,15 @@ export default function Reports() {
                 throw new Error("The server returned an empty file.");
             }
 
-            const url = window.URL.createObjectURL(blob);
+            const url_blob = window.URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.href = url;
+            link.href = url_blob;
             link.download =
                 format === "pdf" ? "project-report.pdf" : "project-report.docx";
             document.body.appendChild(link);
             link.click();
             link.remove();
-            window.URL.revokeObjectURL(url);
+            window.URL.revokeObjectURL(url_blob);
         } catch (error: any) {
             console.error("Download report error:", error);
             alert(error.message || "Failed to download report");
@@ -672,11 +731,12 @@ export default function Reports() {
             id: project.report.id,
             title: project.report.title,
             targetName: project.name,
-            targetType: "Project",
+            targetType: project.isProgramProject ? "Program Project" : "Project",
             format: project.report.format,
             content: project.report.content,
             createdAt: project.report.createdAt || new Date().toISOString(),
             projectId: project.id,
+            isProgramProject: Boolean(project.isProgramProject),
         };
 
         setPreviewReport(report);
@@ -786,8 +846,20 @@ export default function Reports() {
                     </div>
 
                     <p className="text-sm text-gray-600">
-                        Manage and create project reports
+                        Manage and create project and program project reports
                     </p>
+
+                    {/* Legend */}
+                    <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-gray-600">
+                        <span className="inline-flex items-center gap-1.5">
+                            <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                            Normal project
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                            Program project
+                        </span>
+                    </div>
 
                     {currentUser && (
                         <div className="mt-3 flex items-center gap-2">
@@ -857,7 +929,7 @@ export default function Reports() {
                                     Projects Pending Reports
                                 </h2>
                                 <p className="mt-1 text-xs text-gray-600">
-                                    Projects without reports
+                                    Projects and program projects without reports
                                 </p>
                             </div>
                             <div className="rounded-lg bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
@@ -881,20 +953,38 @@ export default function Reports() {
                             ) : (
                                 filteredPendingProjects.map((project) => {
                                     const isExpanded = expandedProjects.includes(project.id);
+                                    const isProgram = project.isProgramProject;
 
                                     return (
                                         <div
                                             key={project.id}
-                                            className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow"
+                                            className={`overflow-hidden rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow ${
+                                                isProgram
+                                                    ? "border-2 border-emerald-300"
+                                                    : "border border-gray-200"
+                                            }`}
                                         >
                                             {/* PROJECT HEADER */}
-                                            <div className="border-b border-gray-100 bg-gray-50 p-4">
+                                            <div
+                                                className={`border-b p-4 ${
+                                                    isProgram
+                                                        ? "border-emerald-100 bg-emerald-50/50"
+                                                        : "border-gray-100 bg-gray-50"
+                                                }`}
+                                            >
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex flex-wrap items-center gap-2">
                                                             <h3 className="truncate text-sm font-bold text-black">
                                                                 {project.name}
                                                             </h3>
+
+                                                            {isProgram && (
+                                                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                                                                    <Layers size={10} />
+                                                                    {project.programName || "Program"}
+                                                                </span>
+                                                            )}
                                                         </div>
 
                                                         <div className="mt-2 flex flex-wrap gap-2">
@@ -920,10 +1010,12 @@ export default function Reports() {
 
                                                     {permissions.canCreateReport && (
                                                         <button
-                                                            onClick={() =>
-                                                                handleCreateReport(project)
-                                                            }
-                                                            className="flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 whitespace-nowrap"
+                                                            onClick={() => handleCreateReport(project)}
+                                                            className={`flex items-center gap-1 rounded-md px-3 py-2 text-xs font-bold text-white whitespace-nowrap ${
+                                                                isProgram
+                                                                    ? "bg-emerald-600 hover:bg-emerald-700"
+                                                                    : "bg-blue-600 hover:bg-blue-700"
+                                                            }`}
                                                         >
                                                             <Plus size={14} />
                                                             Create
@@ -956,9 +1048,7 @@ export default function Reports() {
                                             {permissions.canCreateReport && (
                                                 <div className="bg-white p-4">
                                                     <button
-                                                        onClick={() =>
-                                                            toggleProject(project.id)
-                                                        }
+                                                        onClick={() => toggleProject(project.id)}
                                                         className="flex w-full items-center justify-between rounded-md hover:bg-gray-50 p-2 -m-2"
                                                     >
                                                         <div className="flex items-center gap-2">
@@ -990,8 +1080,7 @@ export default function Reports() {
                                                                         className="rounded-md bg-gray-50 p-2 text-xs"
                                                                     >
                                                                         <div className="flex items-start gap-2">
-                                                                            {task.status ===
-                                                                            "Done" ? (
+                                                                            {task.status === "Done" ? (
                                                                                 <CheckCircle2
                                                                                     size={14}
                                                                                     className="shrink-0 text-green-600 mt-0.5"
@@ -1048,10 +1137,10 @@ export default function Reports() {
                         <div className="mb-4 flex items-center justify-between">
                             <div>
                                 <h2 className="text-lg font-bold text-black">
-                                    Available Project Reports
+                                    Available Reports
                                 </h2>
                                 <p className="mt-1 text-xs text-gray-600">
-                                    Submitted reports
+                                    Submitted project and program reports
                                 </p>
                             </div>
                             <div className="rounded-lg bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
@@ -1071,101 +1160,114 @@ export default function Reports() {
                                     </p>
                                 </div>
                             ) : (
-                                filteredCompletedProjects.map((project) => (
-                                    <div
-                                        key={project.id}
-                                        className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
-                                    >
-                                        {project.report && (
-                                            <>
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            {project.report.format ===
-                                                            "PDF" ? (
-                                                                <FileText
-                                                                    size={16}
-                                                                    className="text-red-500"
-                                                                />
-                                                            ) : (
-                                                                <FileType
-                                                                    size={16}
-                                                                    className="text-blue-500"
-                                                                />
-                                                            )}
-                                                            <h3 className="truncate text-sm font-bold text-black">
-                                                                {project.report.title}
-                                                            </h3>
+                                filteredCompletedProjects.map((project) => {
+                                    const isProgram = project.isProgramProject;
+
+                                    return (
+                                        <div
+                                            key={project.id}
+                                            className={`rounded-lg bg-white p-4 shadow-sm hover:shadow-md transition-shadow ${
+                                                isProgram
+                                                    ? "border-2 border-emerald-300"
+                                                    : "border border-gray-200"
+                                            }`}
+                                        >
+                                            {project.report && (
+                                                <>
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                {project.report.format === "PDF" ? (
+                                                                    <FileText
+                                                                        size={16}
+                                                                        className="text-red-500"
+                                                                    />
+                                                                ) : (
+                                                                    <FileType
+                                                                        size={16}
+                                                                        className="text-blue-500"
+                                                                    />
+                                                                )}
+                                                                <h3 className="truncate text-sm font-bold text-black">
+                                                                    {project.report.title}
+                                                                </h3>
+
+                                                                {isProgram && (
+                                                                    <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                                                                        <Layers size={10} />
+                                                                        {project.programName || "Program"}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+
+                                                            <p className="mt-1.5 text-xs text-gray-600">
+                                                                {isProgram ? "Program Project" : "Project"}:{" "}
+                                                                {project.name}
+                                                            </p>
+                                                            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-500">
+                                                                <Calendar size={11} />
+                                                                Created{" "}
+                                                                {formatDate(project.report.createdAt)}
+                                                            </p>
                                                         </div>
-                                                        <p className="mt-1.5 text-xs text-gray-600">
-                                                            Project: {project.name}
-                                                        </p>
-                                                        <p className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-500">
-                                                            <Calendar size={11} />
-                                                            Created{" "}
-                                                            {formatDate(
-                                                                project.report.createdAt
-                                                            )}
-                                                        </p>
+
+                                                        <span
+                                                            className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold ${
+                                                                project.report.format === "PDF"
+                                                                    ? "border-red-200 bg-red-50 text-red-700"
+                                                                    : "border-blue-200 bg-blue-50 text-blue-700"
+                                                            }`}
+                                                        >
+                                                            {project.report.format}
+                                                        </span>
                                                     </div>
 
-                                                    <span
-                                                        className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold ${
-                                                            project.report.format ===
-                                                            "PDF"
-                                                                ? "border-red-200 bg-red-50 text-red-700"
-                                                                : "border-blue-200 bg-blue-50 text-blue-700"
-                                                        }`}
-                                                    >
-                                                        {project.report.format}
-                                                    </span>
-                                                </div>
+                                                    <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+                                                        <button
+                                                            onClick={() => previewCreatedReport(project)}
+                                                            className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                                                        >
+                                                            <Eye size={14} />
+                                                            Preview
+                                                        </button>
 
-                                                <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
-                                                    <button
-                                                        onClick={() =>
-                                                            previewCreatedReport(project)
-                                                        }
-                                                        className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
-                                                    >
-                                                        <Eye size={14} />
-                                                        Preview
-                                                    </button>
+                                                        {permissions.canDownloadReport && (
+                                                            <>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        handleDownloadReport(
+                                                                            project.id,
+                                                                            "pdf",
+                                                                            isProgram
+                                                                        )
+                                                                    }
+                                                                    className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
+                                                                >
+                                                                    <Download size={14} />
+                                                                    PDF
+                                                                </button>
 
-                                                    {permissions.canDownloadReport && (
-                                                        <>
-                                                            <button
-                                                                onClick={() =>
-                                                                    handleDownloadReport(
-                                                                        project.id,
-                                                                        "pdf"
-                                                                    )
-                                                                }
-                                                                className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
-                                                            >
-                                                                <Download size={14} />
-                                                                PDF
-                                                            </button>
-
-                                                            <button
-                                                                onClick={() =>
-                                                                    handleDownloadReport(
-                                                                        project.id,
-                                                                        "word"
-                                                                    )
-                                                                }
-                                                                className="flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
-                                                            >
-                                                                <Download size={14} />
-                                                                Word
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                ))
+                                                                <button
+                                                                    onClick={() =>
+                                                                        handleDownloadReport(
+                                                                            project.id,
+                                                                            "word",
+                                                                            isProgram
+                                                                        )
+                                                                    }
+                                                                    className="flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
+                                                                >
+                                                                    <Download size={14} />
+                                                                    Word
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                })
                             )}
                         </div>
                     </section>
@@ -1176,13 +1278,33 @@ export default function Reports() {
                 {/* ============================================== */}
 
                 {permissions.canCreateReport && selectedProject && (
-                    <section className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
+                    <section
+                        className={`mt-6 rounded-lg bg-white shadow-sm ${
+                            selectedProject.isProgramProject
+                                ? "border-2 border-emerald-300"
+                                : "border border-gray-200"
+                        }`}
+                    >
                         {/* HEADER */}
-                        <div className="border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-4 flex items-center justify-between">
+                        <div
+                            className={`border-b px-6 py-4 flex items-center justify-between ${
+                                selectedProject.isProgramProject
+                                    ? "border-emerald-100 bg-gradient-to-r from-emerald-50 to-emerald-100"
+                                    : "border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100"
+                            }`}
+                        >
                             <div>
-                                <h2 className="text-lg font-bold text-black">
-                                    Create Report for {selectedProject.name}
-                                </h2>
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-lg font-bold text-black">
+                                        Create Report for {selectedProject.name}
+                                    </h2>
+                                    {selectedProject.isProgramProject && (
+                                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                                            <Layers size={10} />
+                                            {selectedProject.programName || "Program"}
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="mt-1 text-sm text-gray-600">
                                     Fill in the details below and preview in real-time
                                 </p>
@@ -1381,7 +1503,11 @@ export default function Reports() {
                                     type="button"
                                     onClick={handleSaveReport}
                                     disabled={savingReport}
-                                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-blue-600 bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                                    className={`flex w-full items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-bold text-white disabled:opacity-50 ${
+                                        selectedProject.isProgramProject
+                                            ? "border-emerald-600 bg-emerald-600 hover:bg-emerald-700"
+                                            : "border-blue-600 bg-blue-600 hover:bg-blue-700"
+                                    }`}
                                 >
                                     {savingReport ? (
                                         <>
@@ -1479,9 +1605,15 @@ export default function Reports() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* MODAL HEADER */}
-                        <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 text-white">
+                        <div
+                            className={`flex items-center justify-between border-b px-6 py-4 text-white ${
+                                previewReport.isProgramProject
+                                    ? "border-emerald-200 bg-gradient-to-r from-emerald-600 to-emerald-700"
+                                    : "border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700"
+                            }`}
+                        >
                             <div>
-                                <p className="text-xs font-bold uppercase tracking-wider text-blue-100">
+                                <p className="text-xs font-bold uppercase tracking-wider text-white/80">
                                     Report Preview
                                 </p>
                                 <h2 className="mt-1 text-xl font-bold">
@@ -1508,8 +1640,16 @@ export default function Reports() {
                             >
                                 {previewReport.format}
                             </span>
+
+                            {previewReport.isProgramProject && (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                                    <Layers size={10} />
+                                    Program Project
+                                </span>
+                            )}
+
                             <span className="text-xs text-gray-600">
-                                Project: {previewReport.targetName}
+                                {previewReport.targetType}: {previewReport.targetName}
                             </span>
                             <span className="text-xs text-gray-600">
                                 Created {formatDate(previewReport.createdAt)}
@@ -1544,7 +1684,8 @@ export default function Reports() {
                                         onClick={() =>
                                             handleDownloadReport(
                                                 previewReport.projectId,
-                                                "pdf"
+                                                "pdf",
+                                                previewReport.isProgramProject
                                             )
                                         }
                                         className="flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
@@ -1558,7 +1699,8 @@ export default function Reports() {
                                         onClick={() =>
                                             handleDownloadReport(
                                                 previewReport.projectId,
-                                                "word"
+                                                "word",
+                                                previewReport.isProgramProject
                                             )
                                         }
                                         className="flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
@@ -1572,7 +1714,11 @@ export default function Reports() {
                             <button
                                 type="button"
                                 onClick={() => setShowPreview(false)}
-                                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                                className={`rounded-lg px-4 py-2 text-xs font-bold text-white ${
+                                    previewReport.isProgramProject
+                                        ? "bg-emerald-600 hover:bg-emerald-700"
+                                        : "bg-blue-600 hover:bg-blue-700"
+                                }`}
                             >
                                 Close
                             </button>
