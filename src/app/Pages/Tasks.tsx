@@ -586,16 +586,24 @@ export default function Tasks() {
   // ====================================
   // SUBMISSION HELPERS
   // ====================================
- const canSubmitWork = (task: Task): boolean => {
-  // Members can only submit on tasks assigned to themselves,
-  // even if they share the project with other members.
-  return (
-    isMember &&
-    String(task.assignee_id || "") === String(currentUser?.id || "") &&
-    task.status !== "Done"
-  );
-};
+const canSubmitWork = (task: Task): boolean => {
+  if (isManagementRole) return true;
+  if (isMember) {
+    if (
+      task.assignee_id &&
+      String(task.assignee_id) === String(currentUser?.id || "")
+    ) {
+      return true;
+    }
 
+    // Case 2: Task has no assignee — any member of the same program project can submit
+    if (!task.assignee_id && isInSameProgramProject(task)) {
+      return true;
+    }
+  }
+  return false;
+};
+  
   const canViewSubmissions = (task: Task): boolean => {
   // Managers see everything
   if (isManagementRole) return true;
@@ -836,30 +844,45 @@ export default function Tasks() {
     setSubmissionDescription("");
   };
 
-  const canWriteChallenge = (task: Task) => {
-    return (
-      isMember &&
-      String(task.assignee_id || "") ===
-      String(currentUser?.id || "")
-    );
-  };;
-
- const canReadChallenge = (task: Task) => {
+ const canWriteChallenge = (task: Task) => {
   if (isManagementRole) return true;
 
-  if (
-    isMember &&
-    String(task.assignee_id || "") === String(currentUser?.id || "")
-  ) {
-    return true;
-  }
+  if (isMember) {
+    // Directly assigned to this member
+    if (
+      task.assignee_id &&
+      String(task.assignee_id) === String(currentUser?.id || "")
+    ) {
+      return true;
+    }
 
-  // 👇 Any member in the same program project can read challenges
-  if (isMember && isInSameProgramProject(task)) return true;
+    // Unassigned task in a program project the member belongs to
+    if (!task.assignee_id && isInSameProgramProject(task)) {
+      return true;
+    }
+  }
 
   return false;
 };
 
+const canReadChallenge = (task: Task) => {
+  if (isManagementRole) return true;
+
+  if (isMember) {
+    if (
+      task.assignee_id &&
+      String(task.assignee_id) === String(currentUser?.id || "")
+    ) {
+      return true;
+    }
+
+    if (!task.assignee_id && isInSameProgramProject(task)) {
+      return true;
+    }
+  }
+
+  return false;
+};
   const isInSameProgramProject = (task: Task): boolean => {
   const ppId = (task as any).program_project_id;
   if (!ppId) return false;
@@ -869,12 +892,24 @@ export default function Tasks() {
   // ====================================
   // FILE ATTACHMENT HELPERS
   // ====================================
-  const canReadAttachments = (task: Task): boolean => {
-    return (
-      isManagementRole ||
-      (String(task.assignee_id || "") === String(currentUser?.id || ""))
-    );
-  };
+ const canReadAttachments = (task: Task): boolean => {
+  if (isManagementRole) return true;
+
+  if (isMember) {
+    if (
+      task.assignee_id &&
+      String(task.assignee_id) === String(currentUser?.id || "")
+    ) {
+      return true;
+    }
+
+    if (!task.assignee_id && isInSameProgramProject(task)) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
   const getFileIcon = (fileType: string) => {
     switch (fileType.toLowerCase()) {
