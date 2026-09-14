@@ -44,6 +44,7 @@ interface Message {
   functionCalled?: string | null;
   requiresAction?: boolean;
   isError?: boolean;
+  agent?: "general" | "program"; // NEW
 }
 
 interface ConversationHistory {
@@ -95,6 +96,54 @@ const formatDate = (date: Date): string => {
 // ============================================================
 
 const API_BASE = "https://backend-five-swart-88.vercel.app/api";
+
+    /**
+     * Route a message to the right AI agent:
+     *   - Program-related prompts  → /ai/program-agent
+     *   - Everything else          → /ai/chat
+     *
+     * Detection is intentionally conservative: we only route to the
+     * program agent when the message clearly references programs,
+     * program projects, or program tasks.
+     */
+    const PROGRAM_KEYWORDS = [
+      "program",
+      "programs",
+      "program project",
+      "program projects",
+      "program task",
+      "program tasks",
+      "internship program",
+      "mentorship program",
+    ];
+    
+    const PROGRAM_VERBS = [
+      "create program",
+      "add program",
+      "list program",
+      "show program",
+      "assign program",
+      "delete program",
+      "update program",
+      "program stats",
+      "program members",
+    ];
+    
+    function isProgramRequest(message: string): boolean {
+      const m = message.toLowerCase();
+    
+      // Explicit verbs win
+      if (PROGRAM_VERBS.some(v => m.includes(v))) return true;
+    
+      // Keyword match — require the word "program" somewhere
+      return PROGRAM_KEYWORDS.some(k => m.includes(k));
+    }
+    
+    function getAgentEndpoint(message: string): string {
+      return isProgramRequest(message)
+        ? `${API_BASE}/ai/program-agent`
+        : `${API_BASE}/ai/chat`;
+    }
 
 const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
   // Get user info from localStorage or session
@@ -300,7 +349,11 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
     setConversationHistory(newHistory);
 
     try {
-      const response = await fetch(`${API_BASE}/ai/chat`, {
+     const endpoint = getAgentEndpoint(messageText);
+
+      console.log(`🤖 Routing to: ${endpoint}`);
+      
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -316,15 +369,16 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
       }
 
       // Add assistant message
-      const assistantMessage: Message = {
-        id: Date.now().toString() + "-assistant",
-        role: "assistant",
-        content: data.message || "Operation completed successfully.",
-        timestamp: new Date(),
-        data: data.data,
-        functionCalled: data.function_called,
-        requiresAction: data.requires_action,
-      };
+     const assistantMessage: Message = {
+      id: Date.now().toString() + "-assistant",
+      role: "assistant",
+      content: data.message || "Operation completed successfully.",
+      timestamp: new Date(),
+      data: data.data,
+      functionCalled: data.function_called,
+      requiresAction: data.requires_action,
+      agent: endpoint.includes("program-agent") ? "program" : "general", // NEW
+    };
 
       setChatSessions(prev => prev.map(session => 
         session.id === currentSessionId 
@@ -675,6 +729,11 @@ const AIAgentChatbot: React.FC<AIAgentChatbotProps> = ({ isOpen, onClose }) => {
                       <span className="text-xs font-medium text-gray-600">
                         Assistant
                       </span>
+                      {message.agent === "program" && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700">
+                          Program
+                        </span>
+                      )}
                     </div>
                   )}
                   <div className="text-sm leading-relaxed">
