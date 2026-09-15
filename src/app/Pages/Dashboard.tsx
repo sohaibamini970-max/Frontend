@@ -1464,7 +1464,7 @@ const programProjectOverview = useMemo(() => {
                                                     programProject.program_name ||
                                                     "Program"
                                                 }
-                                                className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-[#557bd2]"
+                                                className="whitespace-nowrap text-[12px] font-bold uppercase tracking-wider text-[#557bd2]"
                                                 style={{
                                                     writingMode:
                                                         "vertical-rl",
@@ -1499,16 +1499,16 @@ const programProjectOverview = useMemo(() => {
                                         </div>
                                     </div>
 
-                                    <div className="mt-2 min-h-[52px] w-[125px] text-center">
-                                        <p
-                                            className={`mb-0.5 text-[13px] font-semibold uppercase tracking-wide ${color.labelColor}`}
-                                        >
-                                            Program Project
-                                        </p>
-                                        <p className="text-[13px] font-bold uppercase leading-4 text-[#172633] transition group-hover:text-[#557bd2]">
-                                            {programProject.name}
-                                        </p>
-                                    </div>
+                                      <div className="mt-2 min-h-[52px] w-[125px] text-center">
+                                            <p
+                                                className={`mb-0.5 text-[13px] font-semibold uppercase tracking-wide ${color.labelColor}`}
+                                            >
+                                                Project #{index + 1}
+                                            </p>
+                                            <p className="text-[13px] font-bold uppercase leading-4 text-[#172633] transition group-hover:text-[#557bd2]">
+                                                {programProject.name}
+                                            </p>
+                                      </div>
                                 </button>
                             );
                         }
