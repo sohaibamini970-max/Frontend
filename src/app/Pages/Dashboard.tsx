@@ -123,6 +123,8 @@ type ProgramProjectCount = { total: number; done: number };
 const API_BASE =
     "https://backend-five-swart-88.vercel.app/api";
 
+const PROGRAM_API = `${API_BASE}/program-tasks`;
+
 /* =========================================================
    PROJECT GRAPH COLORS
 ========================================================= */
@@ -217,6 +219,11 @@ export default function Dashboard() {
     const [overviewMode, setOverviewMode] = useState<"projects" | "programs">(
         "projects"
     );
+
+    // Member-only: program projects the member belongs to (from /my/program-projects)
+    const [myMemberProgramProjects, setMyMemberProgramProjects] = useState<
+        ProgramProjectRow[]
+    >([]);
 
     /* =======================================================
        CURRENT USER / ROLE
@@ -323,10 +330,9 @@ export default function Dashboard() {
         normalizedRole === "user";
 
     const isManagement =
-        isExecutiveManager ||
-        isSystemAdministrator;
-    
-   const canViewTeamOverview = !isMember;
+        isExecutiveManager || isSystemAdministrator;
+
+    const canViewTeamOverview = !isMember;
     /* =======================================================
        LOAD DASHBOARD
     ======================================================= */
@@ -349,17 +355,6 @@ export default function Dashboard() {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
             };
-
-            /*
-             * IMPORTANT PERFORMANCE CHANGE
-             * --------------------------------
-             * The old dashboard created a waterfall:
-             * team overview -> projects -> teams -> tasks.
-             *
-             * Start every request that does NOT depend on projects at once.
-             * Tasks start immediately when projects arrive and run in parallel
-             * with teams/members parsing.
-             */
 
             const fetchJson = async (url: string) => {
                 const response = await fetch(url, {
@@ -392,10 +387,6 @@ export default function Dashboard() {
                 `${API_BASE}/teams/members`
             ).catch(() => null);
 
-            /*
-             * Resolve projects first because task URLs need project IDs.
-             * Do NOT wait for the other requests before starting tasks.
-             */
             const projectsData = await projectsPromise;
 
             const loadedProjects: Project[] =
@@ -410,10 +401,6 @@ export default function Dashboard() {
 
             setProjects(validProjects);
 
-            /*
-             * Start ALL project task requests immediately.
-             * They run while the team/member requests are still in flight.
-             */
             const taskPromise = Promise.all(
                 validProjects.map(async (project) => {
                     try {
@@ -449,10 +436,6 @@ export default function Dashboard() {
                 })
             ).then((results) => results.flat());
 
-            /*
-             * Team data and team overview are independent of projects.
-             * Wait for them together instead of sequentially.
-             */
             const [teamOverviewData, teamsData, membersData] =
                 await Promise.all([
                     teamOverviewPromise,
@@ -505,15 +488,6 @@ export default function Dashboard() {
                 );
             }
 
-            /*
-             * MANAGEMENT / PROJECT MANAGER:
-             * The useful dashboard UI does not need task data to paint.
-             * Stop showing the full-screen loader now.
-             *
-             * MEMBER:
-             * Their visible projects are calculated from assigned tasks,
-             * so keep the loader until tasks arrive.
-             */
             if (!isMember) {
                 setLoading(false);
             }
@@ -550,63 +524,104 @@ export default function Dashboard() {
                     })
                 );
 
-    const flat: ProgramProjectRow[] = nested.flat();
-    setProgramProjects(flat);
+                const flat: ProgramProjectRow[] = nested.flat();
+                setProgramProjects(flat);
 
-  type ProgramProjectEntry = [
-    string,
-    { total: number; done: number; tasks: any[] }
-];
-
-const entries: ProgramProjectEntry[] = await Promise.all(
-    flat.map(async (proj): Promise<ProgramProjectEntry> => {
-        try {
-            const res = await fetch(
-                `${API_BASE.replace("/api", "")}/api/program-tasks/program-project/${proj.id}`,
-                { method: "GET", headers, cache: "no-store" }
-            );
-            if (!res.ok) {
-                return [
-                    proj.id,
-                    { total: 0, done: 0, tasks: [] as any[] },
+                type ProgramProjectEntry = [
+                    string,
+                    { total: number; done: number; tasks: any[] }
                 ];
-            }
-            const data = await res.json();
-            const tasks: any[] = Array.isArray(data.tasks) ? data.tasks : [];
-            return [
-                proj.id,
-                {
-                    total: tasks.length,
-                    done: tasks.filter((t) => t.status === "Done").length,
-                    tasks,
-                },
-            ];
-        } catch {
-            return [
-                proj.id,
-                { total: 0, done: 0, tasks: [] as any[] },
-            ];
-        }
-    })
-);
-                    setProgramProjectCounts(
-                        Object.fromEntries(
-                            entries.map(([id, v]) => [
-                                id,
-                                { total: v.total, done: v.done },
-                            ])
-                        )
-                    );
-                    setProgramProjectTasks(
-                        Object.fromEntries(entries.map(([id, v]) => [id, v.tasks]))
-                    );
-                } catch (err) {
-                    console.error("Programs overview load error:", err);
-                }
 
-            /*
-             * For members, tasks are required to determine visible projects.
-             */
+                const entries: ProgramProjectEntry[] = await Promise.all(
+                    flat.map(async (proj): Promise<ProgramProjectEntry> => {
+                        try {
+                            const res = await fetch(
+                                `${API_BASE.replace("/api", "")}/api/program-tasks/program-project/${proj.id}`,
+                                { method: "GET", headers, cache: "no-store" }
+                            );
+                            if (!res.ok) {
+                                return [
+                                    proj.id,
+                                    { total: 0, done: 0, tasks: [] as any[] },
+                                ];
+                            }
+                            const data = await res.json();
+                            const tasks: any[] = Array.isArray(data.tasks) ? data.tasks : [];
+                            return [
+                                proj.id,
+                                {
+                                    total: tasks.length,
+                                    done: tasks.filter((t) => t.status === "Done").length,
+                                    tasks,
+                                },
+                            ];
+                        } catch {
+                            return [
+                                proj.id,
+                                { total: 0, done: 0, tasks: [] as any[] },
+                            ];
+                        }
+                    })
+                );
+                setProgramProjectCounts(
+                    Object.fromEntries(
+                        entries.map(([id, v]) => [
+                            id,
+                            { total: v.total, done: v.done },
+                        ])
+                    )
+                );
+                setProgramProjectTasks(
+                    Object.fromEntries(entries.map(([id, v]) => [id, v.tasks]))
+                );
+            } catch (err) {
+                console.error("Programs overview load error:", err);
+            }
+
+            /* ---------- MEMBER: program projects they belong to ---------- */
+            if (isMember && currentUserId) {
+                try {
+                    const ppRes = await fetch(
+                        `${PROGRAM_API}/my/program-projects`,
+                        { method: "GET", headers, cache: "no-store" }
+                    );
+                    if (ppRes.ok) {
+                        const ppData = await ppRes.json();
+                        const rawList: any[] =
+                            ppData?.programProjects ||
+                            ppData?.projects ||
+                            ppData?.data ||
+                            [];
+                        const mapped: ProgramProjectRow[] = rawList.map(
+                            (pp: any) => ({
+                                id: String(pp.id),
+                                name:
+                                    pp.name ||
+                                    pp.program_project_name ||
+                                    "Program Project",
+                                domain: pp.domain || null,
+                                status: pp.status || null,
+                                priority: pp.priority || null,
+                                start_date: pp.start_date || null,
+                                deadline: pp.deadline || null,
+                                program_id: String(
+                                    pp.program_id || pp.programId || ""
+                                ),
+                                program_name:
+                                    pp.program_name || pp.programName || null,
+                                assigned_to:
+                                    pp.assigned_to ??
+                                    pp.program_project_manager_id ??
+                                    null,
+                            })
+                        );
+                        setMyMemberProgramProjects(mapped);
+                    }
+                } catch (err) {
+                    console.error("Member program-projects load error:", err);
+                }
+            }
+
             if (isMember) {
                 setLoading(false);
             }
@@ -644,21 +659,9 @@ const entries: ProgramProjectEntry[] = await Promise.all(
     ======================================================= */
 
     const visibleProjects = useMemo(() => {
-        /*
-         * Executive Manager + System Administrator
-         * -----------------------------------------
-         * Can see every project.
-         */
-
         if (isManagement) {
             return projects;
         }
-
-        /*
-         * Project Manager
-         * ---------------
-         * Can only see projects assigned to them.
-         */
 
         if (isProjectManager) {
             if (!currentUserId) {
@@ -671,13 +674,6 @@ const entries: ProgramProjectEntry[] = await Promise.all(
                     String(currentUserId)
             );
         }
-
-        /*
-         * Member / User
-         * -------------
-         * A member only sees projects for which
-         * they have an assigned task.
-         */
 
         if (isMember) {
             if (!currentUserId) {
@@ -710,11 +706,6 @@ const entries: ProgramProjectEntry[] = await Promise.all(
             );
         }
 
-        /*
-         * Fallback:
-         * Unknown roles get no project data.
-         */
-
         return [];
     }, [
         projects,
@@ -725,77 +716,80 @@ const entries: ProgramProjectEntry[] = await Promise.all(
         isMember,
     ]);
 
+    /* =======================================================
+       VISIBLE PROGRAM PROJECTS (role-aware)
+       - Management: everything
+       - Project Manager: program projects where they're the manager
+       - Member: program projects they belong to (/my/program-projects)
+    ======================================================= */
     const visibleProgramProjects = useMemo(() => {
-    if (isManagement) return programProjects;
+        if (isManagement) return programProjects;
 
-    if (isProjectManager) {
-        return programProjects.filter(
-            (p) =>
-                String(p.assigned_to || "") === String(currentUserId)
-        );
-    }
-
-    if (isMember) {
-        if (!currentUserId) return [];
-        return programProjects.filter((p) => {
-            const list = programProjectTasks[p.id] || [];
-            return list.some(
-                (t) =>
-                    String(
-                        t.assignee_id || t.assigneeId || ""
-                    ) === String(currentUserId)
+        if (isProjectManager) {
+            return programProjects.filter(
+                (p) =>
+                    String(p.assigned_to || "") === String(currentUserId)
             );
+        }
+
+        if (isMember) {
+            if (!currentUserId) return [];
+
+            // Primary source: /my/program-projects (already role-scoped)
+            if (myMemberProgramProjects.length > 0) {
+                return myMemberProgramProjects;
+            }
+
+            // Fallback: any program project with a task assigned to the member
+            return programProjects.filter((p) => {
+                const list = programProjectTasks[p.id] || [];
+                return list.some(
+                    (t) =>
+                        String(
+                            t.assignee_id || t.assigneeId || ""
+                        ) === String(currentUserId)
+                );
+            });
+        }
+
+        return [];
+    }, [
+        programProjects,
+        programProjectTasks,
+        myMemberProgramProjects,
+        currentUserId,
+        isManagement,
+        isProjectManager,
+        isMember,
+    ]);
+
+    const programProjectOverview = useMemo(() => {
+        return visibleProgramProjects.map((p) => {
+            const counts =
+                programProjectCounts[p.id] || { total: 0, done: 0 };
+            const progress =
+                counts.total > 0
+                    ? Math.round((counts.done / counts.total) * 100)
+                    : p.status === "Done"
+                    ? 100
+                    : 0;
+            return {
+                programProject: p,
+                totalTasks: counts.total,
+                completedTasks: counts.done,
+                progress,
+            };
         });
-    }
-
-    return [];
-}, [
-    programProjects,
-    programProjectTasks,
-    currentUserId,
-    isManagement,
-    isProjectManager,
-    isMember,
-]);
-
-const programProjectOverview = useMemo(() => {
-    return visibleProgramProjects.map((p) => {
-        const counts =
-            programProjectCounts[p.id] || { total: 0, done: 0 };
-        const progress =
-            counts.total > 0
-                ? Math.round((counts.done / counts.total) * 100)
-                : p.status === "Done"
-                ? 100
-                : 0;
-        return {
-            programProject: p,
-            totalTasks: counts.total,
-            completedTasks: counts.done,
-            progress,
-        };
-    });
-}, [visibleProgramProjects, programProjectCounts]);
+    }, [visibleProgramProjects, programProjectCounts]);
 
     /* =======================================================
        ROLE-BASED TASKS
     ======================================================= */
 
     const visibleTasks = useMemo(() => {
-        /*
-         * Executive Manager / System Administrator
-         */
-
         if (isManagement) {
             return tasks;
         }
-
-        /*
-         * Project Manager
-         *
-         * All tasks belonging to projects managed
-         * by the logged-in Project Manager.
-         */
 
         if (isProjectManager) {
             const projectIds =
@@ -815,12 +809,6 @@ const programProjectOverview = useMemo(() => {
                     )
             );
         }
-
-        /*
-         * Member / User
-         *
-         * Only their own assigned tasks.
-         */
 
         if (isMember) {
             if (!currentUserId) {
@@ -949,66 +937,6 @@ const programProjectOverview = useMemo(() => {
         visibleProjects,
         visibleTasks,
     ]);
-
-    /* =======================================================
-       TASK STATISTICS
-    ======================================================= */
-
-    const taskStats = useMemo(() => {
-        const completed =
-            visibleTasks.filter(
-                (task) => {
-                    const status =
-                        task.status
-                            ?.toLowerCase()
-                            .trim();
-
-                    return (
-                        status === "done" ||
-                        status === "completed"
-                    );
-                }
-            ).length;
-
-        const inProgress =
-            visibleTasks.filter(
-                (task) => {
-                    const status =
-                        task.status
-                            ?.toLowerCase()
-                            .trim();
-
-                    return (
-                        status === "in progress" ||
-                        status === "in_progress"
-                    );
-                }
-            ).length;
-
-        const pending =
-            visibleTasks.filter(
-                (task) => {
-                    const status =
-                        task.status
-                            ?.toLowerCase()
-                            .trim();
-
-                    return (
-                        status === "to do" ||
-                        status === "todo" ||
-                        status === "pending" ||
-                        status === "backlog"
-                    );
-                }
-            ).length;
-
-        return {
-            total: visibleTasks.length,
-            completed,
-            inProgress,
-            pending,
-        };
-    }, [visibleTasks]);
 
     /* =======================================================
        DOMAIN OVERVIEW
@@ -1888,45 +1816,6 @@ const programProjectOverview = useMemo(() => {
 
                 </section>
               )}
-                {/* =================================================
-            ROLE TASK SUMMARY
-        ================================================= */}
-
-                <section className="mb-7 grid grid-cols-2 gap-4 md:grid-cols-4">
-
-                    <DashboardStat
-                        icon={<Circle size={17} />}
-                        label="Total Tasks"
-                        value={taskStats.total}
-                        className="bg-[#edf2ff]"
-                        iconClass="text-[#557bd2]"
-                    />
-
-                    <DashboardStat
-                        icon={<CheckCircle2 size={17} />}
-                        label="Completed"
-                        value={taskStats.completed}
-                        className="bg-[#eaf5ed]"
-                        iconClass="text-[#438d59]"
-                    />
-
-                    <DashboardStat
-                        icon={<Clock3 size={17} />}
-                        label="In Progress"
-                        value={taskStats.inProgress}
-                        className="bg-[#f8f0e4]"
-                        iconClass="text-[#be8944]"
-                    />
-
-                    <DashboardStat
-                        icon={<FolderKanban size={17} />}
-                        label="My Visible Projects"
-                        value={visibleProjects.length}
-                        className="bg-[#f3eafa]"
-                        iconClass="text-[#895a9d]"
-                    />
-
-                </section>
 
                 {/* =================================================
             ROW 4 — TASK SCHEDULE
@@ -2376,44 +2265,6 @@ const programProjectOverview = useMemo(() => {
                 })()}
 
         </main>
-    );
-}
-
-/* =========================================================
-   DASHBOARD STAT
-========================================================= */
-
-function DashboardStat({
-    icon,
-    label,
-    value,
-    className,
-    iconClass,
-}: {
-    icon: React.ReactNode;
-    label: string;
-    value: number;
-    className: string;
-    iconClass: string;
-}) {
-    return (
-        <div
-            className={`rounded-2xl border border-white/70 p-5 ${className}`}
-        >
-            <div className="flex items-center gap-2.5">
-                <span className={iconClass}>
-                    {icon}
-                </span>
-
-                <span className="text-[10px] font-bold uppercase tracking-wide text-[#697783]">
-                    {label}
-                </span>
-            </div>
-
-            <p className="mt-3 text-[26px] font-bold text-[#172633]">
-                {value}
-            </p>
-        </div>
     );
 }
 
