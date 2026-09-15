@@ -579,49 +579,133 @@ export default function Dashboard() {
             }
 
             /* ---------- MEMBER: program projects they belong to ---------- */
-            if (isMember && currentUserId) {
-                try {
-                    const ppRes = await fetch(
-                        `${PROGRAM_API}/my/program-projects`,
-                        { method: "GET", headers, cache: "no-store" }
-                    );
-                    if (ppRes.ok) {
-                        const ppData = await ppRes.json();
-                        const rawList: any[] =
-                            ppData?.programProjects ||
-                            ppData?.projects ||
-                            ppData?.data ||
-                            [];
-                        const mapped: ProgramProjectRow[] = rawList.map(
-                            (pp: any) => ({
-                                id: String(pp.id),
-                                name:
-                                    pp.name ||
-                                    pp.program_project_name ||
-                                    "Program Project",
-                                domain: pp.domain || null,
-                                status: pp.status || null,
-                                priority: pp.priority || null,
-                                start_date: pp.start_date || null,
-                                deadline: pp.deadline || null,
-                                program_id: String(
-                                    pp.program_id || pp.programId || ""
-                                ),
-                                program_name:
-                                    pp.program_name || pp.programName || null,
-                                assigned_to:
-                                    pp.assigned_to ??
-                                    pp.program_project_manager_id ??
-                                    null,
-                            })
-                        );
-                        setMyMemberProgramProjects(mapped);
-                    }
-                } catch (err) {
-                    console.error("Member program-projects load error:", err);
-                }
-            }
+           /* ---------- MEMBER: program projects they belong to ---------- */
+if (isMember && currentUserId) {
+    try {
+        console.log("[Dashboard] Fetching member program projects...");
+        const ppRes = await fetch(
+            `${PROGRAM_API}/my/program-projects`,
+            { method: "GET", headers, cache: "no-store" }
+        );
 
+        if (!ppRes.ok) {
+            console.error(
+                "[Dashboard] /my/program-projects failed:",
+                ppRes.status,
+                await ppRes.text().catch(() => "")
+            );
+        } else {
+            const ppData = await ppRes.json();
+            console.log("[Dashboard] /my/program-projects response:", ppData);
+
+            const rawList: any[] =
+                ppData?.programProjects ||
+                ppData?.projects ||
+                ppData?.data ||
+                (Array.isArray(ppData) ? ppData : []);
+
+            const mapped: ProgramProjectRow[] = rawList.map(
+                (pp: any) => ({
+                    id: String(pp.id),
+                    name:
+                        pp.name ||
+                        pp.program_project_name ||
+                        "Program Project",
+                    domain: pp.domain || null,
+                    status: pp.status || null,
+                    priority: pp.priority || null,
+                    start_date: pp.start_date || null,
+                    deadline: pp.deadline || null,
+                    program_id: String(
+                        pp.program_id || pp.programId || ""
+                    ),
+                    program_name:
+                        pp.program_name || pp.programName || null,
+                    assigned_to:
+                        pp.assigned_to ??
+                        pp.program_project_manager_id ??
+                        null,
+                })
+            );
+
+            setMyMemberProgramProjects(mapped);
+            console.log(
+                "[Dashboard] Mapped member program projects:",
+                mapped
+            );
+
+            /* ---------- Fetch tasks for each member program project ---------- */
+            if (mapped.length > 0) {
+                const memberEntries = await Promise.all(
+                    mapped.map(async (proj) => {
+                        try {
+                            const res = await fetch(
+                                `${PROGRAM_API}/my/program-project/${proj.id}/tasks`,
+                                { method: "GET", headers, cache: "no-store" }
+                            );
+                            if (!res.ok) {
+                                console.warn(
+                                    `[Dashboard] Tasks fetch failed for program project ${proj.id}:`,
+                                    res.status
+                                );
+                                return [
+                                    proj.id,
+                                    { total: 0, done: 0, tasks: [] as any[] },
+                                ] as const;
+                            }
+                            const data = await res.json();
+                            const tasks: any[] = Array.isArray(data.tasks)
+                                ? data.tasks
+                                : Array.isArray(data.data)
+                                ? data.data
+                                : [];
+                            return [
+                                proj.id,
+                                {
+                                    total: tasks.length,
+                                    done: tasks.filter(
+                                        (t) =>
+                                            t.status === "Done" ||
+                                            t.status === "Completed"
+                                    ).length,
+                                    tasks,
+                                },
+                            ] as const;
+                        } catch (e) {
+                            console.error(
+                                `[Dashboard] Task fetch error for ${proj.id}:`,
+                                e
+                            );
+                            return [
+                                proj.id,
+                                { total: 0, done: 0, tasks: [] as any[] },
+                            ] as const;
+                        }
+                    })
+                );
+
+                setProgramProjectCounts((prev) => ({
+                    ...prev,
+                    ...Object.fromEntries(
+                        memberEntries.map(([id, v]) => [
+                            id,
+                            { total: v.total, done: v.done },
+                        ])
+                    ),
+                }));
+
+                setProgramProjectTasks((prev) => ({
+                    ...prev,
+                    ...Object.fromEntries(
+                        memberEntries.map(([id, v]) => [id, v.tasks])
+                    ),
+                }));
+            }
+        }
+    } catch (err) {
+        console.error("Member program-projects load error:", err);
+    }
+}
             if (isMember) {
                 setLoading(false);
             }
@@ -675,37 +759,25 @@ export default function Dashboard() {
             );
         }
 
-        if (isMember) {
-            if (!currentUserId) {
-                return [];
-            }
+       if (isMember) {
+    if (!currentUserId) return [];
 
-            const memberProjectIds =
-                new Set(
-                    tasks
-                        .filter(
-                            (task) =>
-                                String(
-                                    task.assignee_id || ""
-                                ) ===
-                                String(currentUserId)
-                        )
-                        .map(
-                            (task) =>
-                                String(
-                                    task.project_id || ""
-                                )
-                        )
-                );
+    // Primary source: /my/program-projects (already role-scoped)
+    if (myMemberProgramProjects.length > 0) {
+        return myMemberProgramProjects;
+    }
 
-            return projects.filter(
-                (project) =>
-                    memberProjectIds.has(
-                        String(project.id)
-                    )
-            );
-        }
-
+    // Fallback: any program project with a task assigned to the member
+    return programProjects.filter((p) => {
+        const list = programProjectTasks[p.id] || [];
+        return list.some(
+            (t) =>
+                String(
+                    t.assignee_id || t.assigneeId || ""
+                ) === String(currentUserId)
+        );
+    });
+}
         return [];
     }, [
         projects,
@@ -763,25 +835,42 @@ export default function Dashboard() {
         isMember,
     ]);
 
-    const programProjectOverview = useMemo(() => {
-        return visibleProgramProjects.map((p) => {
-            const counts =
-                programProjectCounts[p.id] || { total: 0, done: 0 };
-            const progress =
-                counts.total > 0
-                    ? Math.round((counts.done / counts.total) * 100)
-                    : p.status === "Done"
-                    ? 100
-                    : 0;
-            return {
-                programProject: p,
-                totalTasks: counts.total,
-                completedTasks: counts.done,
-                progress,
-            };
-        });
-    }, [visibleProgramProjects, programProjectCounts]);
+  const programProjectOverview = useMemo(() => {
+    return visibleProgramProjects.map((p) => {
+        // Primary: from programProjectCounts
+        let counts = programProjectCounts[p.id];
 
+        // Fallback: derive from programProjectTasks (member-friendly)
+        if (!counts) {
+            const list = programProjectTasks[p.id] || [];
+            counts = {
+                total: list.length,
+                done: list.filter(
+                    (t: any) =>
+                        t.status === "Done" || t.status === "Completed"
+                ).length,
+            };
+        }
+
+        const progress =
+            counts.total > 0
+                ? Math.round((counts.done / counts.total) * 100)
+                : p.status === "Done"
+                ? 100
+                : 0;
+
+        return {
+            programProject: p,
+            totalTasks: counts.total,
+            completedTasks: counts.done,
+            progress,
+        };
+    });
+}, [
+    visibleProgramProjects,
+    programProjectCounts,
+    programProjectTasks,
+]);
     /* =======================================================
        ROLE-BASED TASKS
     ======================================================= */
