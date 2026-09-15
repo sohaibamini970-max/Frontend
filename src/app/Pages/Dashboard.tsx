@@ -553,32 +553,42 @@ export default function Dashboard() {
     const flat: ProgramProjectRow[] = nested.flat();
     setProgramProjects(flat);
 
-    /* ---------- PROGRAM PROJECT TASK COUNTS ---------- */
-    const entries = await Promise.all(
-        flat.map(async (proj) => {
-            try {
-                const res = await fetch(
-                    `${API_BASE.replace("/api", "")}/api/program-tasks/program-project/${proj.id}`,
-                    { method: "GET", headers, cache: "no-store" }
-                );
-                if (!res.ok)
-                    return [proj.id, { total: 0, done: 0, tasks: [] }] as const;
-                const data = await res.json();
-                const tasks: any[] = data.tasks || [];
+  type ProgramProjectEntry = [
+    string,
+    { total: number; done: number; tasks: any[] }
+];
+
+const entries: ProgramProjectEntry[] = await Promise.all(
+    flat.map(async (proj): Promise<ProgramProjectEntry> => {
+        try {
+            const res = await fetch(
+                `${API_BASE.replace("/api", "")}/api/program-tasks/program-project/${proj.id}`,
+                { method: "GET", headers, cache: "no-store" }
+            );
+            if (!res.ok) {
                 return [
                     proj.id,
-                    {
-                        total: tasks.length,
-                        done: tasks.filter((t) => t.status === "Done").length,
-                        tasks,
-                    },
-                ] as const;
-            } catch {
-                return [proj.id, { total: 0, done: 0, tasks: [] }] as const;
+                    { total: 0, done: 0, tasks: [] as any[] },
+                ];
             }
-        })
-    );
-
+            const data = await res.json();
+            const tasks: any[] = Array.isArray(data.tasks) ? data.tasks : [];
+            return [
+                proj.id,
+                {
+                    total: tasks.length,
+                    done: tasks.filter((t) => t.status === "Done").length,
+                    tasks,
+                },
+            ];
+        } catch {
+            return [
+                proj.id,
+                { total: 0, done: 0, tasks: [] as any[] },
+            ];
+        }
+    })
+);
                     setProgramProjectCounts(
                         Object.fromEntries(
                             entries.map(([id, v]) => [
