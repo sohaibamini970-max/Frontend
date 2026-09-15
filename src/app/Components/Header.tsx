@@ -44,6 +44,7 @@ function ClientOnly({ children }: { children: React.ReactNode }) {
 ========================================================= */
 
 const API_BASE = "https://backend-five-swart-88.vercel.app/api";
+const PROGRAM_API = `${API_BASE}/program-tasks`;
 
 /* =========================================================
    TYPES
@@ -62,12 +63,32 @@ type Task = {
   id: string;
   project_id?: string;
   name: string;
-  status: "To Do" | "In Progress" | "Done";
+  status: "To Do" | "In Progress" | "Done" | "Completed";
   assignee_id?: string | null;
   due_date?: string | null;
   created_at?: string;
   updated_at?: string;
   project_name?: string;
+};
+
+type ProgramTask = {
+  id: string;
+  name: string;
+  status: "To Do" | "In Progress" | "Done" | "Completed";
+  assignee_id?: string | null;
+  due_date?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  program_project_id?: string;
+  program_project_name?: string;
+  program_project_manager_id?: string | null;
+  program_name?: string;
+};
+
+type ProgramProject = {
+  id: string;
+  name: string;
+  manager_id?: string | null;
 };
 
 type NotificationItem = {
@@ -141,7 +162,7 @@ const navigation = [
   { name: "Tasks", href: "/tasks" },
   { name: "Reports", href: "/reports" },
   { name: "Schedule", href: "/schedule" },
-  {name:"Performance",href: "/performance"},
+  { name: "Performance", href: "/performance" },
 ];
 
 export default function Header() {
@@ -153,14 +174,22 @@ export default function Header() {
 
   const { user, loading, logout } = useAuth();
   const isSystemAdministrator = user?.role === "System Administrator";
+  const isExecutiveManager = user?.role === "Executive Manager";
+  const isProjectManager = user?.role === "Project Manager";
+  const isMember = user?.role === "Member";
+
+  const isOrgWide = isSystemAdministrator || isExecutiveManager;
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
 
-  const isOrgWide =
-    user?.role === "Executive Manager" || user?.role === "System Administrator";
+  // Program data
+  const [programTasks, setProgramTasks] = useState<ProgramTask[]>([]);
+  const [programProjects, setProgramProjects] = useState<ProgramProject[]>([]);
+  const [myProgramProjectIds, setMyProgramProjectIds] = useState<string[]>([]);
+
+  const [dataLoading, setDataLoading] = useState(true);
 
   const getHeaders = () => {
     const token = getToken();
@@ -170,7 +199,10 @@ export default function Header() {
     };
   };
 
-  const fetchProjectTasks = async (projectId: string, headers: HeadersInit) => {
+  const fetchProjectTasks = async (
+    projectId: string,
+    headers: HeadersInit
+  ): Promise<Task[]> => {
     try {
       const r = await fetch(`${API_BASE}/tasks/project/${projectId}`, {
         headers,
@@ -183,21 +215,109 @@ export default function Header() {
     }
   };
 
+  const fetchProgramTasksAll = async (
+    headers: HeadersInit
+  ): Promise<ProgramTask[]> => {
+    try {
+      const r = await fetch(`${PROGRAM_API}/all`, { headers });
+      if (!r.ok) return [];
+      const d = await r.json();
+      return d.tasks || d.data || [];
+    } catch {
+      return [];
+    }
+  };
+
+  const fetchProgramTasksForMember = async (
+    headers: HeadersInit,
+    userId: string
+  ): Promise<{ tasks: ProgramTask[]; programProjects: ProgramProject[] }> => {
+    try {
+      // Tasks directly assigned to the member
+      const ownRes = await fetch(`${PROGRAM_API}/my/tasks`, { headers });
+      const ownData = ownRes.ok ? await ownRes.json() : { tasks: [] };
+      const ownTasks: ProgramTask[] = ownData.tasks || [];
+
+      // Program projects the member belongs to
+      const ppRes = await fetch(`${PROGRAM_API}/my/program-projects`, {
+        headers,
+      });
+      const ppData = ppRes.ok ? await ppRes.json() : { programProjects: [] };
+      const myProgramProjects: ProgramProject[] = (
+        ppData.programProjects || []
+      ).map((pp: any) => ({
+        id: String(pp.id),
+        name: pp.name || pp.program_project_name || "Program Project",
+        manager_id: String(
+          pp.manager_id ?? pp.program_project_manager_id ?? ""
+        ),
+      }));
+
+      // Tasks in each of those program projects
+      const taskLists = await Promise.all(
+        myProgramProjects.map(async (pp) => {
+          const r = await fetch(
+            `${PROGRAM_API}/my/program-project/${pp.id}/tasks`,
+            { headers }
+          );
+          if (!r.ok) return [];
+          const d = await r.json();
+          return d.tasks || [];
+        })
+      );
+
+      // Merge + dedupe
+      const merged = new Map<string, ProgramTask>();
+      [...ownTasks, ...taskLists.flat()].forEach((t: any) => {
+        merged.set(String(t.id), {
+          id: String(t.id),
+          name: t.name || t.title || "Untitled Task",
+          status: t.status || "To Do",
+          assignee_id: t.assignee_id ?? t.assigneeId ?? "",
+          due_date: t.due_date ?? t.dueDate ?? null,
+          created_at: t.created_at ?? t.createdAt ?? "",
+          updated_at: t.updated_at ?? t.updatedAt ?? "",
+          program_project_id: String(t.program_project_id || ""),
+          program_project_name: t.program_project_name || "",
+          program_project_manager_id: String(
+            t.program_project_manager_id || ""
+          ),
+          program_name: t.program_name || "",
+        });
+      });
+
+      return {
+        tasks: Array.from(merged.values()),
+        programProjects: myProgramProjects,
+      };
+    } catch (e) {
+      console.error("Program member fetch error:", e);
+      return { tasks: [], programProjects: [] };
+    }
+  };
+
   const loadHeaderData = async (currentUser: any) => {
     try {
       setDataLoading(true);
       const headers = getHeaders();
 
-      const myTasksData: Task[] = await fetch(`${API_BASE}/tasks/my/tasks`, {
-        headers,
-      })
+      // -----------------------------------------------------------
+      // 1. My assigned regular tasks (used for notifications + member view)
+      // -----------------------------------------------------------
+      const myTasksData: Task[] = await fetch(
+        `${API_BASE}/tasks/my/tasks`,
+        { headers }
+      )
         .then((r) => (r.ok ? r.json() : { tasks: [] }))
         .then((d) => d.tasks || [])
         .catch(() => []);
-
       setMyTasks(myTasksData);
 
+      // -----------------------------------------------------------
+      // 2. Role-specific regular projects + tasks
+      // -----------------------------------------------------------
       if (isOrgWide) {
+        // --- All regular projects + all tasks ---
         const projRes = await fetch(`${API_BASE}/projects`, { headers });
         const projJson = await projRes.json();
         const allProjects: Project[] = projJson.projects || projJson.data || [];
@@ -208,15 +328,26 @@ export default function Header() {
 
         setProjects(allProjects);
         setTasks(taskResults.flat());
-      } else if (currentUser.role === "Project Manager") {
+
+        // --- All program tasks (org-wide) ---
+        const allProgramTasks = await fetchProgramTasksAll(headers);
+        setProgramTasks(allProgramTasks);
+
+        // Derive unique program projects from program tasks
+        const uniqueProgramProjects = deriveProgramProjects(allProgramTasks);
+        setProgramProjects(uniqueProgramProjects);
+        setMyProgramProjectIds(uniqueProgramProjects.map((pp) => pp.id));
+      } else if (isProjectManager) {
+        // --- Only PM's own regular projects ---
         const projRes = await fetch(`${API_BASE}/projects`, { headers });
         const projJson = await projRes.json();
         const allProjects: Project[] = projJson.projects || projJson.data || [];
 
+        const myUserId = String(currentUser.id);
         const myProjects = allProjects.filter(
           (p) =>
-            p.manager_id === currentUser.id ||
-            p.manager_id === String(currentUser.id)
+            String(p.manager_id || "") === myUserId ||
+            String((p as any).project_manager_id || "") === myUserId
         );
 
         const taskResults = await Promise.all(
@@ -225,13 +356,35 @@ export default function Header() {
 
         setProjects(myProjects);
         setTasks(taskResults.flat());
+
+        // --- Program tasks: PM sees tasks in program projects they manage ---
+        const allProgramTasks = await fetchProgramTasksAll(headers);
+        const myProgramTasks = allProgramTasks.filter(
+          (t) =>
+            String(t.program_project_manager_id || "") === myUserId ||
+            String(t.assignee_id || "") === myUserId
+        );
+        setProgramTasks(myProgramTasks);
+
+        const uniqueProgramProjects = deriveProgramProjects(myProgramTasks);
+        setProgramProjects(uniqueProgramProjects);
+        setMyProgramProjectIds(uniqueProgramProjects.map((pp) => pp.id));
       } else {
+        // --- Member: only their own regular projects + tasks ---
         const projRes = await fetch(`${API_BASE}/tasks/my/projects`, {
           headers,
         });
         const projJson = await projRes.json();
         setProjects(projJson.projects || []);
         setTasks(myTasksData);
+
+        // --- Member: program projects they belong to + their program tasks ---
+        const { tasks: memberProgramTasks, programProjects: memberProgramProjects } =
+          await fetchProgramTasksForMember(headers, String(currentUser.id));
+
+        setProgramTasks(memberProgramTasks);
+        setProgramProjects(memberProgramProjects);
+        setMyProgramProjectIds(memberProgramProjects.map((pp) => pp.id));
       }
     } catch (err) {
       console.error("Header data loading error:", err);
@@ -240,148 +393,158 @@ export default function Header() {
     }
   };
 
+  // Derive unique program projects from a list of program tasks
+  const deriveProgramProjects = (list: ProgramTask[]): ProgramProject[] => {
+    const map = new Map<string, ProgramProject>();
+    list.forEach((t) => {
+      const id = String(t.program_project_id || "");
+      if (!id) return;
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          name: t.program_project_name || "Program Project",
+          manager_id: String(t.program_project_manager_id || ""),
+        });
+      }
+    });
+    return Array.from(map.values());
+  };
+
   useEffect(() => {
     if (!user?.id || !user?.role) return;
     loadHeaderData(user);
   }, [user?.id, user?.role]);
 
   /* =========================================================
-     STAT CARDS
+     STAT CARDS — role-based, including program projects & tasks
   ========================================================= */
 
   const statsData: StatCard[] = useMemo(() => {
     if (!user) return [];
 
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter((t) => t.status === "Done").length;
-    const overdueTasks = tasks.filter((t) => {
-      const days = getDaysUntil(t.due_date);
-      return days !== null && days < 0 && t.status !== "Done";
+    // ----- Combined counts (regular + program) -----
+    const regularProjectsCount = projects.length;
+    const regularTasksCount = tasks.length;
+
+    const programProjectsCount = programProjects.length;
+    const programTasksCount = programTasks.length;
+
+    const totalProjects = regularProjectsCount + programProjectsCount;
+    const totalTasks = regularTasksCount + programTasksCount;
+
+    // Completed regular tasks (Done or Completed both count as "completed"
+    // for the user-facing summary — keep it simple and inclusive)
+    const regularCompleted = tasks.filter(
+      (t) => t.status === "Done" || t.status === "Completed"
+    ).length;
+    const programCompleted = programTasks.filter(
+      (t) => t.status === "Done" || t.status === "Completed"
+    ).length;
+    const totalCompleted = regularCompleted + programCompleted;
+
+    // Overdue across both
+    const overdueRegular = tasks.filter((t) => {
+      const d = getDaysUntil(t.due_date);
+      return d !== null && d < 0 && t.status !== "Done" && t.status !== "Completed";
     }).length;
+    const overdueProgram = programTasks.filter((t) => {
+      const d = getDaysUntil(t.due_date);
+      return d !== null && d < 0 && t.status !== "Done" && t.status !== "Completed";
+    }).length;
+    const overdueTasks = overdueRegular + overdueProgram;
+
     const completionRate =
-      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+      totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
+
+    // Completed projects (regular) + program projects fully done
+    const completedRegularProjects = projects.filter(
+      (p) => p.status === "Completed"
+    ).length;
+
+    // Program projects considered "completed" if all their program tasks are Done/Completed
+    const programProjectProgress = new Map<string, { total: number; done: number }>();
+    programTasks.forEach((t) => {
+      const id = String(t.program_project_id || "");
+      if (!id) return;
+      const entry = programProjectProgress.get(id) || { total: 0, done: 0 };
+      entry.total += 1;
+      if (t.status === "Done" || t.status === "Completed") entry.done += 1;
+      programProjectProgress.set(id, entry);
+    });
+    const completedProgramProjects = Array.from(
+      programProjectProgress.values()
+    ).filter((e) => e.total > 0 && e.done === e.total).length;
+
+    const totalCompletedProjects =
+      completedRegularProjects + completedProgramProjects;
+
+    // ----- Labels & notes per role -----
+    let projectLabel = "My";
+    let projectLabel2 = "Projects";
+    let projectNote = "assigned to you";
+
+    let taskLabel = "My";
+    let taskLabel2 = "Tasks";
+    let taskNote = "assigned to you";
+
+    let completedNote = "of your tasks";
+    let overdueNote =
+      overdueTasks > 0 ? "needs attention" : "all on track";
 
     if (isOrgWide) {
-      const completedProjects = projects.filter(
-        (p) => p.status === "Completed"
-      ).length;
+      projectLabel = "All";
+      projectLabel2 = "Projects";
+      projectNote = "incl. program projects";
 
-      return [
-        {
-          value: String(projects.length),
-          label: "My",
-          label2: "Projects",
-          badge: `${completedProjects}`,
-          note: "completed",
-          icon: FolderKanban,
-          iconClass: "bg-[#e8f5e9] text-[#2e7d32]",
-        },
-        {
-          value: String(totalTasks),
-          label: "Team",
-          label2: "Tasks",
-          badge: `${completedTasks}`,
-          note: "done",
-          icon: CheckSquare,
-          iconClass: "bg-[#e3f2fd] text-[#1565c0]",
-        },
-        {
-          value: String(completedTasks),
-          label: "Completed",
-          label2: "Tasks",
-          badge: `${completionRate}%`,
-          note: "of team tasks",
-          icon: TrendingUp,
-          iconClass: "bg-[#f3e5f5] text-[#7b1fa2]",
-        },
-        {
-          value: String(overdueTasks),
-          label: "Overdue",
-          label2: "Tasks",
-          badge: overdueTasks > 0 ? "!" : "✓",
-          note: overdueTasks > 0 ? "needs attention" : "all on track",
-          icon: CalendarDays,
-          iconClass: "bg-[#fce4ec] text-[#c62828]",
-        },
-      ];
+      taskLabel = "All";
+      taskLabel2 = "Tasks";
+      taskNote = "incl. program tasks";
+
+      completedNote = "of all tasks";
+    } else if (isProjectManager) {
+      projectLabel = "My";
+      projectLabel2 = "Projects";
+      projectNote = "projects you manage";
+
+      taskLabel = "My";
+      taskLabel2 = "Tasks";
+      taskNote = "incl. program tasks";
+    } else if (isMember) {
+      projectLabel = "My";
+      projectLabel2 = "Projects";
+      projectNote = "incl. program projects";
+
+      taskLabel = "My";
+      taskLabel2 = "Tasks";
+      taskNote = "incl. program tasks";
     }
 
-    if (user.role === "Project Manager") {
-      const completedProjects = projects.filter(
-        (p) => p.status === "Completed"
-      ).length;
-
-      return [
-        {
-          value: String(projects.length),
-          label: "My",
-          label2: "Projects",
-          badge: `${completedProjects}`,
-          note: "completed",
-          icon: FolderKanban,
-          iconClass: "bg-[#e8f5e9] text-[#2e7d32]",
-        },
-        {
-          value: String(totalTasks),
-          label: "Team",
-          label2: "Tasks",
-          badge: `${completedTasks}`,
-          note: "done",
-          icon: CheckSquare,
-          iconClass: "bg-[#e3f2fd] text-[#1565c0]",
-        },
-        {
-          value: String(completedTasks),
-          label: "Completed",
-          label2: "Tasks",
-          badge: `${completionRate}%`,
-          note: "of team tasks",
-          icon: TrendingUp,
-          iconClass: "bg-[#f3e5f5] text-[#7b1fa2]",
-        },
-        {
-          value: String(overdueTasks),
-          label: "Overdue",
-          label2: "Tasks",
-          badge: overdueTasks > 0 ? "!" : "✓",
-          note: overdueTasks > 0 ? "needs attention" : "all on track",
-          icon: CalendarDays,
-          iconClass: "bg-[#fce4ec] text-[#c62828]",
-        },
-      ];
-    }
-
-    // Member
-    const dueSoon = tasks.filter((t) => {
-      const days = getDaysUntil(t.due_date);
-      return days !== null && days >= 0 && days <= 3 && t.status !== "Done";
-    }).length;
-
+    // 4 cards, same structure as before
     return [
       {
-        value: String(projects.length),
-        label: "My",
-        label2: "Projects",
-        badge: `${projects.length}`,
-        note: "assigned to you",
+        value: String(totalProjects),
+        label: projectLabel,
+        label2: projectLabel2,
+        badge: `${totalCompletedProjects}`,
+        note: "completed",
         icon: FolderKanban,
         iconClass: "bg-[#e8f5e9] text-[#2e7d32]",
       },
       {
         value: String(totalTasks),
-        label: "My",
-        label2: "Tasks",
-        badge: `${completedTasks}`,
+        label: taskLabel,
+        label2: taskLabel2,
+        badge: `${totalCompleted}`,
         note: "done",
         icon: CheckSquare,
         iconClass: "bg-[#e3f2fd] text-[#1565c0]",
       },
       {
-        value: String(completedTasks),
+        value: String(totalCompleted),
         label: "Completed",
         label2: "Tasks",
         badge: `${completionRate}%`,
-        note: "of your tasks",
+        note: completedNote,
         icon: TrendingUp,
         iconClass: "bg-[#f3e5f5] text-[#7b1fa2]",
       },
@@ -389,13 +552,22 @@ export default function Header() {
         value: String(overdueTasks),
         label: "Overdue",
         label2: "Tasks",
-        badge: `${dueSoon}`,
-        note: overdueTasks > 0 ? "needs attention" : "due within 3 days",
+        badge: overdueTasks > 0 ? "!" : "✓",
+        note: overdueNote,
         icon: CalendarDays,
         iconClass: "bg-[#fce4ec] text-[#c62828]",
       },
     ];
-  }, [user, isOrgWide, projects, tasks]);
+  }, [
+    user,
+    isOrgWide,
+    isProjectManager,
+    isMember,
+    projects,
+    tasks,
+    programProjects,
+    programTasks,
+  ]);
 
   /* =========================================================
      NOTIFICATIONS
@@ -415,8 +587,9 @@ export default function Header() {
         icon: UserPlus,
         iconClass: "bg-[#e3f2fd] text-[#1565c0]",
         title: "Task assigned to you",
-        description: `"${task.name}"${task.project_name ? ` in ${task.project_name}` : ""
-          }`,
+        description: `"${task.name}"${
+          task.project_name ? ` in ${task.project_name}` : ""
+        }`,
         time,
       });
     });
@@ -439,7 +612,7 @@ export default function Header() {
 
     if (isOrgWide) {
       tasks.forEach((task) => {
-        if (task.status !== "Done") return;
+        if (task.status !== "Done" && task.status !== "Completed") return;
         const time = task.updated_at || task.created_at;
         if (!time) return;
 
@@ -496,7 +669,10 @@ export default function Header() {
         notifications.forEach((n) => ids.add(n.id));
         setReadIds(ids);
         try {
-          localStorage.setItem("notif_read_ids", JSON.stringify(Array.from(ids)));
+          localStorage.setItem(
+            "notif_read_ids",
+            JSON.stringify(Array.from(ids))
+          );
         } catch {
           // ignore
         }
@@ -519,14 +695,11 @@ export default function Header() {
   return (
     <ClientOnly>
       <header className="border-b border-[#1a2a3a] bg-[#1a2a3a]">
-
         {/* =====================================================
             TOP NAVIGATION - Dark background
         ===================================================== */}
         <div className="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-10">
-
           <div className="flex h-[68px] items-center justify-between">
-
             {/* LOGO - White text */}
             <Link
               href="/dashboard"
@@ -563,9 +736,10 @@ export default function Header() {
                       relative flex h-full items-center
                       text-[14px] font-medium
                       transition-colors
-                      ${active
-                        ? "text-white"
-                        : "text-white/60 hover:text-white"
+                      ${
+                        active
+                          ? "text-white"
+                          : "text-white/60 hover:text-white"
                       }
                     `}
                   >
@@ -580,7 +754,6 @@ export default function Header() {
 
             {/* RIGHT SIDE */}
             <div className="flex items-center gap-3">
-
               {/* NOTIFICATIONS */}
               <div className="relative">
                 <button
@@ -606,7 +779,10 @@ export default function Header() {
                     <div className="max-h-96 overflow-y-auto">
                       {dataLoading ? (
                         <div className="flex items-center justify-center py-10">
-                          <Loader2 size={20} className="animate-spin text-white/40" />
+                          <Loader2
+                            size={20}
+                            className="animate-spin text-white/40"
+                          />
                         </div>
                       ) : notifications.length === 0 ? (
                         <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
@@ -670,8 +846,9 @@ export default function Header() {
                   </div>
                   <ChevronDown
                     size={16}
-                    className={`text-white/60 transition-transform ${profileOpen ? "rotate-180" : ""
-                      }`}
+                    className={`text-white/60 transition-transform ${
+                      profileOpen ? "rotate-180" : ""
+                    }`}
                   />
                 </button>
 
@@ -720,7 +897,6 @@ export default function Header() {
               >
                 {mobileMenuOpen ? <X size={21} /> : <Menu size={21} />}
               </button>
-
             </div>
           </div>
 
@@ -744,9 +920,10 @@ export default function Header() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`
                       block rounded-lg px-4 py-3 text-sm
-                      ${active
-                        ? "bg-white/10 font-semibold text-white"
-                        : "text-white/60 hover:bg-white/5 hover:text-white"
+                      ${
+                        active
+                          ? "bg-white/10 font-semibold text-white"
+                          : "text-white/60 hover:bg-white/5 hover:text-white"
                       }
                     `}
                   >
@@ -764,7 +941,6 @@ export default function Header() {
         <div className="border-t border-[#2a3a4a] bg-[#1a2a3a]">
           <div className="mx-auto max-w-[1440px] px-5 py-10 sm:px-8 lg:px-10">
             <div className="grid items-start gap-8 lg:grid-cols-[1fr_650px]">
-
               {/* LEFT - Welcome Text - White text */}
               <div className="max-w-[560px] pt-1">
                 <h2 className="text-[32px] font-light tracking-[-0.5px] text-white sm:text-[38px]">
@@ -786,10 +962,12 @@ export default function Header() {
 
               {/* RIGHT - STAT CARDS - Glass/Transparent background */}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-
                 {dataLoading ? (
                   <div className="col-span-2 flex min-h-[145px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm sm:col-span-4">
-                    <Loader2 size={22} className="animate-spin text-white/60" />
+                    <Loader2
+                      size={22}
+                      className="animate-spin text-white/60"
+                    />
                   </div>
                 ) : (
                   statsData.map((stat, index) => {
@@ -834,13 +1012,10 @@ export default function Header() {
                     );
                   })
                 )}
-
               </div>
-
             </div>
           </div>
         </div>
-
       </header>
     </ClientOnly>
   );
