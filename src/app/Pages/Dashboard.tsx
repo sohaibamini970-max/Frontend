@@ -579,7 +579,7 @@ export default function Dashboard() {
             }
 
             /* ---------- MEMBER: program projects they belong to ---------- */
-           /* ---------- MEMBER: program projects they belong to ---------- */
+         
 if (isMember && currentUserId) {
     try {
         console.log("[Dashboard] Fetching member program projects...");
@@ -758,26 +758,26 @@ if (isMember && currentUserId) {
                     String(currentUserId)
             );
         }
+                if (isMember) {
+            if (!currentUserId) {
+                return [];
+            }
 
-       if (isMember) {
-    if (!currentUserId) return [];
+            const memberProjectIds = new Set(
+                tasks
+                    .filter(
+                        (task) =>
+                            String(task.assignee_id || "") ===
+                            String(currentUserId)
+                    )
+                    .map((task) => String(task.project_id || ""))
+            );
 
-    // Primary source: /my/program-projects (already role-scoped)
-    if (myMemberProgramProjects.length > 0) {
-        return myMemberProgramProjects;
-    }
+            return projects.filter((project) =>
+                memberProjectIds.has(String(project.id))
+            );
+        }
 
-    // Fallback: any program project with a task assigned to the member
-    return programProjects.filter((p) => {
-        const list = programProjectTasks[p.id] || [];
-        return list.some(
-            (t) =>
-                String(
-                    t.assignee_id || t.assigneeId || ""
-                ) === String(currentUserId)
-        );
-    });
-}
         return [];
     }, [
         projects,
