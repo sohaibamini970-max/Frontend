@@ -337,12 +337,20 @@ export default function Dashboard() {
        LOAD DASHBOARD
     ======================================================= */
 
-    const loadDashboard = async () => {
+      const loadDashboard = async () => {
         try {
             setError("");
 
-                        // Always read the freshest user from localStorage
-             const freshUserId = String(
+            // Always read the freshest user from localStorage
+            let freshUser: any = null;
+            try {
+                const raw = localStorage.getItem("user");
+                freshUser = raw ? JSON.parse(raw) : null;
+            } catch {
+                freshUser = null;
+            }
+
+            const freshUserId = String(
                 freshUser?.id || freshUser?.user_id || ""
             );
 
