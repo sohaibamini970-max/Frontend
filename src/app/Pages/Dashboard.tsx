@@ -341,6 +341,18 @@ export default function Dashboard() {
         try {
             setError("");
 
+                        // Always read the freshest user from localStorage
+            let freshUser: any = null;
+            try {
+                const raw = localStorage.getItem("user");
+                freshUser = raw ? JSON.parse(raw) : null;
+            } catch {
+                freshUser = null;
+            }
+            const freshUserId = String(
+                freshUser?.id || freshUser?.user_id || ""
+            );
+
             const token =
                 typeof window !== "undefined"
                     ? localStorage.getItem("token")
@@ -488,10 +500,6 @@ export default function Dashboard() {
                 );
             }
 
-            if (!isMember) {
-                setLoading(false);
-            }
-
             const loadedTasks = await taskPromise;
             setTasks(loadedTasks);
 
@@ -580,7 +588,7 @@ export default function Dashboard() {
 
             /* ---------- MEMBER: program projects they belong to ---------- */
          
-if (isMember && currentUserId) {
+if (isMember && freshUserId) {
     try {
         console.log("[Dashboard] Fetching member program projects...");
         const ppRes = await fetch(
@@ -706,9 +714,9 @@ if (isMember && currentUserId) {
         console.error("Member program-projects load error:", err);
     }
 }
-            if (isMember) {
+        
                 setLoading(false);
-            }
+            
         } catch (err) {
             console.error("Dashboard loading error:", err);
 
