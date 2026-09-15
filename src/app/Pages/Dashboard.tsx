@@ -1305,7 +1305,7 @@ if (freshIsMember && freshUserId) {
                         m === "projects" ? "programs" : "projects"
                     )
                 }
-                className="flex items-center gap-2 rounded-xl bg-[#172b3a] px-4 py-3 text-[12px] font-bold text-white shadow-sm transition hover:bg-[#223d50]"
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#223d50]"
             >
                 {overviewMode === "projects" ? (
                     <>
