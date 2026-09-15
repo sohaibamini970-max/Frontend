@@ -101,6 +101,21 @@ type TeamRoleStats = {
     other: number;
     total: number;
 };
+
+type ProgramProjectRow = {
+    id: string;
+    name: string;
+    domain?: string | null;
+    status?: string | null;
+    priority?: string | null;
+    start_date?: string | null;
+    deadline?: string | null;
+    program_id: string;
+    program_name?: string | null;
+    assigned_to?: string | null;
+};
+
+type ProgramProjectCount = { total: number; done: number };
 /* =========================================================
    API
 ========================================================= */
@@ -191,6 +206,17 @@ export default function Dashboard() {
             other: 0,
             total: 0,
         });
+
+    const [programProjects, setProgramProjects] = useState<ProgramProjectRow[]>([]);
+    const [programProjectCounts, setProgramProjectCounts] = useState<
+        Record<string, ProgramProjectCount>
+    >({});
+    const [programProjectTasks, setProgramProjectTasks] = useState<
+        Record<string, any[]>
+    >({});
+    const [overviewMode, setOverviewMode] = useState<"projects" | "programs">(
+        "projects"
+    );
 
     /* =======================================================
        CURRENT USER / ROLE
@@ -495,6 +521,79 @@ export default function Dashboard() {
             const loadedTasks = await taskPromise;
             setTasks(loadedTasks);
 
+            /* ---------- PROGRAMS + THEIR PROJECTS ---------- */
+            try {
+                const programsRes = await fetchJson(`${API_BASE}/programs`).catch(
+                    () => null
+                );
+                const loadedPrograms: any[] =
+                    programsRes?.programs || programsRes?.data || [];
+            
+                const nested = await Promise.all(
+                    loadedPrograms.map(async (p: any) => {
+                        try {
+                            const res = await fetch(
+                                `${API_BASE}/programs/${p.id}`,
+                                { method: "GET", headers, cache: "no-store" }
+                            );
+                            if (!res.ok) return [];
+                            const data = await res.json();
+                            const projs: any[] = data.projects || [];
+                            return projs.map((proj) => ({
+                                ...proj,
+                                program_id: p.id,
+                                program_name: p.name,
+                            }));
+                        } catch {
+                            return [];
+                        }
+                    })
+                );
+
+    const flat: ProgramProjectRow[] = nested.flat();
+    setProgramProjects(flat);
+
+    /* ---------- PROGRAM PROJECT TASK COUNTS ---------- */
+    const entries = await Promise.all(
+        flat.map(async (proj) => {
+            try {
+                const res = await fetch(
+                    `${API_BASE.replace("/api", "")}/api/program-tasks/program-project/${proj.id}`,
+                    { method: "GET", headers, cache: "no-store" }
+                );
+                if (!res.ok)
+                    return [proj.id, { total: 0, done: 0, tasks: [] }] as const;
+                const data = await res.json();
+                const tasks: any[] = data.tasks || [];
+                return [
+                    proj.id,
+                    {
+                        total: tasks.length,
+                        done: tasks.filter((t) => t.status === "Done").length,
+                        tasks,
+                    },
+                ] as const;
+            } catch {
+                return [proj.id, { total: 0, done: 0, tasks: [] }] as const;
+            }
+        })
+    );
+
+                    setProgramProjectCounts(
+                        Object.fromEntries(
+                            entries.map(([id, v]) => [
+                                id,
+                                { total: v.total, done: v.done },
+                            ])
+                        )
+                    );
+                    setProgramProjectTasks(
+                        Object.fromEntries(entries.map(([id, v]) => [id, v.tasks]))
+                    );
+                } catch (err) {
+                    console.error("Programs overview load error:", err);
+                }
+
             /*
              * For members, tasks are required to determine visible projects.
              */
@@ -615,6 +714,58 @@ export default function Dashboard() {
         isProjectManager,
         isMember,
     ]);
+
+    const visibleProgramProjects = useMemo(() => {
+    if (isManagement) return programProjects;
+
+    if (isProjectManager) {
+        return programProjects.filter(
+            (p) =>
+                String(p.assigned_to || "") === String(currentUserId)
+        );
+    }
+
+    if (isMember) {
+        if (!currentUserId) return [];
+        return programProjects.filter((p) => {
+            const list = programProjectTasks[p.id] || [];
+            return list.some(
+                (t) =>
+                    String(
+                        t.assignee_id || t.assigneeId || ""
+                    ) === String(currentUserId)
+            );
+        });
+    }
+
+    return [];
+}, [
+    programProjects,
+    programProjectTasks,
+    currentUserId,
+    isManagement,
+    isProjectManager,
+    isMember,
+]);
+
+const programProjectOverview = useMemo(() => {
+    return visibleProgramProjects.map((p) => {
+        const counts =
+            programProjectCounts[p.id] || { total: 0, done: 0 };
+        const progress =
+            counts.total > 0
+                ? Math.round((counts.done / counts.total) * 100)
+                : p.status === "Done"
+                ? 100
+                : 0;
+        return {
+            programProject: p,
+            totalTasks: counts.total,
+            completedTasks: counts.done,
+            progress,
+        };
+    });
+}, [visibleProgramProjects, programProjectCounts]);
 
     /* =======================================================
        ROLE-BASED TASKS
@@ -1075,209 +1226,297 @@ export default function Dashboard() {
                 {/* =================================================
             ROW 1 — PROJECTS OVERVIEW
         ================================================= */}
-                <section className="mb-7 overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
+              <section className="mb-7 overflow-hidden rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
 
-                    {/* =========================================================
-      HEADER
-  ========================================================= */}
-                    <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+    {/* ============ HEADER ============ */}
+    <div className="flex flex-col gap-4 border-b border-[#edf0f3] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+        <div>
+            <div className="flex items-center gap-3">
+                <h2 className="text-[25px] font-bold text-[#172633]">
+                    Projects Overview
+                </h2>
+                <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[13px] font-bold text-[#557bd2]">
+                    {overviewMode === "projects"
+                        ? projectOverview.length
+                        : programProjectOverview.length}
+                </span>
+            </div>
 
-                        <div>
-                            <div className="flex items-center gap-3">
+            <p className="mt-1.5 text-[13px] text-[#7b8794]">
+                {overviewMode === "projects"
+                    ? "Track project progress and task completion at a glance"
+                    : "Track program-project progress and task completion"}
+            </p>
+        </div>
 
-                                <h2 className="text-[25px] font-bold text-[#172633]">
-                                    Projects Overview
-                                </h2>
+        <div className="flex flex-wrap items-center gap-2.5">
+            {/* ============ TOGGLE BUTTON ============ */}
+            <button
+                type="button"
+                onClick={() =>
+                    setOverviewMode((m) =>
+                        m === "projects" ? "programs" : "projects"
+                    )
+                }
+                className="flex items-center gap-2 rounded-xl bg-[#172b3a] px-4 py-3 text-[12px] font-bold text-white shadow-sm transition hover:bg-[#223d50]"
+            >
+                {overviewMode === "projects" ? (
+                    <>
+                        <FolderKanban size={14} />
+                        View Program Projects
+                    </>
+                ) : (
+                    <>
+                        <ChevronLeft size={14} />
+                        Back to Projects
+                    </>
+                )}
+            </button>
 
-                                <span className="rounded-full bg-[#e7efff] px-3 py-1.5 text-[13px] font-bold text-[#557bd2]">
-                                    {projectOverview.length}
-                                </span>
+            <div className="flex w-fit items-center gap-2.5 rounded-xl border border-[#dfe5ea] bg-[#fafbfd] px-4 py-3">
+                <CalendarDays size={15} className="text-[#557bd2]" />
+                <span className="text-[13px] font-semibold text-[#53616d]">
+                    Data:{" "}
+                    {new Date().toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                    })}
+                </span>
+            </div>
+        </div>
+    </div>
 
-                            </div>
+    {/* ============ CHART / EMPTY ============ */}
+    {overviewMode === "projects" ? (
+        projectOverview.length === 0 ? (
+            <div className="flex min-h-[330px] items-center justify-center px-5">
+                <EmptyState
+                    title={
+                        isProjectManager
+                            ? "No projects assigned to you"
+                            : isMember
+                            ? "No assigned projects yet"
+                            : "No projects available"
+                    }
+                    description={
+                        isProjectManager
+                            ? "Projects assigned to you will appear here."
+                            : isMember
+                            ? "Projects will appear here when tasks are assigned to you."
+                            : "Projects will appear here once they are created."
+                    }
+                />
+            </div>
+        ) : (
+            <div className="px-5 pb-6 pt-7 sm:px-7 sm:pb-7">
+                <div className="relative">
+                    <div className="pointer-events-none absolute inset-x-0 bottom-[72px] h-px bg-[#6f7b87]" />
 
-                            <p className="mt-1.5 text-[13px] text-[#7b8794]">
-                                Track project progress and task completion at a glance
-                            </p>
-                        </div>
-
-                        <div className="flex w-fit items-center gap-2.5 rounded-xl border border-[#dfe5ea] bg-[#fafbfd] px-4 py-3">
-
-                            <CalendarDays
-                                size={15}
-                                className="text-[#557bd2]"
-                            />
-
-                            <span className="text-[13px] font-semibold text-[#53616d]">
-                                Data:{" "}
-                                {new Date().toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                })}
-                            </span>
-
-                        </div>
-
-                    </div>
-
-                    {/* =========================================================
-      EMPTY STATE
-  ========================================================= */}
-                    {projectOverview.length === 0 ? (
-
-                        <div className="flex min-h-[330px] items-center justify-center px-5">
-
-                            <EmptyState
-                                title={
-                                    isProjectManager
-                                        ? "No projects assigned to you"
-                                        : isMember
-                                            ? "No assigned projects yet"
-                                            : "No projects available"
-                                }
-                                description={
-                                    isProjectManager
-                                        ? "Projects assigned to you will appear here."
-                                        : isMember
-                                            ? "Projects will appear here when tasks are assigned to you."
-                                            : "Projects will appear here once they are created."
-                                }
-                            />
-
-                        </div>
-
-                    ) : (
-
-                        /* =========================================================
-                           CHART
-                        ========================================================= */
-                        <div className="px-5 pb-6 pt-7 sm:px-7 sm:pb-7">
-
-                            <div className="relative">
-
-                                {/* =====================================================
-            ONLY BOTTOM BASELINE
-        ===================================================== */}
-                                <div className="pointer-events-none absolute inset-x-0 bottom-[72px] h-px bg-[#6f7b87]" />
-
-                                {/* =====================================================
-            PROJECT BARS
-        ===================================================== */}
-                                <div className="relative flex flex-wrap justify-start gap-x-8 gap-y-8 pl-6">
-
-                                    {projectOverview.map(
-                                        (
-                                            {
-                                                project,
-                                                totalTasks,
-                                                completedTasks,
-                                                progress,
-                                            },
-                                            index
-                                        ) => {
-
-                                            const color =
-                                                PROJECT_OVERVIEW_COLORS[
-                                                index % PROJECT_OVERVIEW_COLORS.length
-                                                ];
-
-                                            return (
-                                                <button
-                                                    key={project.id}
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setSelectedOverviewProject(project)
-                                                    }
-                                                    className="group flex w-[120px] flex-col items-center rounded-xl px-1 pt-1 transition hover:bg-[#fafbfd]"
-                                                >
-
-                                                    {/* =================================================
-                      PERCENTAGE
-                  ================================================= */}
-                                                    <div className="mb-3 h-6">
-
-                                                        <span className="text-[17px] font-bold text-[#172633] transition group-hover:text-[#557bd2]">
-                                                            {progress}%
-                                                        </span>
-
-                                                    </div>
-
-                                                    {/* =================================================
-                      BAR AREA
-                  ================================================= */}
-                                                    <div className="relative flex h-[200px] w-full max-w-[42px] items-end justify-center">
-
-                                                        {/* Very subtle background column */}
-                                                        <div
-                                                            className={`absolute bottom-0 h-full w-full rounded-t-xl opacity-[0.035] ${color.bar}`}
-                                                        />
-
-                                                        {/* Actual progress bar */}
-                                                        <div
-                                                            className={`relative z-10 w-full rounded-t-xl bg-gradient-to-t ${color.bar} shadow-[0_8px_18px_rgba(85,123,210,0.16)] transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_12px_25px_rgba(85,123,210,0.22)]`}
-                                                            style={{
-                                                                height: `${Math.max(
-                                                                    progress,
-                                                                    progress === 0 ? 2 : 8
-                                                                )}%`,
-                                                            }}
-                                                        >
-
-                                                            {/* Soft highlight inside bar */}
-                                                            <div className="absolute inset-x-0 top-0 h-12 rounded-t-xl bg-white/10" />
-
-                                                        </div>
-
-                                                    </div>
-
-                                                    {/* =================================================
-                      PROJECT NAME - MATCHING COLOR
-                  ================================================= */}
-                                                    <div className="mt-2 min-h-[52px] w-[125px] text-center">
-
-                                                        <p className={`mb-0.5 text-[13px] font-semibold uppercase tracking-wide ${color.labelColor}`}>
-                                                            Project #{index + 1}
-                                                        </p>
-
-                                                        <p className="text-[13px] font-bold uppercase leading-4 text-[#172633] transition group-hover:text-[#557bd2]">
-                                                            {project.name}
-                                                        </p>
-
-                                                    </div>
-
-                                                </button>
-                                            );
+                    <div className="relative flex flex-wrap justify-start gap-x-8 gap-y-8 pl-6">
+                        {projectOverview.map(
+                            (
+                                {
+                                    project,
+                                    totalTasks,
+                                    completedTasks,
+                                    progress,
+                                },
+                                index
+                            ) => {
+                                const color =
+                                    PROJECT_OVERVIEW_COLORS[
+                                        index %
+                                            PROJECT_OVERVIEW_COLORS.length
+                                    ];
+                                return (
+                                    <button
+                                        key={project.id}
+                                        type="button"
+                                        onClick={() =>
+                                            setSelectedOverviewProject(
+                                                project
+                                            )
                                         }
-                                    )}
+                                        className="group flex w-[120px] flex-col items-center rounded-xl px-1 pt-1 transition hover:bg-[#fafbfd]"
+                                    >
+                                        <div className="mb-3 h-6">
+                                            <span className="text-[17px] font-bold text-[#172633] transition group-hover:text-[#557bd2]">
+                                                {progress}%
+                                            </span>
+                                        </div>
 
-                                </div>
+                                        <div className="relative flex h-[200px] w-full max-w-[42px] items-end justify-center">
+                                            <div
+                                                className={`absolute bottom-0 h-full w-full rounded-t-xl opacity-[0.035] ${color.bar}`}
+                                            />
+                                            <div
+                                                className={`relative z-10 w-full rounded-t-xl bg-gradient-to-t ${color.bar} shadow-[0_8px_18px_rgba(85,123,210,0.16)] transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_12px_25px_rgba(85,123,210,0.22)]`}
+                                                style={{
+                                                    height: `${Math.max(
+                                                        progress,
+                                                        progress === 0
+                                                            ? 2
+                                                            : 8
+                                                    )}%`,
+                                                }}
+                                            >
+                                                <div className="absolute inset-x-0 top-0 h-12 rounded-t-xl bg-white/10" />
+                                            </div>
+                                        </div>
 
-                            </div>
+                                        <div className="mt-2 min-h-[52px] w-[125px] text-center">
+                                            <p
+                                                className={`mb-0.5 text-[13px] font-semibold uppercase tracking-wide ${color.labelColor}`}
+                                            >
+                                                Project #{index + 1}
+                                            </p>
+                                            <p className="text-[13px] font-bold uppercase leading-4 text-[#172633] transition group-hover:text-[#557bd2]">
+                                                {project.name}
+                                            </p>
+                                        </div>
+                                    </button>
+                                );
+                            }
+                        )}
+                    </div>
+                </div>
 
-                            {/* =========================================================
-          BOTTOM INSTRUCTION
-      ========================================================= */}
-                            <div className="mt-6 flex items-center justify-center">
+                <div className="mt-6 flex items-center justify-center">
+                    <div className="flex items-center gap-2.5 rounded-full bg-[#f7f9fb] px-5 py-2.5">
+                        <Eye size={18} className="text-[#557bd2]" />
+                        <span className="text-[14px] font-medium text-[#7b8794]">
+                            Click any project bar to view detailed progress
+                        </span>
+                    </div>
+                </div>
+            </div>
+        )
+    ) : programProjectOverview.length === 0 ? (
+        <div className="flex min-h-[330px] items-center justify-center px-5">
+            <EmptyState
+                title={
+                    isMember
+                        ? "No program projects assigned to you"
+                        : "No program projects available"
+                }
+                description={
+                    isMember
+                        ? "Program projects where you have assigned tasks will appear here."
+                        : "Program projects will appear here once they are created."
+                }
+            />
+        </div>
+    ) : (
+        <div className="px-5 pb-6 pt-7 sm:px-7 sm:pb-7">
+            <div className="relative">
+                <div className="pointer-events-none absolute inset-x-0 bottom-[72px] h-px bg-[#6f7b87]" />
 
-                                <div className="flex items-center gap-2.5 rounded-full bg-[#f7f9fb] px-5 py-2.5">
+                <div className="relative flex flex-wrap justify-start gap-x-10 gap-y-8 pl-6">
+                    {programProjectOverview.map(
+                        (
+                            {
+                                programProject,
+                                totalTasks,
+                                completedTasks,
+                                progress,
+                            },
+                            index
+                        ) => {
+                            const color =
+                                PROJECT_OVERVIEW_COLORS[
+                                    index %
+                                        PROJECT_OVERVIEW_COLORS.length
+                                ];
 
-                                    <Eye
-                                        size={18}
-                                        className="text-[#557bd2]"
-                                    />
+                            return (
+                                <button
+                                    key={programProject.id}
+                                    type="button"
+                                    onClick={() =>
+                                        router.push(
+                                            `/programs?projectId=${programProject.id}`
+                                        )
+                                    }
+                                    className="group flex w-[120px] flex-col items-center rounded-xl px-1 pt-1 transition hover:bg-[#fafbfd]"
+                                >
+                                    <div className="mb-3 h-6">
+                                        <span className="text-[17px] font-bold text-[#172633] transition group-hover:text-[#557bd2]">
+                                            {progress}%
+                                        </span>
+                                    </div>
 
-                                    <span className="text-[14px] font-medium text-[#7b8794]">
-                                        Click any project bar to view detailed progress
-                                    </span>
+                                    <div className="relative flex h-[200px] w-full items-end justify-center">
+                                        {/* ============ ROTATED PROGRAM NAME (bottom → top) ============ */}
+                                        <div className="pointer-events-none absolute bottom-0 -left-7 top-0 flex items-end">
+                                            <span
+                                                title={
+                                                    programProject.program_name ||
+                                                    "Program"
+                                                }
+                                                className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-[#557bd2]"
+                                                style={{
+                                                    writingMode:
+                                                        "vertical-rl",
+                                                    transform:
+                                                        "rotate(180deg)",
+                                                    transformOrigin:
+                                                        "center",
+                                                }}
+                                            >
+                                                {programProject.program_name ||
+                                                    "Program"}
+                                            </span>
+                                        </div>
 
-                                </div>
+                                        <div className="relative flex h-full w-full max-w-[42px] items-end justify-center">
+                                            <div
+                                                className={`absolute bottom-0 h-full w-full rounded-t-xl opacity-[0.035] ${color.bar}`}
+                                            />
+                                            <div
+                                                className={`relative z-10 w-full rounded-t-xl bg-gradient-to-t ${color.bar} shadow-[0_8px_18px_rgba(85,123,210,0.16)] transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_12px_25px_rgba(85,123,210,0.22)]`}
+                                                style={{
+                                                    height: `${Math.max(
+                                                        progress,
+                                                        progress === 0
+                                                            ? 2
+                                                            : 8
+                                                    )}%`,
+                                                }}
+                                            >
+                                                <div className="absolute inset-x-0 top-0 h-12 rounded-t-xl bg-white/10" />
+                                            </div>
+                                        </div>
+                                    </div>
 
-                            </div>
-
-                        </div>
+                                    <div className="mt-2 min-h-[52px] w-[125px] text-center">
+                                        <p
+                                            className={`mb-0.5 text-[13px] font-semibold uppercase tracking-wide ${color.labelColor}`}
+                                        >
+                                            Program Project
+                                        </p>
+                                        <p className="text-[13px] font-bold uppercase leading-4 text-[#172633] transition group-hover:text-[#557bd2]">
+                                            {programProject.name}
+                                        </p>
+                                    </div>
+                                </button>
+                            );
+                        }
                     )}
+                </div>
+            </div>
 
-                </section>
+            <div className="mt-6 flex items-center justify-center">
+                <div className="flex items-center gap-2.5 rounded-full bg-[#f7f9fb] px-5 py-2.5">
+                    <Eye size={18} className="text-[#557bd2]" />
+                    <span className="text-[14px] font-medium text-[#7b8794]">
+                        Click any program-project bar to open it
+                    </span>
+                </div>
+            </div>
+        </div>
+    )}
+</section>
                 {/* =================================================
             ROW 2 — ACTIVE PROJECTS
         ================================================= */}
