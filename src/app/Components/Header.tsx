@@ -712,7 +712,7 @@ export default function Header() {
                 </div>
               </div>
               <span className="text-[20px] font-medium tracking-[-0.6px] text-white">
-                ProjectSpace
+                ARGProjectSpace
               </span>
             </Link>
 
@@ -734,7 +734,7 @@ export default function Header() {
                     href={item.href}
                     className={`
                       relative flex h-full items-center
-                      text-[14px] font-medium
+                      text-[16px] font-medium
                       transition-colors
                       ${
                         active
