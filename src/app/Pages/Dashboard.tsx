@@ -342,16 +342,20 @@ export default function Dashboard() {
             setError("");
 
                         // Always read the freshest user from localStorage
-            let freshUser: any = null;
-            try {
-                const raw = localStorage.getItem("user");
-                freshUser = raw ? JSON.parse(raw) : null;
-            } catch {
-                freshUser = null;
-            }
-            const freshUserId = String(
+             const freshUserId = String(
                 freshUser?.id || freshUser?.user_id || ""
             );
+
+            const freshRole = String(
+                freshUser?.role || freshUser?.user_role || ""
+            )
+                .toLowerCase()
+                .trim()
+                .replace(/[_-]+/g, " ")
+                .replace(/\s+/g, " ");
+
+            const freshIsMember =
+                freshRole === "member" || freshRole === "user";
 
             const token =
                 typeof window !== "undefined"
@@ -588,7 +592,7 @@ export default function Dashboard() {
 
             /* ---------- MEMBER: program projects they belong to ---------- */
          
-if (isMember && freshUserId) {
+if (freshIsMember && freshUserId) {
     try {
         console.log("[Dashboard] Fetching member program projects...");
         const ppRes = await fetch(
