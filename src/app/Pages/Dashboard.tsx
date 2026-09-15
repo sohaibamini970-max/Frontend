@@ -299,7 +299,8 @@ export default function Dashboard() {
     const isManagement =
         isExecutiveManager ||
         isSystemAdministrator;
-
+    
+   const canViewTeamOverview = !isMember;
     /* =======================================================
        LOAD DASHBOARD
     ======================================================= */
@@ -1361,9 +1362,9 @@ export default function Dashboard() {
                 </section>
 
                 {/* =================================================
-            ROW 3 — TEAM OVERVIEW - ENLARGED FONTS
-        ================================================= */}
-
+                            ROW 3 — TEAM OVERVIEW - ENLARGED FONTS
+                    ================================================= */}
+              {canViewTeamOverview && (
                 <section className="mb-7 rounded-2xl border border-[#e1e6eb] bg-white shadow-[0_4px_20px_rgba(24,39,54,0.05)]">
 
                     <div className="flex items-center justify-between border-b border-[#edf0f3] px-5 py-6 sm:px-7">
@@ -1637,7 +1638,7 @@ export default function Dashboard() {
                     </div>
 
                 </section>
-
+              )}
                 {/* =================================================
             ROLE TASK SUMMARY
         ================================================= */}
