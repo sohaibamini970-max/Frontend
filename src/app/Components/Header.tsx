@@ -734,7 +734,7 @@ export default function Header() {
                     href={item.href}
                     className={`
                       relative flex h-full items-center
-                      text-[16px] font-medium
+                      text-[13px] font-medium
                       transition-colors
                       ${
                         active
