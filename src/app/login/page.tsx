@@ -418,6 +418,17 @@ export default function LoginPage() {
 
               </form>
 
+              {/* =================================================
+                  DEMO CREDENTIALS
+              ================================================= */}
+              <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-center">
+                <p className="text-[10px] font-medium text-blue-700">
+                  Demo credentials: <strong>admin@arg.com</strong> / <strong>11111111</strong>
+                </p>
+              </div>
+
+              
+
 
               {/* =================================================
                   SECURITY
